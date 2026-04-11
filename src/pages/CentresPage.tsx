@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Building2, Plus, MapPin, Users, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,21 +20,30 @@ const CentresPage = () => {
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [type, setType] = useState<"In-school" | "After-school">("In-school");
+  const [selectedFellowIds, setSelectedFellowIds] = useState<string[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const resetForm = () => { setName(""); setLocation(""); setType("In-school"); setEditItem(null); };
+  const resetForm = () => { setName(""); setLocation(""); setType("In-school"); setSelectedFellowIds([]); setEditItem(null); };
 
   const openEdit = (c: Centre) => {
-    setEditItem(c); setName(c.name); setLocation(c.location); setType(c.type); setOpen(true);
+    setEditItem(c); setName(c.name); setLocation(c.location); setType(c.type); setSelectedFellowIds(c.fellowIds); setOpen(true);
+  };
+
+  const toggleFellow = (fid: string) => {
+    setSelectedFellowIds(prev => prev.includes(fid) ? prev.filter(id => id !== fid) : [...prev, fid]);
   };
 
   const handleSubmit = () => {
     if (!name.trim() || !location.trim()) { toast.error("Please fill in all fields"); return; }
+    if (type === "In-school" && selectedFellowIds.length !== 2) {
+      toast.error("In-school centres must have exactly 2 fellows assigned");
+      return;
+    }
     if (editItem) {
-      setCentres(prev => prev.map(c => c.id === editItem.id ? { ...c, name: name.trim(), location: location.trim(), type } : c));
+      setCentres(prev => prev.map(c => c.id === editItem.id ? { ...c, name: name.trim(), location: location.trim(), type, fellowIds: selectedFellowIds } : c));
       toast.success("Centre updated successfully");
     } else {
-      setCentres(prev => [...prev, { id: `c${Date.now()}`, name: name.trim(), location: location.trim(), type, fellowIds: [], studentCount: 0 }]);
+      setCentres(prev => [...prev, { id: `c${Date.now()}`, name: name.trim(), location: location.trim(), type, fellowIds: selectedFellowIds, studentCount: 0 }]);
       toast.success("Centre added successfully");
     }
     resetForm(); setOpen(false);
@@ -79,6 +89,24 @@ const CentresPage = () => {
                     <SelectItem value="After-school">After-school</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Assign Fellows {type === "In-school" && <span className="text-xs text-muted-foreground">(exactly 2 required)</span>}</Label>
+                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {fellows.map(f => (
+                    <div key={f.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`fellow-${f.id}`}
+                        checked={selectedFellowIds.includes(f.id)}
+                        onCheckedChange={() => toggleFellow(f.id)}
+                      />
+                      <label htmlFor={`fellow-${f.id}`} className="text-sm cursor-pointer">{f.name}</label>
+                    </div>
+                  ))}
+                </div>
+                {type === "In-school" && selectedFellowIds.length !== 2 && (
+                  <p className="text-xs text-destructive">Please select exactly 2 fellows ({selectedFellowIds.length} selected)</p>
+                )}
               </div>
             </div>
             <DialogFooter>
