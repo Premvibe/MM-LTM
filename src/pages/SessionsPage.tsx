@@ -7,36 +7,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, CalendarDays, Clock, Users } from "lucide-react";
+import { Plus, CalendarDays, Clock, Users, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+type Session = { id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number };
+
 const SessionsPage = () => {
-  const [sessionsList, setSessionsList] = useState(initialSessions);
+  const [sessionsList, setSessionsList] = useState<Session[]>(initialSessions);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Session | null>(null);
   const [topic, setTopic] = useState("");
   const [centreId, setCentreId] = useState("");
   const [fellowId, setFellowId] = useState("");
   const [duration, setDuration] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const handleAdd = () => {
-    if (!topic.trim() || !centreId || !fellowId || !duration) {
-      toast.error("Please fill in all fields");
-      return;
+  const resetForm = () => { setTopic(""); setCentreId(""); setFellowId(""); setDuration(""); setDate(new Date().toISOString().split("T")[0]); setEditItem(null); };
+
+  const openEdit = (s: Session) => {
+    setEditItem(s); setTopic(s.topic); setCentreId(s.centreId); setFellowId(s.fellowId); setDuration(String(s.duration)); setDate(s.date); setOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (!topic.trim() || !centreId || !fellowId || !duration) { toast.error("Please fill in all fields"); return; }
+    if (editItem) {
+      setSessionsList(prev => prev.map(s => s.id === editItem.id ? { ...s, date, centreId, fellowId, topic: topic.trim(), duration: parseInt(duration) } : s));
+      toast.success("Session updated successfully");
+    } else {
+      setSessionsList(prev => [...prev, { id: `ss${Date.now()}`, date, centreId, fellowId, topic: topic.trim(), duration: parseInt(duration), activities: [], studentsPresent: 0 }]);
+      toast.success("Session logged successfully");
     }
-    setSessionsList(prev => [...prev, {
-      id: `ss${Date.now()}`,
-      date,
-      centreId,
-      fellowId,
-      topic: topic.trim(),
-      duration: parseInt(duration),
-      activities: [],
-      studentsPresent: 0,
-    }]);
-    setTopic(""); setCentreId(""); setFellowId(""); setDuration("");
-    setOpen(false);
-    toast.success("Session logged successfully");
+    resetForm(); setOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    setSessionsList(prev => prev.filter(s => s.id !== deleteId));
+    setDeleteId(null);
+    toast.success("Session deleted");
   };
 
   return (
@@ -46,13 +55,13 @@ const SessionsPage = () => {
           <h1 className="page-title">Sessions</h1>
           <p className="page-description">Track and manage session logs</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Log Session</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Log New Session</DialogTitle>
+              <DialogTitle>{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-2">
@@ -67,18 +76,14 @@ const SessionsPage = () => {
                 <Label>Centre</Label>
                 <Select value={centreId} onValueChange={setCentreId}>
                   <SelectTrigger><SelectValue placeholder="Select centre" /></SelectTrigger>
-                  <SelectContent>
-                    {centres.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{centres.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Fellow</Label>
                 <Select value={fellowId} onValueChange={setFellowId}>
                   <SelectTrigger><SelectValue placeholder="Select fellow" /></SelectTrigger>
-                  <SelectContent>
-                    {fellows.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{fellows.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -88,11 +93,23 @@ const SessionsPage = () => {
             </div>
             <DialogFooter>
               <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-              <Button onClick={handleAdd}>Log Session</Button>
+              <Button onClick={handleSubmit}>{editItem ? "Save Changes" : "Log Session"}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete Session?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-3">
         {sessionsList.map(s => (
           <Card key={s.id} className="animate-fade-in hover:shadow-md transition-shadow">
@@ -106,9 +123,11 @@ const SessionsPage = () => {
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" />{s.studentsPresent} present</span>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2">
                   <Badge variant="secondary">{centres.find(c => c.id === s.centreId)?.name.split(" - ")[1]}</Badge>
                   <Badge variant="outline">{fellows.find(f => f.id === s.fellowId)?.name}</Badge>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
               {s.activities.length > 0 && (

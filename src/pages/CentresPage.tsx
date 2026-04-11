@@ -7,35 +7,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Building2, Plus, MapPin, Users } from "lucide-react";
+import { Building2, Plus, MapPin, Users, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+type Centre = { id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+
 const CentresPage = () => {
-  const [centres, setCentres] = useState(initialCentres);
+  const [centres, setCentres] = useState<Centre[]>(initialCentres);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Centre | null>(null);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [type, setType] = useState<"In-school" | "After-school">("In-school");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const handleAdd = () => {
-    if (!name.trim() || !location.trim()) {
-      toast.error("Please fill in all fields");
-      return;
+  const resetForm = () => { setName(""); setLocation(""); setType("In-school"); setEditItem(null); };
+
+  const openEdit = (c: Centre) => {
+    setEditItem(c); setName(c.name); setLocation(c.location); setType(c.type); setOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim() || !location.trim()) { toast.error("Please fill in all fields"); return; }
+    if (editItem) {
+      setCentres(prev => prev.map(c => c.id === editItem.id ? { ...c, name: name.trim(), location: location.trim(), type } : c));
+      toast.success("Centre updated successfully");
+    } else {
+      setCentres(prev => [...prev, { id: `c${Date.now()}`, name: name.trim(), location: location.trim(), type, fellowIds: [], studentCount: 0 }]);
+      toast.success("Centre added successfully");
     }
-    const newCentre = {
-      id: `c${Date.now()}`,
-      name: name.trim(),
-      location: location.trim(),
-      type,
-      fellowIds: [] as string[],
-      studentCount: 0,
-    };
-    setCentres(prev => [...prev, newCentre]);
-    setName("");
-    setLocation("");
-    setType("In-school");
-    setOpen(false);
-    toast.success("Centre added successfully");
+    resetForm(); setOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    setCentres(prev => prev.filter(c => c.id !== deleteId));
+    setDeleteId(null);
+    toast.success("Centre deleted");
   };
 
   return (
@@ -45,13 +53,13 @@ const CentresPage = () => {
           <h1 className="page-title">Centres</h1>
           <p className="page-description">Manage learning centres across the program</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Add Centre</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Centre</DialogTitle>
+              <DialogTitle>{editItem ? "Edit Centre" : "Add New Centre"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-2">
@@ -74,14 +82,24 @@ const CentresPage = () => {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button onClick={handleAdd}>Add Centre</Button>
+              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+              <Button onClick={handleSubmit}>{editItem ? "Save Changes" : "Add Centre"}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete Centre?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {centres.map(c => (
           <Card key={c.id} className="animate-fade-in hover:shadow-md transition-shadow">
@@ -98,8 +116,12 @@ const CentresPage = () => {
                     </div>
                   </div>
                 </div>
-                <Badge variant={c.type === "In-school" ? "default" : "secondary"}>{c.type}</Badge>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
               </div>
+              <Badge variant={c.type === "In-school" ? "default" : "secondary"} className="w-fit mt-1">{c.type}</Badge>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="flex items-center justify-between text-sm">
