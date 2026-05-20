@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import api from "@/lib/api";
 
-export type UserRole = "admin" | "fellow" | "mne_officer";
+export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager";
 
 interface User {
   id: string;
@@ -12,33 +13,34 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (data: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Demo users for testing
-const DEMO_USERS: Record<string, User & { password: string }> = {
-  "admin@manzil.org": { id: "1", name: "Rahul Sharma", email: "admin@manzil.org", role: "admin", password: "admin123" },
-  "fellow@manzil.org": { id: "2", name: "Priya Gupta", email: "fellow@manzil.org", role: "fellow", password: "fellow123" },
-  "mne@manzil.org": { id: "3", name: "Arjun Patel", email: "mne@manzil.org", role: "mne_officer", password: "mne123" },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("manzil_user");
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem("manzil_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const login = useCallback(async (email: string, password: string) => {
-    const demoUser = DEMO_USERS[email];
-    if (!demoUser || demoUser.password !== password) {
-      throw new Error("Invalid email or password");
+    try {
+      const response = await api.post("/auth/login", { email, password });
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem("manzil_user", JSON.stringify(userData));
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "Invalid email or password");
     }
-    const { password: _, ...userData } = demoUser;
-    setUser(userData);
-    localStorage.setItem("manzil_user", JSON.stringify(userData));
   }, []);
 
   const logout = useCallback(() => {
@@ -46,8 +48,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("manzil_user");
   }, []);
 
+  const updateProfile = useCallback((data: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...data };
+      localStorage.setItem("manzil_user", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const isAdmin = user ? ["admin", "program_director", "program_lead", "program_manager"].includes(user.role) : false;
+  const isSuperAdmin = user ? ["admin", "program_director", "program_lead"].includes(user.role) : false;
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isAdmin, isSuperAdmin, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

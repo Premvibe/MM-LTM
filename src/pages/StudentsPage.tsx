@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { students as initialStudents, centres } from "@/data/mockData";
+import React, { useState, useEffect } from "react";
+import api from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,149 +7,517 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck } from "lucide-react";
+import { useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-type Student = { id: string; name: string; age: number; gender: "Male" | "Female"; centreId: string; attendancePercent: number; lastAssessmentScore: number };
+import { useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+
+type Student = { 
+  _id: string; 
+  id: string; 
+  name: string; 
+  age: number; 
+  gender: "Male" | "Female"; 
+  centreId: string; 
+  phone?: string;
+  schoolName?: string;
+  fathersName?: string;
+  fathersContact?: string;
+  mothersName?: string;
+  mothersContact?: string;
+  address?: string;
+  grade?: string;
+  section?: string;
+  attendancePercent: number; 
+  lastAssessmentScore: number 
+};
+type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+type Fellow = { _id: string; id: string; name: string; email: string };
 
 const StudentsPage = () => {
-  const [studentsList, setStudentsList] = useState<Student[]>(initialStudents);
+  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [studentsList, setStudentsList] = useState<Student[]>([]);
+  const [centresList, setCentresList] = useState<Centre[]>([]);
+  const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
+  const selectedCentreId = searchParams.get("centre");
+  const setSelectedCentreId = (id: string | null) => {
+    if (id) setSearchParams({ centre: id });
+    else setSearchParams({});
+  };
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Student | null>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<"Male" | "Female">("Male");
   const [centreId, setCentreId] = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [schoolName, setSchoolName] = useState("");
+  const [fathersName, setFathersName] = useState("");
+  const [fathersContact, setFathersContact] = useState("");
+  const [mothersName, setMothersName] = useState("");
+  const [mothersContact, setMothersContact] = useState("");
+  const [address, setAddress] = useState("");
+  const [grade, setGrade] = useState("");
+  const [section, setSection] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterGender, setFilterGender] = useState("all");
+  const [centreSearchQuery, setCentreSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterFellow, setFilterFellow] = useState("all");
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const resetForm = () => { setName(""); setAge(""); setGender("Male"); setCentreId(""); setEditItem(null); };
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const params = user?.role === 'fellow' 
+        ? `?role=fellow&email=${user.email}` 
+        : user?.role === 'program_manager' 
+          ? `?role=program_manager&email=${user.email}` 
+          : '';
+      const [studentsRes, centresRes, fellowsRes] = await Promise.all([
+        api.get(`/students${params}`),
+        api.get(`/centres${params}`),
+        api.get(`/fellows${params}`)
+      ]);
+      setStudentsList(studentsRes.data);
+      setCentresList(centresRes.data);
+      setFellowsList(fellowsRes.data);
+    } catch (error) {
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => { 
+    setName(""); setAge(""); setGender("Male"); setCentreId(""); 
+    setPhone(""); setSchoolName(""); setFathersName(""); setFathersContact("");
+    setMothersName(""); setMothersContact(""); setAddress("");
+    setGrade(""); setSection("");
+    setEditItem(null); 
+  };
 
   const openEdit = (s: Student) => {
-    setEditItem(s); setName(s.name); setAge(String(s.age)); setGender(s.gender); setCentreId(s.centreId); setOpen(true);
+    setEditItem(s); 
+    setName(s.name); 
+    setAge(String(s.age)); 
+    setGender(s.gender); 
+    setCentreId(s.centreId); 
+    setPhone(s.phone || "");
+    setSchoolName(s.schoolName || "");
+    setFathersName(s.fathersName || "");
+    setFathersContact(s.fathersContact || "");
+    setMothersName(s.mothersName || "");
+    setMothersContact(s.mothersContact || "");
+    setAddress(s.address || "");
+    setGrade(s.grade || "");
+    setSection(s.section || "");
+    setOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim() || !age || !centreId) { toast.error("Please fill in all fields"); return; }
-    if (editItem) {
-      setStudentsList(prev => prev.map(s => s.id === editItem.id ? { ...s, name: name.trim(), age: parseInt(age), gender, centreId } : s));
-      toast.success("Student updated successfully");
-    } else {
-      setStudentsList(prev => [...prev, { id: `s${Date.now()}`, name: name.trim(), age: parseInt(age), gender, centreId, attendancePercent: 0, lastAssessmentScore: 0 }]);
-      toast.success("Student added successfully");
+    
+    const studentData = { 
+      name: name.trim(), 
+      age: parseInt(age), 
+      gender, 
+      centreId,
+      phone: phone.trim(),
+      schoolName: schoolName.trim(),
+      fathersName: fathersName.trim(),
+      fathersContact: fathersContact.trim(),
+      mothersName: mothersName.trim(),
+      mothersContact: mothersContact.trim(),
+      address: address.trim(),
+      grade: selectedCentre?.type === "In-school" ? grade.trim() : undefined,
+      section: selectedCentre?.type === "In-school" ? section.trim() : undefined
+    };
+
+    try {
+      if (editItem) {
+        await api.put(`/students/${editItem._id}`, studentData);
+        toast.success("Student updated successfully");
+      } else {
+        await api.post("/students", { ...studentData, attendancePercent: 0, lastAssessmentScore: 0 });
+        toast.success("Student added successfully");
+      }
+      fetchData();
+      resetForm(); 
+      setOpen(false);
+    } catch (error) {
+      toast.error("Failed to save student");
     }
-    resetForm(); setOpen(false);
   };
 
-  const handleDelete = () => {
-    if (!deleteId) return;
-    setStudentsList(prev => prev.filter(s => s.id !== deleteId));
-    setDeleteId(null);
-    toast.success("Student deleted");
+  const handleBulkSubmit = async () => {
+    if (!bulkText.trim()) { toast.error("Please enter student data"); return; }
+    
+    setIsSubmitting(true);
+    try {
+      const lines = bulkText.split('\n').filter(l => l.trim());
+      const students = lines.map(line => {
+        // Handle both comma and tab/space separation
+        const parts = line.includes(',') ? line.split(',') : line.split(/\t+/);
+        const name = parts[0]?.trim();
+        const age = parseInt(parts[1]?.trim()) || 12;
+        const genderPart = parts[2]?.trim()?.toLowerCase();
+        
+        // Try to parse grade/section from the 3rd part if it looks like "6thA"
+        let studentGrade = "";
+        let studentSection = "";
+        
+        if (selectedCentre?.type === "In-school" && parts[2]) {
+          const rawClass = parts[2].trim();
+          // Regex to split "6thA" into "6th" and "A"
+          const match = rawClass.match(/^(\d+(?:st|nd|rd|th)?)\s*([A-Z])$/i);
+          if (match) {
+            studentGrade = match[1];
+            studentSection = match[2];
+          } else {
+            studentGrade = rawClass;
+          }
+        }
+
+        return {
+          name,
+          age,
+          gender: (genderPart === 'female' ? 'Female' : 'Male'),
+          centreId: selectedCentreId,
+          grade: studentGrade,
+          section: studentSection,
+          attendancePercent: 0,
+          lastAssessmentScore: 0
+        };
+      }).filter(s => s.name);
+
+      if (students.length === 0) { toast.error("No valid student data found"); return; }
+      
+      await api.post("/students/bulk", { students });
+      toast.success(`Successfully added ${students.length} students`);
+      fetchData();
+      setIsBulkOpen(false);
+      setBulkText("");
+    } catch (error) {
+      toast.error("Failed to add students in bulk");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  return (
-    <div>
-      <div className="page-header flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Students</h1>
-          <p className="page-description">Track enrolled students and their progress</p>
+  const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
+  const centreStudents = useMemo(() => selectedCentreId ? studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === selectedCentreId) : [], [studentsList, selectedCentreId]);
+
+  // Centre list view
+  if (!selectedCentreId) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl md:text-4xl font-[1000] tracking-tighter text-foreground">Students</h1>
+          <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">Learner Database & Performance Analytics</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Student</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editItem ? "Edit Student" : "Add New Student"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input placeholder="e.g. Ravi Kumar" value={name} onChange={e => setName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Age</Label>
-                <Input type="number" placeholder="e.g. 12" min={5} max={25} value={age} onChange={e => setAge(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <Select value={gender} onValueChange={(v: "Male" | "Female") => setGender(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Centre</Label>
-                <Select value={centreId} onValueChange={setCentreId}>
-                  <SelectTrigger><SelectValue placeholder="Select centre" /></SelectTrigger>
-                  <SelectContent>
-                    {centres.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+
+        <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
+            <Input 
+              placeholder="Search centres or locations..." 
+              className="pl-10 h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs" 
+              value={centreSearchQuery} 
+              onChange={(e) => setCentreSearchQuery(e.target.value)} 
+            />
+          </div>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-xl">
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="In-school">In-school</SelectItem>
+                  <SelectItem value="After-school">After-school</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-              <Button onClick={handleSubmit}>{editItem ? "Save Changes" : "Add Student"}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {centresList
+            .filter(c => {
+              const assignedFellows = c.fellowIds.map(fid => fellowsList.find(f => (f._id === fid || f.id === fid))?.name || "").join(" ").toLowerCase();
+              const matchesSearch = c.name.toLowerCase().includes(centreSearchQuery.toLowerCase()) || 
+                                   c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
+                                   assignedFellows.includes(centreSearchQuery.toLowerCase());
+              const matchesType = filterType === "all" || c.type === filterType;
+              const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
+              return matchesSearch && matchesType && matchesFellow;
+            })
+            .map(centre => {
+              const count = studentsList.filter(s => (s.centreId === (centre._id || centre.id) || (s.centreId as any)?._id === (centre._id || centre.id))).length;
+              return (
+                <Card 
+                  key={centre._id || centre.id} 
+                  className="glass-card-premium border-none hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden"
+                  onClick={() => setSelectedCentreId(centre._id || centre.id)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:rotate-6 transition-transform">
+                          <Users className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black tracking-tight">{centre.name}</h3>
+                          <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                            <MapPin className="h-3 w-3" />{centre.location}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest h-fit border-none">{centre.type}</Badge>
+                    </div>
+                    <div className="flex items-end justify-between border-t border-primary/5 pt-4">
+                      <div>
+                        <div className="text-2xl font-[1000] tracking-tighter text-primary">{count}</div>
+                        <div className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Enrolled Students</div>
+                      </div>
+                      <div className="flex -space-x-2">
+                        {centre.fellowIds.slice(0, 3).map(fid => {
+                          const fellow = fellowsList.find(f => (f._id === fid || f.id === fid));
+                          return fellow ? (
+                            <div key={fid} className="h-6 w-6 rounded-full bg-white border-2 border-primary/10 flex items-center justify-center overflow-hidden" title={fellow.name}>
+                              <span className="text-[8px] font-black">{fellow.name.charAt(0)}</span>
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+        </div>
+      </div>
+    );
+  }
+
+  // Student detail view for selected centre
+  return (
+    <div className="space-y-8 animate-fade-in pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="flex items-center gap-6">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setSelectedCentreId(null)} 
+            className="h-10 w-10 md:h-12 md:w-12 rounded-2xl border-primary/10 bg-white/50 backdrop-blur-md hover:bg-primary hover:text-white transition-all shadow-sm"
+          >
+            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+              <h1 className="text-xl md:text-4xl font-[1000] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
+              <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest h-fit border-none">{selectedCentre?.type}</Badge>
+            </div>
+            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">{centreStudents.length} Active Students Enrolled</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setCentreId(selectedCentreId!)} className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                <Plus className="h-4 w-4 mr-2" /> New Enrollment
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
+              <div className="bg-primary p-10 text-white relative overflow-hidden">
+                <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
+                <div className="relative z-10">
+                  <DialogTitle className="text-3xl font-black tracking-tighter">{editItem ? "Update Student" : "New Enrollment"}</DialogTitle>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Registration Module v2.0</p>
+                </div>
+              </div>
+              <div className="p-10 space-y-6 max-h-[60vh] overflow-y-auto">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Student Full Name</Label>
+                  <Input placeholder="Enter student's legal name" value={name} onChange={e => setName(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Age</Label>
+                    <Input type="number" value={age} onChange={e => setAge(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Gender</Label>
+                    <Select value={gender} onValueChange={(v: "Male" | "Female") => setGender(v)}>
+                      <SelectTrigger className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all"><SelectValue /></SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl">
+                        <SelectItem value="Male" className="rounded-xl">Male</SelectItem>
+                        <SelectItem value="Female" className="rounded-xl">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t pt-4 border-dashed">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Phone Number</Label>
+                    <Input placeholder="e.g. 9876543210" value={phone} onChange={e => setPhone(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">School Name</Label>
+                    <Input placeholder="e.g. Govt. School" value={schoolName} onChange={e => setSchoolName(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                  </div>
+                </div>
+
+                {selectedCentre?.type === "In-school" && (
+                  <div className="grid grid-cols-2 gap-4 border-t pt-4 border-dashed">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Class (Grade)</Label>
+                      <Input placeholder="e.g. 6th" value={grade} onChange={e => setGrade(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Section</Label>
+                      <Input placeholder="e.g. A" value={section} onChange={e => setSection(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
+                <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
+                <Button onClick={handleSubmit} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+                  {editItem ? "Save Changes" : "Confirm Enrollment"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5">
+                <ClipboardCheck className="h-4 w-4 mr-2" /> Bulk Log
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
+              <div className="bg-primary p-10 text-white relative overflow-hidden">
+                <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
+                <div className="relative z-10">
+                  <DialogTitle className="text-3xl font-black tracking-tighter">Bulk Enrollment</DialogTitle>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Rapid Data Processing</p>
+                </div>
+              </div>
+              <div className="p-10 space-y-6">
+                <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-3">Format Guide</p>
+                  <p className="text-xs font-bold text-muted-foreground leading-relaxed">Paste lines formatted as: <span className="text-foreground">Name, Age, Gender</span></p>
+                  <div className="mt-4 p-3 bg-white/60 rounded-xl text-[10px] font-bold text-primary italic border border-primary/5">
+                    Example: Ravi Kumar, 12, Male
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Data Stream</Label>
+                  <textarea 
+                    className="w-full h-48 rounded-3xl border-none bg-muted/40 p-6 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/30"
+                    placeholder="Anjali Sharma, 13, Female..."
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
+                <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
+                <Button onClick={handleBulkSubmit} disabled={isSubmitting} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+                  {isSubmitting ? "Processing..." : "Process Batch"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Delete Student?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
+          <Input 
+            placeholder="Find student by name..." 
+            className="pl-10 h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={filterGender} onValueChange={setFilterGender}>
+            <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Gender" /></SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              <SelectItem value="all">All Genders</SelectItem>
+              <SelectItem value="Male">Male</SelectItem>
+              <SelectItem value="Female">Female</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Centre</TableHead>
-              <TableHead>Attendance</TableHead>
-              <TableHead>Learning Score</TableHead>
-              <TableHead className="w-20">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {studentsList.map(s => (
-              <TableRow key={s.id} className="animate-fade-in">
-                <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell>{s.age}</TableCell>
-                <TableCell><Badge variant="secondary">{s.gender}</Badge></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{centres.find(c => c.id === s.centreId)?.name.split(" - ")[1] || ""}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 min-w-[120px]">
-                    <Progress value={s.attendancePercent} className="h-2 flex-1" />
-                    <span className="text-xs font-medium w-8">{s.attendancePercent}%</span>
+      <div className="space-y-4">
+        {centreStudents
+          .filter(s => {
+            const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesGender = filterGender === "all" || s.gender === filterGender;
+            return matchesSearch && matchesGender;
+          })
+          .map(s => (
+            <Card key={s._id} className="glass-card-premium border-none hover:shadow-2xl transition-all group overflow-hidden">
+              <CardContent className="p-0 flex flex-col sm:flex-row items-stretch">
+                <div className="p-8 flex-1 flex items-center gap-8">
+                <div className="h-12 w-12 md:h-16 md:w-16 rounded-[1.5rem] bg-primary/10 flex items-center justify-center text-primary font-black text-xl md:text-2xl group-hover:rotate-6 transition-transform shrink-0">
+                    {s.name.charAt(0)}
                   </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={s.lastAssessmentScore >= 4 ? "default" : "secondary"}>{s.lastAssessmentScore}/5</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <div className="space-y-1">
+                    <h3 className="text-base md:text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.name}</h3>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">{s.gender}</Badge>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.age} Years Old</span>
+                      {selectedCentre?.type === "In-school" && (
+                        <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-full">{s.grade}-{s.section}</span>
+                      )}
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </div>
+
+                <div className="px-4 md:px-8 py-4 flex items-center justify-center border-t md:border-t-0 md:border-x border-primary/5 min-w-0 md:min-w-[200px] bg-white/20">
+                  <div className="w-full space-y-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      <span>Attendance</span>
+                      <span className="text-primary">{s.attendancePercent}%</span>
+                    </div>
+                    <Progress value={s.attendancePercent} className="h-2 rounded-full" />
+                  </div>
+                </div>
+
+                <div className="p-4 md:p-8 bg-muted/30 sm:w-64 flex flex-col justify-center gap-3">
+                  <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/10 hover:bg-primary hover:text-white transition-all" onClick={() => openEdit(s)}>
+                    <Pencil className="h-4 w-4 mr-2" /> Edit Profile
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        {centreStudents.length === 0 && (
+          <div className="text-center py-20 bg-muted/10 rounded-[3rem] border-2 border-dashed">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto opacity-20" />
+            <p className="text-sm font-black text-muted-foreground mt-4 uppercase tracking-widest">No Learners Found</p>
+          </div>
+        )}
       </div>
     </div>
   );

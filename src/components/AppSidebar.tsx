@@ -1,6 +1,7 @@
+import React from "react";
 import {
   LayoutDashboard, Building2, Users, GraduationCap, CalendarDays,
-  ClipboardCheck, Award, ShieldCheck, MapPin, BarChart3, Bell, LogOut, Music
+  ClipboardCheck, Award, ShieldCheck, Bus, BarChart3, Bell, LogOut, Music, MessageSquarePlus
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -27,9 +28,11 @@ const navItems: NavItem[] = [
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck, roles: ["admin", "fellow"] },
   { title: "Assessments", url: "/assessments", icon: Award, roles: ["admin", "fellow", "mne_officer"] },
   { title: "Quality", url: "/quality", icon: ShieldCheck, roles: ["admin", "mne_officer"] },
-  { title: "Field Visits", url: "/field-visits", icon: MapPin, roles: ["admin", "mne_officer"] },
+  { title: "Bus Visits", url: "/field-visits", icon: Bus, roles: ["admin", "fellow", "mne_officer"] },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "mne_officer"] },
   { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin", "fellow", "mne_officer"] },
+  { title: "Feedback", url: "/feedback", icon: MessageSquarePlus, roles: ["admin", "fellow"] },
+  { title: "Managers", url: "/admins", icon: ShieldCheck, roles: ["admin", "program_director", "program_lead"] },
 ];
 
 export function AppSidebar() {
@@ -38,37 +41,48 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const filteredItems = navItems.filter(item => user && item.roles.includes(user.role));
+  const filteredItems = navItems.filter(item => {
+    if (!user) return false;
+    if (item.roles.includes(user.role)) return true;
+    if (item.roles.includes("admin") && ["program_director", "program_lead", "program_manager"].includes(user.role)) {
+      return true;
+    }
+    return false;
+  });
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+    <Sidebar collapsible="icon" className="glass-sidebar shadow-2xl transition-all duration-500">
+      <SidebarHeader className="p-6 border-b border-sidebar-border/50">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Music className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-primary to-primary/70 shadow-xl shadow-primary/30 transition-all duration-500 hover:scale-110 hover:rotate-3">
+            <Music className="h-6 w-6 text-primary-foreground stroke-[2.5]" />
           </div>
           {!collapsed && (
             <div className="animate-slide-in">
-              <p className="text-sm font-bold text-sidebar-foreground leading-tight">Manzil Mystics</p>
-              <p className="text-xs text-sidebar-foreground/70">LTM Program</p>
+              <p className="text-lg font-[900] text-sidebar-foreground leading-none tracking-tighter">Manzil Mystics</p>
+              <p className="text-[10px] uppercase font-black text-accent tracking-[0.2em] mt-1.5">LTM Program</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
-            {!collapsed && "Navigation"}
+          <SidebarGroupLabel className="px-3 mb-2 text-sidebar-foreground/30 text-[10px] font-bold uppercase tracking-[0.2em]">
+            {!collapsed && "Management"}
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location.pathname === item.url} 
+                    className={`px-3 py-6 rounded-xl transition-all duration-300 group ${location.pathname === item.url ? 'sidebar-item-active' : 'hover:bg-primary/5 hover:translate-x-1'}`}
+                  >
+                    <NavLink to={item.url} end activeClassName="text-primary">
+                      <item.icon className={`h-5 w-5 transition-all duration-300 ${location.pathname === item.url ? 'scale-110 text-primary' : 'group-hover:scale-110 group-hover:text-primary'}`} />
+                      {!collapsed && <span className={`font-bold text-sm ${location.pathname === item.url ? 'text-primary' : 'text-sidebar-foreground'}`}>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -77,6 +91,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
 
       <SidebarFooter className="p-3">
         {!collapsed && user && (

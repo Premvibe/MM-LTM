@@ -1,54 +1,88 @@
-import { useState } from "react";
-import { fellows as initialFellows, centres } from "@/data/mockData";
+import React, { useState, useEffect } from "react";
+import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 
-type Fellow = { id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
 const FellowsPage = () => {
-  const [fellowsList, setFellowsList] = useState<Fellow[]>(initialFellows);
+  const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
+  const [centresList, setCentresList] = useState<Centre[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Fellow | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [batch, setBatch] = useState("4.0");
+  const [password, setPassword] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterBatch, setFilterBatch] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
 
-  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setEditItem(null); };
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [fellowsRes, centresRes] = await Promise.all([
+        api.get("/fellows"),
+        api.get("/centres")
+      ]);
+      setFellowsList(fellowsRes.data.sort((a: Fellow, b: Fellow) => a.name.localeCompare(b.name)));
+      setCentresList(centresRes.data);
+    } catch (error) {
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setPassword(""); setEditItem(null); };
 
   const openEdit = (f: Fellow) => {
-    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setOpen(true);
+    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setPassword(""); setOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim() || !email.trim()) { toast.error("Please fill in name and email"); return; }
-    if (editItem) {
-      setFellowsList(prev => prev.map(f => f.id === editItem.id ? { ...f, name: name.trim(), email: email.trim(), phone: phone.trim() } : f));
-      toast.success("Fellow updated successfully");
-    } else {
-      setFellowsList(prev => [...prev, { id: `f${Date.now()}`, name: name.trim(), email: email.trim(), phone: phone.trim(), centreIds: [], sessionsCompleted: 0, attendanceRate: 0 }]);
-      toast.success("Fellow added successfully");
+    if (!editItem && !password.trim()) { toast.error("Password is required for new fellows"); return; }
+    
+    const fellowData: any = { name: name.trim(), email: email.trim(), phone: phone.trim(), batch };
+    if (password.trim()) {
+      fellowData.password = password.trim();
     }
-    resetForm(); setOpen(false);
-  };
 
-  const handleDelete = () => {
-    if (!deleteId) return;
-    setFellowsList(prev => prev.filter(f => f.id !== deleteId));
-    setDeleteId(null);
-    toast.success("Fellow deleted");
+    try {
+      if (editItem) {
+        await api.put(`/fellows/${editItem._id}`, fellowData);
+        toast.success("Fellow updated successfully");
+      } else {
+        await api.post("/fellows", { ...fellowData, centreIds: [], sessionsCompleted: 0, attendanceRate: 100 });
+        toast.success("Fellow added successfully");
+      }
+      fetchData();
+      resetForm(); 
+      setOpen(false);
+    } catch (error) {
+      toast.error("Failed to save fellow");
+    }
   };
 
   return (
     <div>
-      <div className="page-header flex items-center justify-between">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="page-title">Fellows</h1>
           <p className="page-description">Manage program fellows and track performance</p>
@@ -74,6 +108,14 @@ const FellowsPage = () => {
                 <Label htmlFor="fellow-phone">Phone</Label>
                 <Input id="fellow-phone" placeholder="e.g. +91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="fellow-batch">Batch Version</Label>
+                <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fellow-password">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
+                <Input id="fellow-password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+              </div>
             </div>
             <DialogFooter>
               <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
@@ -83,20 +125,55 @@ const FellowsPage = () => {
         </Dialog>
       </div>
 
-      <Dialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Delete Fellow?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search fellows by name or email..." 
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[150px]">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={filterBatch} onValueChange={setFilterBatch}>
+            <SelectTrigger><SelectValue placeholder="Batch" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              {Array.from(new Set(fellowsList.map(f => f.batch).filter(Boolean))).sort().map(b => (
+                <SelectItem key={b} value={b!}>Batch {b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[150px]">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="In-school">In-school</SelectItem>
+              <SelectItem value="After-school">After-school</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {fellowsList.map(f => (
-          <Card key={f.id} className="animate-fade-in hover:shadow-md transition-shadow">
+        {fellowsList
+          .filter(f => {
+            const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                f.email.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesBatch = filterBatch === "all" || f.batch === filterBatch;
+            
+            const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
+            const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
+            
+            return matchesSearch && matchesBatch && matchesType;
+          })
+          .map(f => (
+          <Card key={f._id} className="animate-fade-in hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -104,22 +181,23 @@ const FellowsPage = () => {
                     <span className="text-sm font-semibold text-primary-foreground">{f.name.charAt(0)}</span>
                   </div>
                   <div>
-                    <CardTitle className="text-sm font-semibold">{f.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-sm font-semibold">{f.name}</CardTitle>
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0">Batch {f.batch || "N/A"}</Badge>
+                    </div>
                     <p className="text-xs text-muted-foreground">{f.email}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(f)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(f.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-1">
-                {f.centreIds.map(cid => {
-                  const centre = centres.find(c => c.id === cid);
-                  return centre ? <Badge key={cid} variant="secondary" className="text-xs">{centre.name.split(" - ")[1] || centre.name}</Badge> : null;
-                })}
+                {centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id)).map(centre => (
+                  <Badge key={centre._id} variant="secondary" className="text-xs">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
+                ))}
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
