@@ -19,6 +19,24 @@ export class ErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Keep console signal for debugging.
     console.error("UI crashed:", error, info);
+
+    // Check if it is a chunk loading/dynamic import error
+    const isChunkError =
+      error.message?.includes("Failed to fetch dynamically imported module") ||
+      error.message?.includes("chunk") ||
+      error.name === "ChunkLoadError";
+
+    if (isChunkError) {
+      try {
+        const hasReloaded = sessionStorage.getItem("chunk-load-error-reload");
+        if (!hasReloaded) {
+          sessionStorage.setItem("chunk-load-error-reload", "true");
+          window.location.reload();
+        }
+      } catch (e) {
+        window.location.reload();
+      }
+    }
   }
 
   render() {
