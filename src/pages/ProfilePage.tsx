@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 
 const ProfilePage = () => {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, isAdmin } = useAuth();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
@@ -100,12 +100,12 @@ const ProfilePage = () => {
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Full Name</Label>
                 <div className="relative group">
-                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${role === "admin" ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
+                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${isAdmin ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
                   <Input 
                     value={name} 
                     onChange={(e) => setName(e.target.value)}
-                    readOnly={role !== "admin"}
-                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${role !== "admin" ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
+                    readOnly={!isAdmin}
+                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${!isAdmin ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
                   />
                 </div>
               </div>
@@ -113,12 +113,12 @@ const ProfilePage = () => {
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Email Address</Label>
                 <div className="relative group">
-                  <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${role === "admin" ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
+                  <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${isAdmin ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
                   <Input 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)}
-                    readOnly={role !== "admin"} 
-                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${role !== "admin" ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
+                    readOnly={!isAdmin} 
+                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${!isAdmin ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
                   />
                 </div>
               </div>
@@ -126,17 +126,17 @@ const ProfilePage = () => {
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Phone Number</Label>
                 <div className="relative group">
-                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${role === "admin" ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
+                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${isAdmin ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
                   <Input 
                     value={phone} 
                     onChange={(e) => setPhone(e.target.value)}
-                    readOnly={role !== "admin"}
-                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${role !== "admin" ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
+                    readOnly={!isAdmin}
+                    className={`pl-12 h-12 md:h-14 bg-gray-50/50 border-gray-100 rounded-2xl text-sm md:text-base font-semibold ${!isAdmin ? "opacity-60 cursor-not-allowed" : "focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"}`}
                   />
                 </div>
               </div>
 
-              {role !== "admin" && (
+              {!isAdmin && (
                 <div className="pt-2 pb-4">
                   <Button onClick={handleRequestUpdate} disabled={isSaving} variant="outline" className="w-full h-12 rounded-xl text-primary font-bold border-primary/20 hover:bg-primary/5">
                     Request Admin to Update Profile Details
