@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Mail, Shield, Camera, Save, LogOut } from "lucide-react";
+import { User, Mail, Shield, Camera, Save, LogOut, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ const ProfilePage = () => {
         id: user?.id,
         name,
         email,
+        phone,
         ...(password ? { password, oldPassword } : {})
       });
       updateProfile(res.data);
@@ -126,7 +127,7 @@ const ProfilePage = () => {
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Phone Number</Label>
                 <div className="relative group">
-                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${isAdmin ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
+                  <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${isAdmin ? "text-muted-foreground group-focus-within:text-primary transition-colors" : "text-muted-foreground"}`} />
                   <Input 
                     value={phone} 
                     onChange={(e) => setPhone(e.target.value)}
