@@ -630,14 +630,15 @@ const StudentsPage = () => {
             </div>
           </div>
           <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
-            <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
+            <DialogClose asChild>
+              <Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button>
+            </DialogClose>
             <Button onClick={handleSubmit} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
               {editItem ? "Save Changes" : "Confirm Enrollment"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
     </div>
   );
 };
