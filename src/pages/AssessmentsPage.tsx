@@ -192,6 +192,22 @@ const AssessmentsPage = () => {
       }
     }
 
+    const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
+    let dateStr = new Date().toISOString();
+    if (finalCategory === "SEL-Mid") {
+      dateStr = new Date(selectedYear, selectedMonth, 15).toISOString();
+    } else if (finalCategory === "Musical" || finalCategory === "Mid-Evaluation") {
+      const q = activeQuarter;
+      if (q === "Q1") dateStr = new Date(acadYear, 7, 15).toISOString();
+      else if (q === "Q2") dateStr = new Date(acadYear, 10, 15).toISOString();
+      else if (q === "Q3") dateStr = new Date(acadYear + 1, 1, 15).toISOString();
+      else if (q === "Q4") dateStr = new Date(acadYear + 1, 4, 15).toISOString();
+    } else {
+      const p = finalPhase;
+      if (p === "Pre") dateStr = new Date(acadYear, 6, 15).toISOString();
+      else if (p === "Post") dateStr = new Date(acadYear + 1, 5, 15).toISOString();
+    }
+
     try {
       await api.post("/assessments", {
         studentId: selectedStudent._id || selectedStudent.id,
@@ -199,9 +215,9 @@ const AssessmentsPage = () => {
         fellowId: user?.id,
         category: finalCategory,
         phase: finalPhase,
-        quarter: finalPhase === "Mid" ? activeQuarter : undefined,
+        quarter: (finalPhase === "Mid" || finalCategory === "Mid-Evaluation") ? activeQuarter : undefined,
         data: payloadData,
-        date: new Date().toISOString(),
+        date: dateStr,
         remarks
       });
       toast.success("Assessment logged successfully");
@@ -218,15 +234,31 @@ const AssessmentsPage = () => {
   const handleBulkSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
+      let dateStr = new Date().toISOString();
+      if (activeCategory === "SEL-Mid") {
+        dateStr = new Date(selectedYear, selectedMonth, 15).toISOString();
+      } else if (activeCategory === "Musical" || activeCategory === "Mid-Evaluation") {
+        const q = activeQuarter;
+        if (q === "Q1") dateStr = new Date(acadYear, 7, 15).toISOString();
+        else if (q === "Q2") dateStr = new Date(acadYear, 10, 15).toISOString();
+        else if (q === "Q3") dateStr = new Date(acadYear + 1, 1, 15).toISOString();
+        else if (q === "Q4") dateStr = new Date(acadYear + 1, 4, 15).toISOString();
+      } else {
+        const p = activePhase;
+        if (p === "Pre") dateStr = new Date(acadYear, 6, 15).toISOString();
+        else if (p === "Post") dateStr = new Date(acadYear + 1, 5, 15).toISOString();
+      }
+
       const assessments = Object.entries(bulkScores).map(([studentId, data]) => ({
         studentId,
         centreId: selectedCentreId,
         fellowId: user?.id,
         category: activeCategory,
         phase: activePhase,
-        quarter: activePhase === "Mid" ? activeQuarter : undefined,
+        quarter: (activePhase === "Mid" || activeCategory === "Mid-Evaluation") ? activeQuarter : undefined,
         data,
-        date: new Date().toISOString()
+        date: dateStr
       }));
 
       if (assessments.length === 0) {
@@ -418,7 +450,7 @@ const AssessmentsPage = () => {
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-              {[2024, 2025, 2026].map(y => (
+              {[2025, 2026, 2027, 2028].map(y => (
                 <SelectItem key={y} value={String(y)} className="rounded-lg text-xs font-medium">{y}</SelectItem>
               ))}
             </SelectContent>
@@ -484,7 +516,7 @@ const AssessmentsPage = () => {
                             </div>
                             <p className="text-[10px] font-black text-success uppercase tracking-widest">LOGGED {new Date(monthlyRecord.date).toLocaleDateString()}</p>
                           </div>
-                        ) : isCurrentMonth ? (
+                        ) : (
                           <Button 
                             className="rounded-2xl h-14 px-8 font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all"
                             onClick={() => {
@@ -497,11 +529,6 @@ const AssessmentsPage = () => {
                             <ClipboardCheck className="mr-2 h-4 w-4" />
                             Log SEL Scores
                           </Button>
-                        ) : (
-                          <div className="flex flex-col items-center gap-2 opacity-30">
-                            <Info className="h-6 w-6 text-muted-foreground" />
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">No Record</p>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -527,12 +554,24 @@ const AssessmentsPage = () => {
               {/* Student rows */}
               {processedAssessments.map((a) => {
                 const milestoneCategories = ["InSchool-PrePost", "AfterSchool-PrePost", "Mid-Evaluation"];
-                const pre = a.records.find(r => r.phase === "Pre" && milestoneCategories.includes(r.category));
-                const post = a.records.find(r => r.phase === "Post" && milestoneCategories.includes(r.category));
-                const midQ1 = a.records.find(r => r.category === "Musical" && r.phase === "Mid" && r.quarter === "Q1");
-                const midQ2 = a.records.find(r => r.category === "Musical" && r.phase === "Mid" && r.quarter === "Q2");
-                const midQ3 = a.records.find(r => r.category === "Musical" && r.phase === "Mid" && r.quarter === "Q3");
-                const midQ4 = a.records.find(r => r.category === "Musical" && r.phase === "Mid" && r.quarter === "Q4");
+                
+                const selectedAcademicYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
+                
+                const getRecordAcademicYear = (dateStr: string) => {
+                  const d = new Date(dateStr);
+                  const m = d.getMonth();
+                  const y = d.getFullYear();
+                  return m < 6 ? y - 1 : y;
+                };
+
+                const academicYearRecords = a.records.filter(r => getRecordAcademicYear(r.date) === selectedAcademicYear);
+
+                const pre = academicYearRecords.find(r => r.phase === "Pre" && milestoneCategories.includes(r.category));
+                const post = academicYearRecords.find(r => r.phase === "Post" && milestoneCategories.includes(r.category));
+                const midQ1 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q1");
+                const midQ2 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q2");
+                const midQ3 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q3");
+                const midQ4 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q4");
                 
                 return (
                   <div key={a.id} className="grid grid-cols-[1fr_repeat(6,100px)] gap-0 items-center px-5 py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">

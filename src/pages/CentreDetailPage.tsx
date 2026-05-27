@@ -18,7 +18,20 @@ import { CheckCircle2, ClipboardCheck, Search } from "lucide-react";
 
 type Centre = { _id: string; id?: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
-type Student = { _id: string; id: string; name: string; age: number; gender: "Male" | "Female"; centreId: string; attendancePercent: number; lastAssessmentScore: number; grade?: string; section?: string };
+type Student = { 
+  _id: string; 
+  id: string; 
+  name: string; 
+  age: number; 
+  gender: "Male" | "Female"; 
+  centreId: string; 
+  attendancePercent: number; 
+  lastAssessmentScore: number; 
+  grade?: string; 
+  section?: string;
+  status?: "Active" | "Inactive" | "Left";
+  statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
+};
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; presentStudentIds?: string[] };
 
 const CentreDetailPage = () => {
@@ -96,12 +109,60 @@ const CentreDetailPage = () => {
   // Match fellows, students, sessions to this centre using both _id and id fields
   const centreId = centre._id;
   const centreIdAlt = centre.id || centre._id;
+  const getStatusForMonth = (student: Student, month: number, year: number): "Active" | "Inactive" | "Left" => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return student.status || "Active";
+    }
+    const relevantHistory = student.statusHistory.filter(h => 
+      h.year < year || (h.year === year && h.month <= month)
+    );
+    if (relevantHistory.length === 0) {
+      const sortedHistory = [...student.statusHistory].sort((a, b) => 
+        (a.year - b.year) || (a.month - b.month)
+      );
+      return sortedHistory[0].status;
+    }
+    relevantHistory.sort((a, b) => 
+      (b.year - a.year) || (b.month - a.month)
+    );
+    return relevantHistory[0].status;
+  };
+
+  const isEnrolledInMonth = (student: Student, month: number, year: number): boolean => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return true;
+    }
+    const sortedHistory = [...student.statusHistory].sort((a, b) => 
+      (a.year - b.year) || (a.month - b.month)
+    );
+    const earliest = sortedHistory[0];
+    return year > earliest.year || (year === earliest.year && month >= earliest.month);
+  };
+
   const centreFellows = allFellows.filter(f =>
     centre.fellowIds.includes(f.id) || centre.fellowIds.includes(f._id)
   );
-  const centreStudents = allStudents.filter(s =>
-    s.centreId === centreId || s.centreId === centreIdAlt
-  );
+
+  const centreStudents = React.useMemo(() => {
+    return allStudents.filter(s =>
+      (s.centreId === centreId || s.centreId === centreIdAlt) &&
+      isEnrolledInMonth(s, selectedMonth, selectedYear) &&
+      getStatusForMonth(s, selectedMonth, selectedYear) !== "Left"
+    );
+  }, [allStudents, centreId, centreIdAlt, selectedMonth, selectedYear]);
+
+  const activeStudentsForSession = React.useMemo(() => {
+    const session = allSessions.find(sess => sess._id === selectedSessionId);
+    if (!session) return [];
+    const d = new Date(session.date);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    return allStudents.filter(s =>
+      (s.centreId === centreId || s.centreId === centreIdAlt) &&
+      isEnrolledInMonth(s, m, y) &&
+      getStatusForMonth(s, m, y) === "Active"
+    );
+  }, [allStudents, centreId, centreIdAlt, selectedSessionId, allSessions]);
   const monthlySessions = allSessions
     .filter(s => (s.centreId === centreId || s.centreId === centreIdAlt))
     .filter(s => {
@@ -151,6 +212,8 @@ const CentreDetailPage = () => {
         section: centre.type === "In-school" ? studentSection.trim() : undefined,
         attendancePercent: 0,
         lastAssessmentScore: 0,
+        month: selectedMonth,
+        year: selectedYear
       });
       toast.success("Student added successfully");
       resetForm();
@@ -215,7 +278,7 @@ const CentreDetailPage = () => {
           <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
             <SelectTrigger className="h-9 w-[90px] rounded-xl border-none font-bold text-xs"><SelectValue /></SelectTrigger>
             <SelectContent className="rounded-xl border-none shadow-2xl">
-              {[2024, 2025, 2026].map(y => (
+              {[2025, 2026, 2027, 2028].map(y => (
                 <SelectItem key={y} value={String(y)}>{y}</SelectItem>
               ))}
             </SelectContent>
@@ -458,7 +521,7 @@ const CentreDetailPage = () => {
             <div className="flex items-center gap-2">
               <Button 
                 variant="ghost" 
-                onClick={() => setCheckedStudentIds(centreStudents.map(s => s._id))}
+                onClick={() => setCheckedStudentIds(activeStudentsForSession.map(s => s._id))}
                 className="text-white hover:bg-white/10 text-xs font-bold"
               >
                 All Present
@@ -486,7 +549,7 @@ const CentreDetailPage = () => {
             
             <ScrollArea className="h-[40vh] pr-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {centreStudents
+                {activeStudentsForSession
                   .filter(s => s.name.toLowerCase().includes(attendanceSearch.toLowerCase()))
                   .map(student => (
                   <div 
@@ -526,7 +589,7 @@ const CentreDetailPage = () => {
           
           <div className="p-8 bg-muted/30 border-t flex items-center justify-between">
             <div className="text-sm font-bold text-muted-foreground">
-              <span className="text-primary">{checkedStudentIds.length}</span> / {centreStudents.length} present
+              <span className="text-primary">{checkedStudentIds.length}</span> / {activeStudentsForSession.length} present
             </div>
             <div className="flex items-center gap-3">
               <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>

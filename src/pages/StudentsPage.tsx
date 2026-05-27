@@ -32,6 +32,8 @@ type Student = {
   address?: string;
   grade?: string;
   section?: string;
+  status?: "Active" | "Inactive" | "Left";
+  statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
   attendancePercent: number; 
   lastAssessmentScore: number 
 };
@@ -133,7 +135,7 @@ const StudentsPage = () => {
     setAddress(s.address || "");
     setGrade(s.grade || "");
     setSection(s.section || "");
-    setStatus(s.status || "Active");
+    setStatus(getStatusForMonth(s, selectedMonth, selectedYear));
     setOpen(true);
   };
 
@@ -154,7 +156,9 @@ const StudentsPage = () => {
       address: address.trim(),
       grade: selectedCentre?.type === "In-school" ? grade.trim() : undefined,
       section: selectedCentre?.type === "In-school" ? section.trim() : undefined,
-      status
+      status,
+      month: selectedMonth,
+      year: selectedYear
     };
 
     try {
@@ -216,7 +220,7 @@ const StudentsPage = () => {
 
       if (students.length === 0) { toast.error("No valid student data found"); return; }
       
-      await api.post("/students/bulk", { students });
+      await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear });
       toast.success(`Successfully added ${students.length} students`);
       fetchData();
       setIsBulkOpen(false);
@@ -230,6 +234,43 @@ const StudentsPage = () => {
 
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
   const centreStudents = useMemo(() => selectedCentreId ? studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === selectedCentreId) : [], [studentsList, selectedCentreId]);
+
+  const getStatusForMonth = (student: Student, month: number, year: number): "Active" | "Inactive" | "Left" => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return student.status || "Active";
+    }
+
+    // Find all history records up to the selected month/year
+    const relevantHistory = student.statusHistory.filter(h => 
+      h.year < year || (h.year === year && h.month <= month)
+    );
+
+    if (relevantHistory.length === 0) {
+      // If selected month is before first log, check the earliest logged status
+      const sortedHistory = [...student.statusHistory].sort((a, b) => 
+        (a.year - b.year) || (a.month - b.month)
+      );
+      return sortedHistory[0].status;
+    }
+
+    // Sort by date descending to get the most recent logged status
+    relevantHistory.sort((a, b) => 
+      (b.year - a.year) || (b.month - a.month)
+    );
+
+    return relevantHistory[0].status;
+  };
+
+  const isEnrolledInMonth = (student: Student, month: number, year: number): boolean => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return true;
+    }
+    const sortedHistory = [...student.statusHistory].sort((a, b) => 
+      (a.year - b.year) || (a.month - b.month)
+    );
+    const earliest = sortedHistory[0];
+    return year > earliest.year || (year === earliest.year && month >= earliest.month);
+  };
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -387,7 +428,9 @@ const StudentsPage = () => {
               <h1 className="text-xl md:text-4xl font-[1000] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
               <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest h-fit border-none">{selectedCentre?.type}</Badge>
             </div>
-            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">{centreStudents.length} Active Students Enrolled</p>
+            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
+              {centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) === "Active").length} Active / {centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) !== "Left").length} Total Students
+            </p>
           </div>
         </div>
         
@@ -504,9 +547,11 @@ const StudentsPage = () => {
       <div className="space-y-4">
         {centreStudents
           .filter(s => {
+            if (!isEnrolledInMonth(s, selectedMonth, selectedYear)) return false;
             const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesGender = filterGender === "all" || s.gender === filterGender;
-            const matchesStatus = filterStatus === "all" || (s.status || "Active") === filterStatus;
+            const monthlyStatus = getStatusForMonth(s, selectedMonth, selectedYear);
+            const matchesStatus = filterStatus === "all" || monthlyStatus === filterStatus;
             return matchesSearch && matchesGender && matchesStatus;
           })
           .map(s => (
@@ -519,7 +564,7 @@ const StudentsPage = () => {
                   <div className="space-y-1">
                     <h3 className="text-base md:text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.name}</h3>
                     <div className="flex flex-wrap items-center gap-3">
-                      {getStatusBadge(s.status)}
+                      {getStatusBadge(getStatusForMonth(s, selectedMonth, selectedYear))}
                       <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">{s.gender}</Badge>
                       <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.age} Years Old</span>
                       {selectedCentre?.type === "In-school" && (

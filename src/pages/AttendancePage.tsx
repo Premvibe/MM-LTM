@@ -14,7 +14,18 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
-type Student = { _id: string; id: string; name: string; age: number; gender: "Male" | "Female"; centreId: any; attendancePercent: number; lastAssessmentScore: number };
+type Student = { 
+  _id: string; 
+  id: string; 
+  name: string; 
+  age: number; 
+  gender: "Male" | "Female"; 
+  centreId: any; 
+  attendancePercent: number; 
+  lastAssessmentScore: number;
+  status?: "Active" | "Inactive" | "Left";
+  statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
+};
 type Fellow = { _id: string; id: string; name: string; email: string };
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; presentStudentIds: string[] };
 
@@ -70,8 +81,49 @@ const AttendancePage = () => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  const getStatusForMonth = (student: Student, month: number, year: number): "Active" | "Inactive" | "Left" => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return student.status || "Active";
+    }
+    const relevantHistory = student.statusHistory.filter(h => 
+      h.year < year || (h.year === year && h.month <= month)
+    );
+    if (relevantHistory.length === 0) {
+      const sortedHistory = [...student.statusHistory].sort((a, b) => 
+        (a.year - b.year) || (a.month - b.month)
+      );
+      return sortedHistory[0].status;
+    }
+    relevantHistory.sort((a, b) => 
+      (b.year - a.year) || (b.month - a.month)
+    );
+    return relevantHistory[0].status;
+  };
+
+  const isEnrolledInMonth = (student: Student, month: number, year: number): boolean => {
+    if (!student.statusHistory || student.statusHistory.length === 0) {
+      return true;
+    }
+    const sortedHistory = [...student.statusHistory].sort((a, b) => 
+      (a.year - b.year) || (a.month - b.month)
+    );
+    const earliest = sortedHistory[0];
+    return year > earliest.year || (year === earliest.year && month >= earliest.month);
+  };
+
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
-  const centreStudents = useMemo(() => selectedCentreId ? studentsList.filter(s => (s.centreId?._id || s.centreId) === selectedCentreId) : [], [studentsList, selectedCentreId]);
+  
+  const centreStudents = useMemo(() => {
+    if (!selectedCentreId) return [];
+    const date = new Date(attendanceDate);
+    const m = date.getMonth();
+    const y = date.getFullYear();
+    return studentsList.filter(s => 
+      ((s.centreId?._id || s.centreId) === selectedCentreId) &&
+      isEnrolledInMonth(s, m, y) &&
+      getStatusForMonth(s, m, y) === "Active"
+    );
+  }, [studentsList, selectedCentreId, attendanceDate]);
   const sessionForDate = useMemo(() => sessionsList.find(s => s.date === attendanceDate && (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id)), [sessionsList, attendanceDate, selectedCentreId, selectedCentre]);
 
   useEffect(() => {
