@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck } from "lucide-react";
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -32,10 +32,8 @@ type Student = {
   address?: string;
   grade?: string;
   section?: string;
-  status?: "Active" | "Inactive" | "Left";
   attendancePercent: number; 
-  lastAssessmentScore: number;
-  createdAt?: string;
+  lastAssessmentScore: number 
 };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string };
@@ -389,7 +387,7 @@ const StudentsPage = () => {
               <h1 className="text-xl md:text-4xl font-[1000] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
               <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest h-fit border-none">{selectedCentre?.type}</Badge>
             </div>
-            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">{centreStudents.filter(s => (s.status || "Active") === "Active").length} Active / {centreStudents.length} Total Students</p>
+            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">{centreStudents.length} Active Students Enrolled</p>
           </div>
         </div>
         
@@ -447,63 +445,8 @@ const StudentsPage = () => {
         )}
       </div>
 
-      {/* Month/Year Picker Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 backdrop-blur-md p-4 rounded-[1.5rem] border border-primary/10 shadow-lg">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Monthly View</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl hover:bg-primary/10"
-            onClick={() => {
-              if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
-              else setSelectedMonth(selectedMonth - 1);
-            }}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-              <SelectTrigger className="w-[130px] h-10 rounded-2xl border-none shadow-sm bg-white/80 font-black text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-none shadow-xl">
-                {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-              <SelectTrigger className="w-[90px] h-10 rounded-2xl border-none shadow-sm bg-white/80 font-black text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-none shadow-xl">
-                {[2024, 2025, 2026, 2027].map(y => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl hover:bg-primary/10"
-            onClick={() => {
-              if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
-              else setSelectedMonth(selectedMonth + 1);
-            }}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Search & Filters Bar */}
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[280px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
           <Input 
             placeholder="Find student by name..." 
@@ -512,22 +455,47 @@ const StudentsPage = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+            <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, idx) => (
+                <SelectItem key={idx} value={String(idx)}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+            <SelectTrigger className="w-[100px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              {[2025, 2026, 2027, 2028].map(y => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[145px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Inactive">Inactive</SelectItem>
+              <SelectItem value="Left">Left</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={filterGender} onValueChange={setFilterGender}>
             <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Gender" /></SelectTrigger>
             <SelectContent className="rounded-xl border-none shadow-xl">
               <SelectItem value="all">All Genders</SelectItem>
               <SelectItem value="Male">Male</SelectItem>
               <SelectItem value="Female">Female</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-xl">
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Inactive">Inactive</SelectItem>
-              <SelectItem value="Left">Left</SelectItem>
             </SelectContent>
           </Select>
         </div>
