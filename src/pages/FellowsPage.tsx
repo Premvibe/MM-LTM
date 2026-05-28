@@ -56,7 +56,7 @@ const FellowsPage = () => {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !email.trim()) { toast.error("Please fill in name and email"); return; }
+    if (!name.trim() || !email.trim() || !phone.trim()) { toast.error("Please fill in name, email, and phone"); return; }
     if (!editItem && !password.trim()) { toast.error("Password is required for new fellows"); return; }
     
     const fellowData: any = { name: name.trim(), email: email.trim(), phone: phone.trim(), batch };
