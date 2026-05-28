@@ -117,10 +117,7 @@ const CentreDetailPage = () => {
       h.year < year || (h.year === year && h.month <= month)
     );
     if (relevantHistory.length === 0) {
-      const sortedHistory = [...student.statusHistory].sort((a, b) => 
-        (a.year - b.year) || (a.month - b.month)
-      );
-      return sortedHistory[0].status;
+      return "Active";
     }
     relevantHistory.sort((a, b) => 
       (b.year - a.year) || (b.month - a.month)

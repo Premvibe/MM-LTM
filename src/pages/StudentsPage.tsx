@@ -246,11 +246,8 @@ const StudentsPage = () => {
     );
 
     if (relevantHistory.length === 0) {
-      // If selected month is before first log, check the earliest logged status
-      const sortedHistory = [...student.statusHistory].sort((a, b) => 
-        (a.year - b.year) || (a.month - b.month)
-      );
-      return sortedHistory[0].status;
+      // Selected month is before any recorded status change — student was implicitly Active
+      return "Active";
     }
 
     // Sort by date descending to get the most recent logged status
