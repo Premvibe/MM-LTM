@@ -25,6 +25,7 @@ type Student = {
   lastAssessmentScore: number;
   status?: "Active" | "Inactive" | "Left";
   statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
+  createdAt?: string;
 };
 type Fellow = { _id: string; id: string; name: string; email: string };
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; presentStudentIds: string[] };
@@ -98,14 +99,31 @@ const AttendancePage = () => {
   };
 
   const isEnrolledInMonth = (student: Student, month: number, year: number): boolean => {
-    if (!student.statusHistory || student.statusHistory.length === 0) {
+    let enrolledMonth = -1;
+    let enrolledYear = 9999;
+
+    if (student.createdAt) {
+      const d = new Date(student.createdAt);
+      enrolledMonth = d.getMonth();
+      enrolledYear = d.getFullYear();
+    }
+
+    if (student.statusHistory && student.statusHistory.length > 0) {
+      const sortedHistory = [...student.statusHistory].sort((a, b) => 
+        (a.year - b.year) || (a.month - b.month)
+      );
+      const earliest = sortedHistory[0];
+      if (enrolledYear === 9999 || earliest.year < enrolledYear || (earliest.year === enrolledYear && earliest.month < enrolledMonth)) {
+        enrolledYear = earliest.year;
+        enrolledMonth = earliest.month;
+      }
+    }
+
+    if (enrolledYear === 9999) {
       return true;
     }
-    const sortedHistory = [...student.statusHistory].sort((a, b) => 
-      (a.year - b.year) || (a.month - b.month)
-    );
-    const earliest = sortedHistory[0];
-    return year > earliest.year || (year === earliest.year && month >= earliest.month);
+
+    return year > enrolledYear || (year === enrolledYear && month >= enrolledMonth);
   };
 
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
