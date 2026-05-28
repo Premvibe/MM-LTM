@@ -158,15 +158,13 @@ const CentreDetailPage = () => {
     centre.fellowIds.includes(f.id) || centre.fellowIds.includes(f._id)
   );
 
-  const centreStudents = React.useMemo(() => {
-    return allStudents.filter(s =>
-      (s.centreId === centreId || s.centreId === centreIdAlt) &&
-      isEnrolledInMonth(s, selectedMonth, selectedYear) &&
-      getStatusForMonth(s, selectedMonth, selectedYear) !== "Left"
-    );
-  }, [allStudents, centreId, centreIdAlt, selectedMonth, selectedYear]);
+  const centreStudents = allStudents.filter(s =>
+    (s.centreId === centreId || s.centreId === centreIdAlt) &&
+    isEnrolledInMonth(s, selectedMonth, selectedYear) &&
+    getStatusForMonth(s, selectedMonth, selectedYear) !== "Left"
+  );
 
-  const activeStudentsForSession = React.useMemo(() => {
+  const activeStudentsForSession = (() => {
     const session = allSessions.find(sess => sess._id === selectedSessionId);
     if (!session) return [];
     const d = new Date(session.date);
@@ -177,7 +175,7 @@ const CentreDetailPage = () => {
       isEnrolledInMonth(s, m, y) &&
       getStatusForMonth(s, m, y) === "Active"
     );
-  }, [allStudents, centreId, centreIdAlt, selectedSessionId, allSessions]);
+  })();
   const monthlySessions = allSessions
     .filter(s => (s.centreId === centreId || s.centreId === centreIdAlt))
     .filter(s => {
