@@ -24,7 +24,7 @@ const StatCard = ({ title, value, icon: Icon, subtitle, color }: { title: string
 );
 
 const DashboardPage = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [stats, setStats] = useState<any>(null);
   const [filterMonth, setFilterMonth] = useState<string>("all");
@@ -52,7 +52,7 @@ const DashboardPage = () => {
   const years = ["2023", "2024", "2025", "2026"];
 
   useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'program_manager') {
+    if (isAdmin) {
       const emailParams = user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
       Promise.all([
         api.get(`/centres${emailParams}`),
@@ -81,7 +81,7 @@ const DashboardPage = () => {
         ? `&role=program_manager&email=${user.email}` 
         : '';
     const dateParams = `&month=${filterMonth}&year=${filterYear}`;
-    const adminParams = (user.role === 'admin' || user.role === 'program_manager') 
+    const adminParams = isAdmin 
       ? `&centreId=${filterCentre}&fellowId=${filterFellow}` 
       : '';
     
@@ -111,7 +111,7 @@ const DashboardPage = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-1.5">
-            {(user?.role === 'admin' || user?.role === 'program_manager') && (
+            {isAdmin && (
               <>
                 <Select value={filterFellow} onValueChange={(v) => { setFilterFellow(v); setFilterCentre("all"); }}>
                   <SelectTrigger className="w-[120px] md:w-[150px] h-9 rounded-xl bg-white/60 border-none shadow-sm focus:ring-primary/20 text-xs font-bold hover:bg-white transition-all">
