@@ -405,13 +405,13 @@ const StudentsPage = () => {
                         <div className="text-2xl font-[1000] tracking-tighter text-primary">{count}</div>
                         <div className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Enrolled Students</div>
                       </div>
-                      <div className="flex -space-x-2">
-                        {centre.fellowIds.slice(0, 3).map(fid => {
+                      <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+                        {centre.fellowIds.map(fid => {
                           const fellow = fellowsList.find(f => (f._id === fid || f.id === fid));
                           return fellow ? (
-                            <div key={fid} className="h-6 w-6 rounded-full bg-white border-2 border-primary/10 flex items-center justify-center overflow-hidden" title={fellow.name}>
-                              <span className="text-[8px] font-black">{fellow.name.charAt(0)}</span>
-                            </div>
+                            <Badge key={fid} variant="outline" className="text-[9px] font-black uppercase tracking-wider py-0.5 px-2 bg-primary/5 text-primary border-primary/10 h-fit rounded-full">
+                              {fellow.name}
+                            </Badge>
                           ) : null;
                         })}
                       </div>
