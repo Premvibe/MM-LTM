@@ -283,7 +283,15 @@ const CentresPage = () => {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={filterBatch} onValueChange={setFilterBatch}>
+          <Select value={filterBatch} onValueChange={(v) => {
+            setFilterBatch(v);
+            if (v !== "all" && filterFellow !== "all") {
+              const selectedFellowObj = fellowsList.find(f => f._id === filterFellow);
+              if (selectedFellowObj && selectedFellowObj.batch !== v) {
+                setFilterFellow("all");
+              }
+            }
+          }}>
             <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[100px] md:w-[120px]"><SelectValue placeholder="Batch" /></SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl">
               <SelectItem value="all">All Batches</SelectItem>
@@ -296,7 +304,9 @@ const CentresPage = () => {
             <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[130px] md:w-[180px]"><SelectValue placeholder="All Fellows" /></SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl">
               <SelectItem value="all">All Fellows</SelectItem>
-              {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
+              {fellowsList
+                .filter(f => filterBatch === "all" || f.batch === filterBatch)
+                .map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterType} onValueChange={setFilterType}>
