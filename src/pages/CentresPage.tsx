@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,22 @@ const CentresPage = () => {
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const filteredCentres = useMemo(() => {
+    return centres.filter(c => {
+      const assignedFellows = c.fellowIds.map(fid => fellowsList.find(f => f._id === fid || f.id === fid)?.name || "").join(" ").toLowerCase();
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          assignedFellows.includes(searchQuery.toLowerCase());
+      const matchesType = filterType === "all" || c.type === filterType;
+      const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
+        const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
+        return fellow?.batch === filterBatch;
+      });
+      const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
+      return matchesSearch && matchesType && matchesBatch && matchesFellow;
+    });
+  }, [centres, fellowsList, searchQuery, filterType, filterBatch, filterFellow]);
 
   useEffect(() => {
     fetchData();
@@ -241,7 +257,7 @@ const CentresPage = () => {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-primary uppercase tracking-wider">Total Centres</p>
-              <p className="text-2xl font-black mt-1">{centres.length}</p>
+              <p className="text-2xl font-black mt-1">{filteredCentres.length}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
               <Building2 className="h-5 w-5 text-primary" />
@@ -252,7 +268,7 @@ const CentresPage = () => {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wider">Active</p>
-              <p className="text-2xl font-black mt-1">{centres.filter(c => c.status !== "paused").length}</p>
+              <p className="text-2xl font-black mt-1">{filteredCentres.filter(c => c.status !== "paused").length}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-success/20 flex items-center justify-center">
               <PlayCircle className="h-5 w-5 text-success" />
@@ -263,7 +279,7 @@ const CentresPage = () => {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-warning uppercase tracking-wider">Paused</p>
-              <p className="text-2xl font-black mt-1">{centres.filter(c => c.status === "paused").length}</p>
+              <p className="text-2xl font-black mt-1">{filteredCentres.filter(c => c.status === "paused").length}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-warning/20 flex items-center justify-center">
               <PauseCircle className="h-5 w-5 text-warning" />
@@ -321,20 +337,7 @@ const CentresPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {centres
-          .filter(c => {
-            const assignedFellows = c.fellowIds.map(fid => fellowsList.find(f => f._id === fid || f.id === fid)?.name || "").join(" ").toLowerCase();
-            const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                c.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                assignedFellows.includes(searchQuery.toLowerCase());
-            const matchesType = filterType === "all" || c.type === filterType;
-            const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
-              const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
-              return fellow?.batch === filterBatch;
-            });
-            const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
-            return matchesSearch && matchesType && matchesBatch && matchesFellow;
-          })
+        {filteredCentres
           .map(c => (
           <Card key={c._id} className="animate-fade-in hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/centres/${c._id}`)}>
             <CardHeader className="pb-3">
