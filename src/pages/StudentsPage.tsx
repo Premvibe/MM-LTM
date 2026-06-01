@@ -39,7 +39,7 @@ type Student = {
   createdAt?: string;
 };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
-type Fellow = { _id: string; id: string; name: string; email: string };
+type Fellow = { _id: string; id: string; name: string; email: string; batch?: string };
 
 const StudentsPage = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
@@ -77,6 +77,7 @@ const StudentsPage = () => {
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterFellow, setFilterFellow] = useState("all");
+  const [filterBatch, setFilterBatch] = useState("all");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -354,6 +355,15 @@ const StudentsPage = () => {
           </div>
           {isAdmin && (
             <div className="flex gap-2">
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Batch" /></SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-xl">
+                  <SelectItem value="all">All Batches</SelectItem>
+                  {Array.from(new Set(fellowsList.map(f => f.batch).filter(Boolean))).sort().map(b => (
+                    <SelectItem key={b} value={b!}>Batch {b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
@@ -374,8 +384,12 @@ const StudentsPage = () => {
                                    c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
                                    assignedFellows.includes(centreSearchQuery.toLowerCase());
               const matchesType = filterType === "all" || c.type === filterType;
+              const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
+                const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
+                return fellow?.batch === filterBatch;
+              });
               const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
-              return matchesSearch && matchesType && matchesFellow;
+              return matchesSearch && matchesType && matchesBatch && matchesFellow;
             })
             .map(centre => {
               const count = studentsList.filter(s => (s.centreId === (centre._id || centre.id) || (s.centreId as any)?._id === (centre._id || centre.id))).length;
