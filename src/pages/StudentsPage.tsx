@@ -20,8 +20,8 @@ type Student = {
   _id: string; 
   id: string; 
   name: string; 
-  age: number; 
-  gender: "Male" | "Female"; 
+  age?: number; 
+  gender?: "Male" | "Female"; 
   centreId: string; 
   phone?: string;
   schoolName?: string;
@@ -189,7 +189,7 @@ const StudentsPage = () => {
         // Handle both comma and tab/space separation
         const parts = line.includes(',') ? line.split(',') : line.split(/\t+/);
         const name = parts[0]?.trim();
-        const age = parseInt(parts[1]?.trim()) || 12;
+        const age = parts[1]?.trim() ? parseInt(parts[1]?.trim()) : undefined;
         const genderPart = parts[2]?.trim()?.toLowerCase();
         
         // Try to parse grade/section from the 3rd part if it looks like "6thA"
@@ -210,8 +210,8 @@ const StudentsPage = () => {
 
         return {
           name,
-          age,
-          gender: (genderPart === 'female' ? 'Female' : 'Male'),
+          ...(age ? { age } : {}),
+          ...(genderPart ? { gender: (genderPart === 'female' ? 'Female' : 'Male') } : {}),
           centreId: selectedCentreId,
           grade: studentGrade,
           section: studentSection,
@@ -588,8 +588,8 @@ const StudentsPage = () => {
                     <h3 className="text-base md:text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.name}</h3>
                     <div className="flex flex-wrap items-center gap-3">
                       {getStatusBadge(getStatusForMonth(s, selectedMonth, selectedYear))}
-                      <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">{s.gender}</Badge>
-                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.age} Years Old</span>
+                      {s.gender && <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">{s.gender}</Badge>}
+                      {s.age && <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.age} Years Old</span>}
                       {selectedCentre?.type === "In-school" && (
                         <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-full">{s.grade}-{s.section}</span>
                       )}
