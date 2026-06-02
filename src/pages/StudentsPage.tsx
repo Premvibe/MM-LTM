@@ -463,8 +463,7 @@ const StudentsPage = () => {
           </div>
         </div>
         
-        {selectedCentre?.type === "After-school" ? (
-          <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
+        <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
             <Button onClick={() => { setCentreId(selectedCentreId!); setOpen(true); }} className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
               <Plus className="h-4 w-4 mr-2" /> New Enrollment
             </Button>
@@ -510,11 +509,6 @@ const StudentsPage = () => {
               </DialogContent>
             </Dialog>
           </div>
-        ) : (
-          <div className="flex items-center px-4 py-2.5 bg-primary/5 border border-primary/10 rounded-xl">
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Enrollment Locked (In-School Centre)</span>
-          </div>
-        )}
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
