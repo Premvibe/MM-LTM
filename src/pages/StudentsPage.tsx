@@ -105,6 +105,15 @@ const StudentsPage = () => {
     fetchData();
   }, [selectedAcademicYear]);
 
+  useEffect(() => {
+    if (selectedAcademicYear) {
+      const [start, end] = selectedAcademicYear.split('-');
+      if (start && end) {
+        setSelectedYear(selectedMonth < 6 ? parseInt(end) : parseInt(start));
+      }
+    }
+  }, [selectedAcademicYear, selectedMonth]);
+
   const fetchData = async () => {
     try {
       const params = user?.role === 'fellow' 
@@ -658,16 +667,7 @@ const StudentsPage = () => {
             </SelectContent>
           </Select>
 
-          <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(parseInt(val))}>
-            <SelectTrigger className="w-[100px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-xl">
-              {[2025, 2026, 2027, 2028].map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
 
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[145px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
