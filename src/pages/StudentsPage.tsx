@@ -22,6 +22,8 @@ type Student = {
   name: string; 
   age?: number; 
   gender?: "Male" | "Female"; 
+  academicYear?: string;
+  previousYearStudentId?: string;
   centreId: string; 
   phone?: string;
   schoolName?: string;
@@ -83,10 +85,25 @@ const StudentsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [isCarryForwardOpen, setIsCarryForwardOpen] = useState(false);
+  const [carryForwardYear, setCarryForwardYear] = useState("");
+  const [carryForwardSelectedIds, setCarryForwardSelectedIds] = useState<string[]>([]);
+
+  const getCurrentAcademicYear = () => {
+    const d = new Date();
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    return m < 6 ? `${y - 1}-${y}` : `${y}-${y + 1}`;
+  };
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(getCurrentAcademicYear());
+
+  useEffect(() => {
+    if (!carryForwardYear) setCarryForwardYear(getCurrentAcademicYear());
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedAcademicYear]);
 
   const fetchData = async () => {
     try {
@@ -96,7 +113,7 @@ const StudentsPage = () => {
           ? `?role=program_manager&email=${user.email}` 
           : '';
       const [studentsRes, centresRes, fellowsRes, sessionsRes, assessmentsRes] = await Promise.all([
-        api.get(`/students${params}`),
+        api.get(`/students${params}${params ? '&' : '?'}academicYear=${selectedAcademicYear}`),
         api.get(`/centres${params}`),
         api.get(`/fellows${params}`),
         api.get(`/sessions${params}`),
@@ -160,7 +177,8 @@ const StudentsPage = () => {
       section: selectedCentre?.type === "In-school" ? section.trim() : undefined,
       status,
       month: selectedMonth,
-      year: selectedYear
+      year: selectedYear,
+      academicYear: selectedAcademicYear
     };
 
     try {
@@ -222,13 +240,33 @@ const StudentsPage = () => {
 
       if (students.length === 0) { toast.error("No valid student data found"); return; }
       
-      await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear });
+      await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear, academicYear: selectedAcademicYear });
       toast.success(`Successfully added ${students.length} students`);
       fetchData();
       setIsBulkOpen(false);
       setBulkText("");
     } catch (error) {
       toast.error("Failed to add students in bulk");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCarryForwardSubmit = async () => {
+    if (carryForwardSelectedIds.length === 0) { toast.error("Please select students to carry forward"); return; }
+    
+    setIsSubmitting(true);
+    try {
+      await api.post("/students/carry-forward", { 
+        studentIds: carryForwardSelectedIds, 
+        newAcademicYear: carryForwardYear 
+      });
+      toast.success(`Successfully carried forward ${carryForwardSelectedIds.length} students`);
+      fetchData();
+      setIsCarryForwardOpen(false);
+      setCarryForwardSelectedIds([]);
+    } catch (error) {
+      toast.error("Failed to carry forward students");
     } finally {
       setIsSubmitting(false);
     }
@@ -355,6 +393,14 @@ const StudentsPage = () => {
           </div>
           {isAdmin && (
             <div className="flex gap-2">
+              <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
+                <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Academic Year" /></SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-xl">
+                  {['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'].map(ay => (
+                    <SelectItem key={ay} value={ay} className="rounded-lg text-xs font-bold">{ay}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filterBatch} onValueChange={setFilterBatch}>
                 <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Batch" /></SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
@@ -468,6 +514,75 @@ const StudentsPage = () => {
               <Plus className="h-4 w-4 mr-2" /> New Enrollment
             </Button>
 
+            <Dialog open={isCarryForwardOpen} onOpenChange={setIsCarryForwardOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5">
+                  Carry Forward
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
+                <div className="bg-primary p-10 text-white relative overflow-hidden">
+                  <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
+                  <div className="relative z-10">
+                    <DialogTitle className="text-3xl font-black tracking-tighter">Carry Forward Students</DialogTitle>
+                    <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Migrate students to a new academic year</p>
+                  </div>
+                </div>
+                <div className="p-10 space-y-6">
+                  <div className="flex items-center gap-4">
+                    <Label className="text-xs font-bold">Target Academic Year:</Label>
+                    <Select value={carryForwardYear} onValueChange={setCarryForwardYear}>
+                      <SelectTrigger className="w-[140px] h-10 rounded-xl bg-muted/40 font-bold text-xs border-none"><SelectValue /></SelectTrigger>
+                      <SelectContent className="rounded-xl shadow-xl border-none">
+                        {['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'].map(ay => (
+                          <SelectItem key={ay} value={ay} className="rounded-lg text-xs font-bold">{ay}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="bg-muted/30 rounded-2xl p-4 max-h-[40vh] overflow-y-auto space-y-2">
+                    {centreStudents.length === 0 ? (
+                      <p className="text-sm font-bold text-muted-foreground text-center py-8">No students found in the current view to carry forward.</p>
+                    ) : (
+                      centreStudents.map(student => (
+                        <div key={student._id} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary"
+                              checked={carryForwardSelectedIds.includes(student._id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setCarryForwardSelectedIds([...carryForwardSelectedIds, student._id]);
+                                else setCarryForwardSelectedIds(carryForwardSelectedIds.filter(id => id !== student._id));
+                              }}
+                            />
+                            <div>
+                              <p className="text-sm font-bold">{student.name}</p>
+                              {student.grade && <p className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">{student.grade}-{student.section}</p>}
+                            </div>
+                          </div>
+                          {student.academicYear && <Badge variant="secondary" className="text-[8px] uppercase">{student.academicYear}</Badge>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setCarryForwardSelectedIds(centreStudents.map(s => s._id))} className="text-[10px] rounded-lg">Select All</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCarryForwardSelectedIds([])} className="text-[10px] rounded-lg">Deselect All</Button>
+                    <span className="text-xs font-bold text-muted-foreground ml-auto">{carryForwardSelectedIds.length} Selected</span>
+                  </div>
+                </div>
+                <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
+                  <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
+                  <Button onClick={handleCarryForwardSubmit} disabled={isSubmitting || carryForwardSelectedIds.length === 0} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+                    {isSubmitting ? "Processing..." : "Carry Forward"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5">
@@ -522,6 +637,16 @@ const StudentsPage = () => {
           />
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
+            <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
+              <SelectValue placeholder="Academic Year" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              {['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'].map(ay => (
+                <SelectItem key={ay} value={ay} className="rounded-lg text-xs font-bold">{ay}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
             <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
               <SelectValue placeholder="Month" />
