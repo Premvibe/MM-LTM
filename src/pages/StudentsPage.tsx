@@ -81,7 +81,9 @@ const StudentsPage = () => {
   const [filterFellow, setFilterFellow] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
-  const [bulkText, setBulkText] = useState("");
+  type GridRow = { name: string; age: string; gender: string; grade: string; section: string; phone: string };
+  const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', grade: '', section: '', phone: '' });
+  const [gridRows, setGridRows] = useState<GridRow[]>(Array.from({ length: 10 }, emptyRow));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -206,54 +208,72 @@ const StudentsPage = () => {
     }
   };
 
+  const handleGridCellChange = (rowIdx: number, field: keyof GridRow, value: string) => {
+    setGridRows(prev => {
+      const updated = prev.map((r, i) => i === rowIdx ? { ...r, [field]: value } : r);
+      // Auto-add new row when typing in the last row
+      if (rowIdx === updated.length - 1 && value.trim()) {
+        updated.push(emptyRow());
+      }
+      return updated;
+    });
+  };
+
+  const handleGridPaste = (e: React.ClipboardEvent, startRow: number, startField: keyof GridRow) => {
+    const text = e.clipboardData.getData('text');
+    const allLines = text.split('\n').filter(l => l.trim());
+    if (allLines.length <= 1) return; // Let single-line paste happen naturally
+    e.preventDefault();
+    const fields: (keyof GridRow)[] = ['name', 'age', 'gender', 'grade', 'section', 'phone'];
+    const startColIdx = fields.indexOf(startField);
+    setGridRows(prev => {
+      const updated = [...prev];
+      allLines.forEach((line, lineIdx) => {
+        const rowIdx = startRow + lineIdx;
+        const cells = line.split('\t');
+        cells.forEach((cell, cellOffset) => {
+          const colIdx = startColIdx + cellOffset;
+          if (colIdx < fields.length) {
+            const field = fields[colIdx];
+            if (!updated[rowIdx]) updated[rowIdx] = emptyRow();
+            updated[rowIdx] = { ...updated[rowIdx], [field]: cell.trim() };
+          }
+        });
+      });
+      // Ensure there's always an empty row at the bottom
+      if (!updated[updated.length - 1] || updated[updated.length - 1].name.trim()) {
+        updated.push(emptyRow());
+      }
+      return updated;
+    });
+  };
+
   const handleBulkSubmit = async () => {
-    if (!bulkText.trim()) { toast.error("Please enter student data"); return; }
+    const filledRows = gridRows.filter(r => r.name.trim());
+    if (filledRows.length === 0) { toast.error("Please enter at least one student name"); return; }
     
     setIsSubmitting(true);
     try {
-      const lines = bulkText.split('\n').filter(l => l.trim());
-      const students = lines.map(line => {
-        // Handle both comma and tab/space separation
-        const parts = line.includes(',') ? line.split(',') : line.split(/\t+/);
-        const name = parts[0]?.trim();
-        const age = parts[1]?.trim() ? parseInt(parts[1]?.trim()) : undefined;
-        const genderPart = parts[2]?.trim()?.toLowerCase();
-        
-        // Try to parse grade/section from the 3rd part if it looks like "6thA"
-        let studentGrade = "";
-        let studentSection = "";
-        
-        if (selectedCentre?.type === "In-school" && parts[2]) {
-          const rawClass = parts[2].trim();
-          // Regex to split "6thA" into "6th" and "A"
-          const match = rawClass.match(/^(\d+(?:st|nd|rd|th)?)\s*([A-Z])$/i);
-          if (match) {
-            studentGrade = match[1];
-            studentSection = match[2];
-          } else {
-            studentGrade = rawClass;
-          }
-        }
-
+      const students = filledRows.map(r => {
+        const genderPart = r.gender.trim().toLowerCase();
         return {
-          name,
-          ...(age ? { age } : {}),
-          ...(genderPart ? { gender: (genderPart === 'female' ? 'Female' : 'Male') } : {}),
+          name: r.name.trim(),
+          ...(r.age.trim() ? { age: parseInt(r.age.trim()) } : {}),
+          ...(genderPart ? { gender: (genderPart.startsWith('f') ? 'Female' : 'Male') } : {}),
           centreId: selectedCentreId,
-          grade: studentGrade,
-          section: studentSection,
+          grade: r.grade.trim(),
+          section: r.section.trim(),
+          ...(r.phone.trim() ? { phone: r.phone.trim() } : {}),
           attendancePercent: 0,
           lastAssessmentScore: 0
         };
-      }).filter(s => s.name);
+      });
 
-      if (students.length === 0) { toast.error("No valid student data found"); return; }
-      
       await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear, academicYear: selectedAcademicYear });
       toast.success(`Successfully added ${students.length} students`);
       fetchData();
       setIsBulkOpen(false);
-      setBulkText("");
+      setGridRows(Array.from({ length: 10 }, emptyRow));
     } catch (error) {
       toast.error("Failed to add students in bulk");
     } finally {
@@ -594,43 +614,116 @@ const StudentsPage = () => {
             </Dialog>
             )}
 
-            <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
+            <Dialog open={isBulkOpen} onOpenChange={(open) => { setIsBulkOpen(open); if (!open) setGridRows(Array.from({ length: 10 }, emptyRow)); }}>
               <DialogTrigger asChild>
                 <Button variant="ghost" className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5">
                   <ClipboardCheck className="h-4 w-4 mr-2" /> Bulk Log
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden">
-                <div className="bg-primary p-10 text-white relative overflow-hidden">
+              <DialogContent className="max-w-5xl w-[95vw] rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
+                <div className="bg-primary p-8 text-white relative overflow-hidden">
                   <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
-                  <div className="relative z-10">
-                    <DialogTitle className="text-3xl font-black tracking-tighter">Bulk Enrollment</DialogTitle>
-                    <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Rapid Data Processing</p>
-                  </div>
-                </div>
-                <div className="p-10 space-y-6">
-                  <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10">
-                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-3">Format Guide</p>
-                    <p className="text-xs font-bold text-muted-foreground leading-relaxed">Paste lines formatted as: <span className="text-foreground">Name, Age, Gender</span></p>
-                    <div className="mt-4 p-3 bg-white/60 rounded-xl text-[10px] font-bold text-primary italic border border-primary/5">
-                      Example: Ravi Kumar, 12, Male
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div>
+                      <DialogTitle className="text-2xl font-black tracking-tighter">Bulk Enrollment</DialogTitle>
+                      <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Type directly or paste from Google Sheets</p>
+                    </div>
+                    <div className="bg-white/10 rounded-2xl px-4 py-2 text-center">
+                      <p className="text-2xl font-black">{gridRows.filter(r => r.name.trim()).length}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-white/60">Students</p>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Data Stream</Label>
-                    <textarea 
-                      className="w-full h-48 rounded-3xl border-none bg-muted/40 p-6 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/30"
-                      placeholder="Anjali Sharma, 13, Female..."
-                      value={bulkText}
-                      onChange={(e) => setBulkText(e.target.value)}
-                    />
-                  </div>
                 </div>
-                <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
-                  <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
-                  <Button onClick={handleBulkSubmit} disabled={isSubmitting} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
-                    {isSubmitting ? "Processing..." : "Process Batch"}
-                  </Button>
+
+                <div className="overflow-auto max-h-[60vh]">
+                  <table className="w-full border-collapse text-xs">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-primary/5">
+                        <th className="w-8 border border-border/40 p-2 text-center text-[9px] font-black text-muted-foreground/60">#</th>
+                        <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider min-w-[180px]">Name <span className="text-red-400">*</span></th>
+                        <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-16">Age</th>
+                        <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Gender</th>
+                        {selectedCentre?.type === 'In-school' && (
+                          <>
+                            <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Grade</th>
+                            <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Section</th>
+                          </>
+                        )}
+                        <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-36">Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gridRows.map((row, rowIdx) => (
+                        <tr
+                          key={rowIdx}
+                          className={`group transition-colors ${
+                            row.name.trim() ? 'bg-white hover:bg-primary/[0.02]' : 'bg-muted/10 hover:bg-muted/20'
+                          }`}
+                        >
+                          <td className="border border-border/30 p-1 text-center text-[9px] text-muted-foreground/40 font-bold select-none w-8">
+                            {row.name.trim() ? rowIdx + 1 : ''}
+                          </td>
+                          {(['name', 'age', 'gender', 'grade', 'section', 'phone'] as (keyof GridRow)[]).filter(f => {
+                            if ((f === 'grade' || f === 'section') && selectedCentre?.type !== 'In-school') return false;
+                            return true;
+                          }).map((field) => (
+                            <td key={field} className="border border-border/30 p-0">
+                              {field === 'gender' ? (
+                                <select
+                                  value={row.gender}
+                                  onChange={(e) => handleGridCellChange(rowIdx, 'gender', e.target.value)}
+                                  className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground focus:outline-none focus:bg-primary/5 cursor-pointer"
+                                >
+                                  <option value="">-</option>
+                                  <option value="Male">Male</option>
+                                  <option value="Female">Female</option>
+                                </select>
+                              ) : (
+                                <input
+                                  type={field === 'age' ? 'number' : 'text'}
+                                  value={row[field]}
+                                  onChange={(e) => handleGridCellChange(rowIdx, field, e.target.value)}
+                                  onPaste={(e) => handleGridPaste(e, rowIdx, field)}
+                                  placeholder={field === 'name' ? 'Student name...' : ''}
+                                  className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors"
+                                />
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-6 bg-muted/10 border-t flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setGridRows(prev => [...prev, ...Array.from({ length: 10 }, emptyRow)])}
+                      className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors"
+                    >
+                      + Add 10 Rows
+                    </button>
+                    <span className="text-muted-foreground/40">·</span>
+                    <button
+                      onClick={() => setGridRows(Array.from({ length: 10 }, emptyRow))}
+                      className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button>
+                    </DialogClose>
+                    <Button
+                      onClick={handleBulkSubmit}
+                      disabled={isSubmitting || gridRows.filter(r => r.name.trim()).length === 0}
+                      className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+                    >
+                      {isSubmitting ? 'Processing...' : `Add ${gridRows.filter(r => r.name.trim()).length} Students`}
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
