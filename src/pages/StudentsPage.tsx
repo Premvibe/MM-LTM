@@ -163,8 +163,8 @@ const StudentsPage = () => {
     setMothersName(s.mothersName || "");
     setMothersContact(s.mothersContact || "");
     setAddress(s.address || "");
-    setGrade(s.grade || "");
-    setSection(s.section || "");
+    setGrade((s.grade || '') + (s.section || ''));
+    setSection('');
     setStatus(getStatusForMonth(s, selectedMonth, selectedYear));
     setOpen(true);
   };
@@ -184,8 +184,13 @@ const StudentsPage = () => {
       mothersName: mothersName.trim(),
       mothersContact: mothersContact.trim(),
       address: address.trim(),
-      grade: selectedCentre?.type === "In-school" ? grade.trim() : undefined,
-      section: selectedCentre?.type === "In-school" ? section.trim() : undefined,
+      // Parse combined classSection (e.g. "8A") into grade + section
+      const rawClass = grade.trim();
+      const classMatch = rawClass.match(/^(\d+(?:st|nd|rd|th)?)\s*([A-Za-z])?$/i);
+      const parsedGrade = classMatch?.[1] ?? rawClass;
+      const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
+      grade: selectedCentre?.type === "In-school" ? parsedGrade : undefined,
+      section: selectedCentre?.type === "In-school" ? parsedSection : undefined,
       status,
       month: selectedMonth,
       year: selectedYear,
@@ -895,14 +900,10 @@ const StudentsPage = () => {
             </div>
 
             {selectedCentre?.type === "In-school" && (
-              <div className="grid grid-cols-2 gap-4 border-t pt-4 border-dashed">
+              <div className="border-t pt-4 border-dashed">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Class (Grade)</Label>
-                  <Input placeholder="e.g. 6th" value={grade} onChange={e => setGrade(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Section</Label>
-                  <Input placeholder="e.g. A" value={section} onChange={e => setSection(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Class <span className="text-muted-foreground/50 normal-case font-semibold">(e.g. 8A, 6B)</span></Label>
+                  <Input placeholder="e.g. 8A" value={grade} onChange={e => setGrade(e.target.value)} className="rounded-2xl border-none bg-muted/40 h-12 px-5 font-bold text-sm focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
               </div>
             )}
