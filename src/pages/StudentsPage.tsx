@@ -523,7 +523,8 @@ const StudentsPage = () => {
               <Plus className="h-4 w-4 mr-2" /> New Enrollment
             </Button>
 
-            <Dialog open={isCarryForwardOpen} onOpenChange={setIsCarryForwardOpen}>
+            {new Date().getMonth() === 2 && (
+              <Dialog open={isCarryForwardOpen} onOpenChange={setIsCarryForwardOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5">
                   Carry Forward
@@ -591,6 +592,7 @@ const StudentsPage = () => {
                 </div>
               </DialogContent>
             </Dialog>
+            )}
 
             <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
               <DialogTrigger asChild>
