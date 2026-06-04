@@ -81,8 +81,8 @@ const StudentsPage = () => {
   const [filterFellow, setFilterFellow] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
-  type GridRow = { name: string; age: string; gender: string; grade: string; section: string; phone: string };
-  const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', grade: '', section: '', phone: '' });
+  type GridRow = { name: string; age: string; gender: string; classSection: string; phone: string };
+  const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', classSection: '', phone: '' });
   const [gridRows, setGridRows] = useState<GridRow[]>(Array.from({ length: 10 }, emptyRow));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -224,7 +224,7 @@ const StudentsPage = () => {
     const allLines = text.split('\n').filter(l => l.trim());
     if (allLines.length <= 1) return; // Let single-line paste happen naturally
     e.preventDefault();
-    const fields: (keyof GridRow)[] = ['name', 'age', 'gender', 'grade', 'section', 'phone'];
+    const fields: (keyof GridRow)[] = ['name', 'age', 'gender', 'classSection', 'phone'];
     const startColIdx = fields.indexOf(startField);
     setGridRows(prev => {
       const updated = [...prev];
@@ -256,13 +256,18 @@ const StudentsPage = () => {
     try {
       const students = filledRows.map(r => {
         const genderPart = r.gender.trim().toLowerCase();
+        // Parse classSection like "8A", "6th B", "Class 7 C" → grade + section
+        const rawClass = r.classSection.trim();
+        const classMatch = rawClass.match(/^([\d]+(?:st|nd|rd|th)?)?\s*([A-Za-z])?$/i);
+        const parsedGrade = classMatch?.[1] ?? rawClass;
+        const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
         return {
           name: r.name.trim(),
           ...(r.age.trim() ? { age: parseInt(r.age.trim()) } : {}),
           ...(genderPart ? { gender: (genderPart.startsWith('f') ? 'Female' : 'Male') } : {}),
           centreId: selectedCentreId,
-          grade: r.grade.trim(),
-          section: r.section.trim(),
+          grade: parsedGrade,
+          section: parsedSection,
           ...(r.phone.trim() ? { phone: r.phone.trim() } : {}),
           attendancePercent: 0,
           lastAssessmentScore: 0
@@ -644,10 +649,7 @@ const StudentsPage = () => {
                         <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-16">Age</th>
                         <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Gender</th>
                         {selectedCentre?.type === 'In-school' && (
-                          <>
-                            <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Grade</th>
-                            <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Section</th>
-                          </>
+                          <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-24">Class</th>
                         )}
                         <th className="border border-border/40 p-2 text-left text-[9px] font-black text-primary uppercase tracking-wider w-36">Phone</th>
                       </tr>
@@ -663,8 +665,8 @@ const StudentsPage = () => {
                           <td className="border border-border/30 p-1 text-center text-[9px] text-muted-foreground/40 font-bold select-none w-8">
                             {row.name.trim() ? rowIdx + 1 : ''}
                           </td>
-                          {(['name', 'age', 'gender', 'grade', 'section', 'phone'] as (keyof GridRow)[]).filter(f => {
-                            if ((f === 'grade' || f === 'section') && selectedCentre?.type !== 'In-school') return false;
+                          {(['name', 'age', 'gender', 'classSection', 'phone'] as (keyof GridRow)[]).filter(f => {
+                            if (f === 'classSection' && selectedCentre?.type !== 'In-school') return false;
                             return true;
                           }).map((field) => (
                             <td key={field} className="border border-border/30 p-0">
@@ -684,7 +686,7 @@ const StudentsPage = () => {
                                   value={row[field]}
                                   onChange={(e) => handleGridCellChange(rowIdx, field, e.target.value)}
                                   onPaste={(e) => handleGridPaste(e, rowIdx, field)}
-                                  placeholder={field === 'name' ? 'Student name...' : ''}
+                                  placeholder={field === 'name' ? 'Student name...' : field === 'classSection' ? 'e.g. 8A' : ''}
                                   className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors"
                                 />
                               )}
