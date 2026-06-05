@@ -171,7 +171,13 @@ const StudentsPage = () => {
 
   const handleSubmit = async () => {
     if (!name.trim() || !age || !centreId) { toast.error("Please fill in all fields"); return; }
-    
+
+    // Parse combined classSection (e.g. "8A") into grade + section
+    const rawClass = grade.trim();
+    const classMatch = rawClass.match(/^(\d+(?:st|nd|rd|th)?)\s*([A-Za-z])?$/i);
+    const parsedGrade = classMatch?.[1] ?? rawClass;
+    const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
+
     const studentData = { 
       name: name.trim(), 
       age: parseInt(age), 
@@ -184,11 +190,6 @@ const StudentsPage = () => {
       mothersName: mothersName.trim(),
       mothersContact: mothersContact.trim(),
       address: address.trim(),
-      // Parse combined classSection (e.g. "8A") into grade + section
-      const rawClass = grade.trim();
-      const classMatch = rawClass.match(/^(\d+(?:st|nd|rd|th)?)\s*([A-Za-z])?$/i);
-      const parsedGrade = classMatch?.[1] ?? rawClass;
-      const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
       grade: selectedCentre?.type === "In-school" ? parsedGrade : undefined,
       section: selectedCentre?.type === "In-school" ? parsedSection : undefined,
       status,
