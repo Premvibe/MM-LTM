@@ -144,13 +144,21 @@ const AssessmentsPage = () => {
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const getRoleParams = () => {
+    return user?.role === 'fellow' 
+      ? `?role=fellow&email=${user.email}` 
+      : user?.role === 'program_manager' 
+        ? `?role=program_manager&email=${user.email}` 
+        : '';
+  };
+
   useEffect(() => {
-    const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
+    const params = getRoleParams();
     Promise.all([
       api.get(`/students${params}`), 
       api.get(`/centres${params}`),
-      api.get("/fellows"),
-      api.get("/assessments")
+      api.get(`/fellows${params}`),
+      api.get(`/assessments${params}`)
     ])
       .then(([sRes, cRes, fRes, aRes]) => {
         setStudents(sRes.data);
@@ -222,7 +230,7 @@ const AssessmentsPage = () => {
       });
       toast.success("Assessment logged successfully");
       setIsLogOpen(false);
-      const aRes = await api.get("/assessments");
+      const aRes = await api.get(`/assessments${getRoleParams()}`);
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to log assessment");
@@ -269,7 +277,7 @@ const AssessmentsPage = () => {
       await api.post("/assessments/bulk", { assessments });
       toast.success(`Successfully logged ${assessments.length} assessments`);
       setIsBulkOpen(false);
-      const aRes = await api.get("/assessments");
+      const aRes = await api.get(`/assessments${getRoleParams()}`);
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to save bulk assessments");

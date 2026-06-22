@@ -11,11 +11,13 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
 const FellowsPage = () => {
+  const { user } = useAuth();
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,13 +34,14 @@ const FellowsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
   const fetchData = async () => {
     try {
+      const params = user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
       const [fellowsRes, centresRes] = await Promise.all([
-        api.get("/fellows"),
-        api.get("/centres")
+        api.get(`/fellows${params}`),
+        api.get(`/centres${params}`)
       ]);
       setFellowsList(fellowsRes.data.sort((a: Fellow, b: Fellow) => a.name.localeCompare(b.name)));
       setCentresList(centresRes.data);

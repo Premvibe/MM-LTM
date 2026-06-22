@@ -25,6 +25,8 @@ type Fellow = {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  batch?: string;
   centreIds?: string[];
 };
 
@@ -33,6 +35,7 @@ type Centre = {
   id?: string;
   name: string;
   type?: string;
+  fellowIds?: string[];
 };
 
 const AdminsPage = () => {
@@ -156,47 +159,64 @@ const AdminsPage = () => {
     }
   };
 
+  // Helper: get centre IDs assigned to a fellow (using centre.fellowIds as source of truth)
+  const getCentreIdsForFellow = (fellowId: string): string[] => {
+    const fellow = fellowsList.find(f => f._id === fellowId || f.id === fellowId);
+    if (!fellow) return [];
+    return centresList
+      .filter(c => c.fellowIds?.includes(fellow._id) || c.fellowIds?.includes(fellow.id))
+      .map(c => c._id || c.id || "");
+  };
+
   const handleToggleFellow = (fellowId: string) => {
     const isChecking = !selectedFellowIds.includes(fellowId);
     if (isChecking) {
-      setSelectedFellowIds(prev => [...prev, fellowId]);
-      const fellow = fellowsList.find(f => f._id === fellowId || f.id === fellowId);
-      if (fellow && fellow.centreIds && Array.isArray(fellow.centreIds)) {
-        setSelectedCentreIds(prevCentres => {
-          const nextCentres = [...prevCentres];
-          fellow.centreIds?.forEach((cid: string) => {
-            if (!nextCentres.includes(cid)) {
-              nextCentres.push(cid);
-            }
-          });
-          return nextCentres;
+      const newSelectedFellows = [...selectedFellowIds, fellowId];
+      setSelectedFellowIds(newSelectedFellows);
+      // Auto-select this fellow's centres
+      const fellowCentreIds = getCentreIdsForFellow(fellowId);
+      setSelectedCentreIds(prev => {
+        const next = [...prev];
+        fellowCentreIds.forEach(cid => {
+          if (!next.includes(cid)) next.push(cid);
         });
-      }
+        return next;
+      });
     } else {
-      setSelectedFellowIds(prev => prev.filter(id => id !== fellowId));
+      const newSelectedFellows = selectedFellowIds.filter(id => id !== fellowId);
+      setSelectedFellowIds(newSelectedFellows);
+      // Auto-deselect centres that no remaining selected fellow needs
+      const removedFellowCentreIds = getCentreIdsForFellow(fellowId);
+      const stillNeededCentreIds = new Set<string>();
+      newSelectedFellows.forEach(fid => {
+        getCentreIdsForFellow(fid).forEach(cid => stillNeededCentreIds.add(cid));
+      });
+      setSelectedCentreIds(prev =>
+        prev.filter(cid => !removedFellowCentreIds.includes(cid) || stillNeededCentreIds.has(cid))
+      );
     }
   };
 
   const handleSelectAllFellows = () => {
     const allFellowIds = fellowsList.map(f => f._id || f.id);
     setSelectedFellowIds(allFellowIds);
-    setSelectedCentreIds(prevCentres => {
-      const nextCentres = [...prevCentres];
-      fellowsList.forEach(fellow => {
-        if (fellow.centreIds && Array.isArray(fellow.centreIds)) {
-          fellow.centreIds.forEach((cid: string) => {
-            if (!nextCentres.includes(cid)) {
-              nextCentres.push(cid);
-            }
-          });
-        }
+    // Auto-select all centres that belong to any fellow
+    const allCentreIds = new Set<string>();
+    allFellowIds.forEach(fid => {
+      getCentreIdsForFellow(fid).forEach(cid => allCentreIds.add(cid));
+    });
+    setSelectedCentreIds(prev => {
+      const next = [...prev];
+      allCentreIds.forEach(cid => {
+        if (!next.includes(cid)) next.push(cid);
       });
-      return nextCentres;
+      return next;
     });
   };
 
   const handleClearAllFellows = () => {
     setSelectedFellowIds([]);
+    setSelectedCentreIds([]);
   };
 
   const handleToggleCentre = (centreId: string) => {
@@ -347,6 +367,11 @@ const AdminsPage = () => {
                       <div className="flex items-center justify-between">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
                           Delegate Assigned Fellows <span className="text-red-500">*</span>
+                          {selectedFellowIds.length > 0 && (
+                            <span className="ml-2 text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                              {selectedFellowIds.length} selected
+                            </span>
+                          )}
                         </Label>
                         <div className="flex gap-2">
                           <Button 
@@ -370,44 +395,66 @@ const AdminsPage = () => {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto p-2 bg-muted/20 border border-muted rounded-2xl">
-                        {fellowsList.map(fellow => {
-                          const isChecked = selectedFellowIds.includes(fellow._id);
-                          
-                          // Dynamically determine fellow's school types
-                          const fellowCentres = centresList.filter(c => 
-                            fellow.centreIds?.includes(c._id) || fellow.centreIds?.includes(c.id || "")
-                          );
-                          const hasInSchool = fellowCentres.some(c => c.type === "In-school");
-                          const hasAfterSchool = fellowCentres.some(c => c.type === "After-school");
-
-                          return (
-                            <div 
-                              key={fellow._id}
-                              onClick={() => handleToggleFellow(fellow._id)}
-                              className={`flex items-center gap-3 p-2 rounded-xl border transition-all cursor-pointer select-none ${isChecked ? 'bg-primary/5 border-primary/20 text-primary font-bold' : 'bg-white border-muted hover:border-primary/20 text-foreground'}`}
-                            >
-                              <div className={`h-4 w-4 shrink-0 rounded-md border flex items-center justify-center transition-all ${isChecked ? 'bg-primary border-primary text-white scale-105 shadow-sm shadow-primary/20' : 'border-primary/40 bg-white'}`}>
-                                {isChecked && <Check className="h-2.5 w-2.5 stroke-[3.5]" />}
+                      <div className="max-h-[200px] overflow-y-auto p-2 bg-muted/20 border border-muted rounded-2xl space-y-3">
+                        {(() => {
+                          const grouped: Record<string, Fellow[]> = {};
+                          fellowsList.forEach(fellow => {
+                            const batchKey = fellow.batch || 'Other';
+                            if (!grouped[batchKey]) grouped[batchKey] = [];
+                            grouped[batchKey].push(fellow);
+                          });
+                          const sortedBatches = Object.entries(grouped).sort((a, b) => {
+                            const aNum = parseFloat(a[0]);
+                            const bNum = parseFloat(b[0]);
+                            if (isNaN(aNum) && isNaN(bNum)) return 0;
+                            if (isNaN(aNum)) return 1;
+                            if (isNaN(bNum)) return -1;
+                            return aNum - bNum;
+                          });
+                          return sortedBatches.map(([batch, fellows]) => (
+                            <div key={batch} className="space-y-1.5">
+                              <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest sticky top-0 bg-muted/40 backdrop-blur-sm px-2 py-1 rounded-lg">
+                                Batch {batch} Fellows
                               </div>
-                              <div className="flex items-center justify-between flex-1 min-w-0 gap-2">
-                                <span className="text-xs truncate">{fellow.name}</span>
-                                <div className="flex gap-1 shrink-0">
-                                  {hasInSchool && (
-                                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                      In-School
-                                    </span>
-                                  )}
-                                  {hasAfterSchool && (
-                                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                                      After-School
-                                    </span>
-                                  )}
-                                </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {fellows.map(fellow => {
+                                  const isChecked = selectedFellowIds.includes(fellow._id);
+                                  const fellowCentres = centresList.filter(c =>
+                                    c.fellowIds?.includes(fellow._id) || c.fellowIds?.includes(fellow.id)
+                                  );
+                                  const hasInSchool = fellowCentres.some(c => c.type === "In-school");
+                                  const hasAfterSchool = fellowCentres.some(c => c.type === "After-school");
+                                  return (
+                                    <div
+                                      key={fellow._id}
+                                      onClick={() => handleToggleFellow(fellow._id)}
+                                      className={`flex items-center gap-3 p-2 rounded-xl border transition-all cursor-pointer select-none ${isChecked ? 'bg-primary/5 border-primary/20 text-primary font-bold' : 'bg-white border-muted hover:border-primary/20 text-foreground'}`}
+                                    >
+                                      <div className={`h-4 w-4 shrink-0 rounded-md border flex items-center justify-center transition-all ${isChecked ? 'bg-primary border-primary text-white scale-105 shadow-sm shadow-primary/20' : 'border-primary/40 bg-white'}`}>
+                                        {isChecked && <Check className="h-2.5 w-2.5 stroke-[3.5]" />}
+                                      </div>
+                                      <div className="flex items-center justify-between flex-1 min-w-0 gap-2">
+                                        <span className="text-xs truncate">{fellow.name}</span>
+                                        <div className="flex gap-1 shrink-0">
+                                          {hasInSchool && (
+                                            <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                              In-School
+                                            </span>
+                                          )}
+                                          {hasAfterSchool && (
+                                            <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                                              After-School
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     </div>
 
@@ -416,6 +463,11 @@ const AdminsPage = () => {
                       <div className="flex items-center justify-between">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
                           Delegate Assigned Centres <span className="text-red-500">*</span>
+                          {selectedCentreIds.length > 0 && (
+                            <span className="ml-2 text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                              {selectedCentreIds.length} selected
+                            </span>
+                          )}
                         </Label>
                         <div className="flex gap-2">
                           <Button 

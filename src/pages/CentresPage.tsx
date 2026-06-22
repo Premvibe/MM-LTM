@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 
-type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number; status?: "active" | "paused"; startDate?: string; endDate?: string };
+type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number; status?: "active" | "paused"; startDate?: string; endDate?: string; pocName?: string; pocContact?: string; pocEmail?: string; };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
 
 const CentresPage = () => {
@@ -35,6 +35,9 @@ const CentresPage = () => {
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [pocName, setPocName] = useState("");
+  const [pocContact, setPocContact] = useState("");
+  const [pocEmail, setPocEmail] = useState("");
 
   const filteredCentres = useMemo(() => {
     return centres.filter(c => {
@@ -76,7 +79,7 @@ const CentresPage = () => {
     }
   };
 
-  const resetForm = () => { setName(""); setLocation(""); setType("In-school"); setSelectedFellowIds([]); setStartDate(""); setEndDate(""); setEditItem(null); };
+  const resetForm = () => { setName(""); setLocation(""); setType("In-school"); setSelectedFellowIds([]); setStartDate(""); setEndDate(""); setPocName(""); setPocContact(""); setPocEmail(""); setEditItem(null); };
 
   const openEdit = (c: Centre) => {
     setEditItem(c); 
@@ -86,6 +89,9 @@ const CentresPage = () => {
     setSelectedFellowIds(c.fellowIds); 
     setStartDate(c.startDate ? new Date(c.startDate).toISOString().split('T')[0] : "");
     setEndDate(c.endDate ? new Date(c.endDate).toISOString().split('T')[0] : "");
+    setPocName(c.pocName || "");
+    setPocContact(c.pocContact || "");
+    setPocEmail(c.pocEmail || "");
     setOpen(true);
   };
 
@@ -127,7 +133,10 @@ const CentresPage = () => {
       type, 
       fellowIds: selectedFellowIds,
       startDate: startDate || undefined,
-      endDate: endDate || undefined
+      endDate: endDate || undefined,
+      pocName: pocName.trim() || undefined,
+      pocContact: pocContact.trim() || undefined,
+      pocEmail: pocEmail.trim() || undefined
     };
 
     try {
@@ -169,11 +178,11 @@ const CentresPage = () => {
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Add Centre</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>{editItem ? "Edit Centre" : "Add New Centre"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Centre Name</Label>
                 <Input id="name" placeholder="e.g. Govt. School - Saket" value={name} onChange={e => setName(e.target.value)} />
@@ -206,6 +215,21 @@ const CentresPage = () => {
                 <div className="space-y-2">
                   <Label htmlFor="endDate">Closing Date</Label>
                   <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 border-t pt-4 mt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="pocName">POC Name</Label>
+                  <Input id="pocName" placeholder="e.g. Rahul Sharma" value={pocName} onChange={e => setPocName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pocContact">Contact Number</Label>
+                  <Input id="pocContact" placeholder="e.g. 9876543210" value={pocContact} onChange={e => setPocContact(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pocEmail">Email ID</Label>
+                  <Input id="pocEmail" placeholder="e.g. rahul@school.edu" value={pocEmail} onChange={e => setPocEmail(e.target.value)} />
                 </div>
               </div>
 

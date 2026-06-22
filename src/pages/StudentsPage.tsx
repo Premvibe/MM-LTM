@@ -128,7 +128,7 @@ const StudentsPage = () => {
         api.get(`/centres${params}`),
         api.get(`/fellows${params}`),
         api.get(`/sessions${params}`),
-        api.get(`/assessments`)
+        api.get(`/assessments${params}`)
       ]);
       setStudentsList(studentsRes.data);
       setCentresList(centresRes.data);

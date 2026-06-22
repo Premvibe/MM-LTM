@@ -71,7 +71,7 @@ const FieldVisitsPage = () => {
 
   const fetchData = async () => {
     try {
-      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
+      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
       const [visitsRes, centresRes, sessionsRes] = await Promise.all([
         api.get(`/field-visits${params}`),
         api.get(`/centres${params}`),
@@ -185,11 +185,6 @@ const FieldVisitsPage = () => {
           <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">Quarterly Program Quality & Music Bus Monitoring</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
-              <Plus className="h-4 w-4 mr-2" />Log Visit
-            </Button>
-          </DialogTrigger>
           <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-lg">
             <div className="bg-primary p-8 text-white">
               <DialogTitle className="text-2xl font-black tracking-tight">{editItem ? "Edit Visit" : "Log Bus Visit"}</DialogTitle>

@@ -80,14 +80,14 @@ const QualityPage = () => {
 
   const fetchData = async () => {
     try {
-      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
+      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
       const [qualityRes, sessionsRes, centresRes, fellowsRes, assessmentsRes, studentsRes] = await Promise.all([
         api.get(`/quality${params}`),
         api.get(`/sessions${params}`),
         api.get(`/centres${params}`),
-        api.get("/fellows"),
-        api.get("/assessments"),
-        api.get("/students")
+        api.get(`/fellows${params}`),
+        api.get(`/assessments${params}`),
+        api.get(`/students${params}`)
       ]);
       setQualityList(qualityRes.data);
       setSessionsList(sessionsRes.data);
