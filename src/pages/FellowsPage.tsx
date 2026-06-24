@@ -32,6 +32,19 @@ const FellowsPage = () => {
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
 
+  const filteredFellows = useMemo(() => {
+    return fellowsList.filter(f => {
+      const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          f.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesBatch = filterBatch === "all" || f.batch === filterBatch;
+      
+      const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
+      const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
+      
+      return matchesSearch && matchesBatch && matchesType;
+    });
+  }, [fellowsList, centresList, searchQuery, filterBatch, filterType]);
+
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -163,19 +176,14 @@ const FellowsPage = () => {
         </div>
       </div>
 
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest">
+          {filteredFellows.length} Fellow{filteredFellows.length !== 1 ? 's' : ''}
+        </h2>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {fellowsList
-          .filter(f => {
-            const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                f.email.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesBatch = filterBatch === "all" || f.batch === filterBatch;
-            
-            const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
-            const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
-            
-            return matchesSearch && matchesBatch && matchesType;
-          })
-          .map(f => (
+        {filteredFellows.map(f => (
           <Card key={f._id} className="animate-fade-in hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">

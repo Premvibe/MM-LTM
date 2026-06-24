@@ -360,6 +360,12 @@ const CentresPage = () => {
         </div>
       </div>
 
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest">
+          {filteredCentres.length} Centre{filteredCentres.length !== 1 ? 's' : ''}
+        </h2>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredCentres
           .map(c => (

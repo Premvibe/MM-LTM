@@ -9,6 +9,8 @@ interface User {
   email: string;
   role: UserRole;
   phone?: string;
+  assignedFellowIds?: string[];
+  assignedCentreIds?: string[];
 }
 
 interface AuthContextType {
