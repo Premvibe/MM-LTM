@@ -32,11 +32,12 @@ const NotificationsPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fellowsList, setFellowsList] = useState<any[]>([]);
+  const [adminsList, setAdminsList] = useState<any[]>([]);
   
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newMessage, setNewMessage] = useState("");
-  const [targetFellowId, setTargetFellowId] = useState("all");
+  const [targetRecipient, setTargetRecipient] = useState("all_fellows");
   const [isCreating, setIsCreating] = useState(false);
 
   const [replyingTo, setReplyingTo] = useState<any>(null);
@@ -52,12 +53,14 @@ const NotificationsPage = () => {
         : user?.role === 'program_manager' 
           ? `?role=program_manager&email=${user.email}` 
           : `?role=${user?.role}`;
-      const [notifsRes, fellowsRes] = await Promise.all([
+      const [notifsRes, fellowsRes, adminsRes] = await Promise.all([
         api.get(`/notifications${roleParam}`),
-        api.get(`/fellows${roleParam}`)
+        api.get(`/fellows${roleParam}`),
+        user?.role === 'admin' ? api.get(`/admins`) : Promise.resolve({ data: [] })
       ]);
       setNotifications(notifsRes.data);
       setFellowsList(fellowsRes.data);
+      setAdminsList(adminsRes.data.filter((a: any) => a.role === 'program_manager'));
     } catch (error) {
       toast.error("Failed to load notifications");
     } finally {
@@ -123,19 +126,34 @@ const NotificationsPage = () => {
     if (!newTitle.trim() || !newMessage.trim()) return;
     setIsCreating(true);
     try {
+      let recipientRole = "fellow";
+      let recipientId: string | null = null;
+      
+      if (targetRecipient === "all_fellows") {
+        recipientRole = "fellow";
+      } else if (targetRecipient === "all_program_managers") {
+        recipientRole = "program_manager";
+      } else if (adminsList.find(a => a._id === targetRecipient)) {
+        recipientRole = "program_manager";
+        recipientId = targetRecipient;
+      } else {
+        recipientRole = "fellow";
+        recipientId = targetRecipient;
+      }
+
       await api.post("/notifications", {
         type: "info",
         title: newTitle.trim(),
         message: newMessage.trim(),
         date: new Date().toISOString(),
-        recipientRole: targetFellowId === "all" ? "fellow" : "fellow",
-        recipientId: targetFellowId === "all" ? null : targetFellowId
+        recipientRole,
+        recipientId
       });
       toast.success("Notification sent successfully");
       setIsNewDialogOpen(false);
       setNewTitle("");
       setNewMessage("");
-      setTargetFellowId("all");
+      setTargetRecipient("all_fellows");
       fetchNotifications();
     } catch (error) {
       toast.error("Failed to send notification");
@@ -192,9 +210,13 @@ const NotificationsPage = () => {
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
                         {n.recipientRole === 'admin' 
                           ? 'To: Admin' 
-                          : n.recipientId 
-                            ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || 'Unknown Fellow'}` 
-                            : 'To: All Fellows'}
+                          : n.recipientRole === 'program_manager'
+                            ? n.recipientId 
+                              ? `To: ${adminsList.find(a => a._id === n.recipientId)?.name || 'Unknown Manager'}`
+                              : 'To: All Program Managers'
+                            : n.recipientId 
+                              ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || 'Unknown Fellow'}` 
+                              : 'To: All Fellows'}
                       </Badge>
                     )}
                   </div>
@@ -315,11 +337,13 @@ const NotificationsPage = () => {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Recipient</Label>
-            <Select value={targetFellowId} onValueChange={setTargetFellowId}>
+            <Select value={targetRecipient} onValueChange={setTargetRecipient}>
               <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select recipient" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Fellows</SelectItem>
-                {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
+                <SelectItem value="all_fellows">All Fellows</SelectItem>
+                <SelectItem value="all_program_managers">All Program Managers</SelectItem>
+                {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name} (Fellow)</SelectItem>)}
+                {adminsList.map(a => <SelectItem key={a._id} value={a._id}>{a.name} (Program Manager)</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
