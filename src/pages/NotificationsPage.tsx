@@ -45,6 +45,9 @@ const NotificationsPage = () => {
   const [isSending, setIsSending] = useState(false);
 
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState(
+    new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  );
 
   const fetchNotifications = async () => {
     try {
@@ -176,6 +179,15 @@ const NotificationsPage = () => {
     return groups;
   }, {} as Record<string, any[]>);
 
+  const currentMonthStr = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const availableMonths = Array.from(new Set([currentMonthStr, ...Object.keys(groupedNotifications)]));
+
+  const filteredGroups = selectedMonthFilter === "all" 
+    ? groupedNotifications 
+    : groupedNotifications[selectedMonthFilter] 
+      ? { [selectedMonthFilter]: groupedNotifications[selectedMonthFilter] }
+      : {};
+
   return (
   <div>
     <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -183,7 +195,18 @@ const NotificationsPage = () => {
         <h1 className="page-title">Notifications</h1>
         <p className="page-description">Alerts and updates for the program</p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={selectedMonthFilter} onValueChange={setSelectedMonthFilter}>
+          <SelectTrigger className="w-[150px] rounded-2xl h-10 font-bold text-xs">
+            <SelectValue placeholder="All Months" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl">
+            <SelectItem value="all">All Months</SelectItem>
+            {availableMonths.map(m => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {notifications.some(n => !n.read) && (
           <Button variant="outline" onClick={markAllAsRead} className="rounded-2xl px-6 border-primary/20 text-primary hover:bg-primary/5">
             <CheckCheck className="h-4 w-4 mr-2" />
@@ -199,7 +222,7 @@ const NotificationsPage = () => {
       </div>
     </div>
     <div className="space-y-8">
-      {Object.entries(groupedNotifications).map(([monthYear, monthNotifs]) => (
+      {Object.entries(filteredGroups).map(([monthYear, monthNotifs]) => (
         <div key={monthYear} className="space-y-3">
           <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest px-1">{monthYear}</h2>
           {monthNotifs.map(n => {
@@ -268,7 +291,7 @@ const NotificationsPage = () => {
           })}
         </div>
       ))}
-      {notifications.length === 0 && (
+      {Object.keys(filteredGroups).length === 0 && (
         <Card className="border-dashed">
           <CardContent className="p-12 flex flex-col items-center justify-center text-center">
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
