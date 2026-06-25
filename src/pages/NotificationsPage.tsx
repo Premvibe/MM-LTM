@@ -9,7 +9,7 @@ import { AlertTriangle, AlertCircle, Info, CheckCircle2, Undo2, Reply, Send, Che
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 const iconMap = {
@@ -37,7 +37,7 @@ const NotificationsPage = () => {
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newMessage, setNewMessage] = useState("");
-  const [targetRecipient, setTargetRecipient] = useState("all_fellows");
+  const [targetRecipient, setTargetRecipient] = useState("all_users");
   const [isCreating, setIsCreating] = useState(false);
 
   const [replyingTo, setReplyingTo] = useState<any>(null);
@@ -129,7 +129,9 @@ const NotificationsPage = () => {
       let recipientRole = "fellow";
       let recipientId: string | null = null;
       
-      if (targetRecipient === "all_fellows") {
+      if (targetRecipient === "all_users") {
+        recipientRole = "all";
+      } else if (targetRecipient === "all_fellows") {
         recipientRole = "fellow";
       } else if (targetRecipient === "all_program_managers") {
         recipientRole = "program_manager";
@@ -153,7 +155,7 @@ const NotificationsPage = () => {
       setIsNewDialogOpen(false);
       setNewTitle("");
       setNewMessage("");
-      setTargetRecipient("all_fellows");
+      setTargetRecipient("all_users");
       fetchNotifications();
     } catch (error) {
       toast.error("Failed to send notification");
@@ -208,7 +210,9 @@ const NotificationsPage = () => {
                     {!n.read && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">New</Badge>}
                     {user?.role === 'admin' && (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
-                        {n.recipientRole === 'admin' 
+                        {n.recipientRole === 'all'
+                          ? 'To: Everyone'
+                          : n.recipientRole === 'admin' 
                           ? 'To: Admin' 
                           : n.recipientRole === 'program_manager'
                             ? n.recipientId 
@@ -340,10 +344,22 @@ const NotificationsPage = () => {
             <Select value={targetRecipient} onValueChange={setTargetRecipient}>
               <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select recipient" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all_fellows">All Fellows</SelectItem>
-                <SelectItem value="all_program_managers">All Program Managers</SelectItem>
-                {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name} (Fellow)</SelectItem>)}
-                {adminsList.map(a => <SelectItem key={a._id} value={a._id}>{a.name} (Program Manager)</SelectItem>)}
+                <SelectItem value="all_users">Everyone</SelectItem>
+                <SelectSeparator />
+                
+                <SelectGroup>
+                  <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Program Managers</SelectLabel>
+                  <SelectItem value="all_program_managers" className="font-bold">All Program Managers</SelectItem>
+                  {adminsList.map(a => <SelectItem key={a._id} value={a._id} className="pl-8">{a.name}</SelectItem>)}
+                </SelectGroup>
+                
+                <SelectSeparator />
+
+                <SelectGroup>
+                  <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Fellows</SelectLabel>
+                  <SelectItem value="all_fellows" className="font-bold">All Fellows</SelectItem>
+                  {fellowsList.map(f => <SelectItem key={f._id} value={f._id} className="pl-8">{f.name}</SelectItem>)}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
