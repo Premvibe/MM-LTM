@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle } from "lucide-react";
+import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -133,7 +133,7 @@ const CentresPage = () => {
       type, 
       fellowIds: selectedFellowIds,
       startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      endDate: endDate === "" ? null : endDate,
       pocName: pocName.trim() || undefined,
       pocContact: pocContact.trim() || undefined,
       pocEmail: pocEmail.trim() || undefined
@@ -214,7 +214,14 @@ const CentresPage = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endDate">Closing Date</Label>
-                  <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  <div className="flex items-center gap-2">
+                    <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1" />
+                    {endDate && (
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setEndDate("")} title="Clear closing date">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
