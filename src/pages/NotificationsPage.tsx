@@ -182,7 +182,7 @@ const NotificationsPage = () => {
   const currentMonthStr = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const availableMonths = Array.from(new Set([currentMonthStr, ...Object.keys(groupedNotifications)]));
 
-  const filteredGroups = selectedMonthFilter === "all" 
+  const filteredGroups: Record<string, any[]> = selectedMonthFilter === "all" 
     ? groupedNotifications 
     : groupedNotifications[selectedMonthFilter] 
       ? { [selectedMonthFilter]: groupedNotifications[selectedMonthFilter] }
