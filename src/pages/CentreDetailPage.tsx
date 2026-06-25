@@ -273,7 +273,7 @@ const CentreDetailPage = () => {
               <h1 className="text-xl font-[950] tracking-tight">{centre.name}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
                 <MapPin className="h-3.5 w-3.5" />{centre.location}
-                <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="ml-1 text-[10px] font-black uppercase tracking-widest h-5">{centre.type}</Badge>
+                <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="ml-1 text-[10px] font-black uppercase tracking-widest h-5 whitespace-nowrap">{centre.type}</Badge>
               </div>
             </div>
           </div>
