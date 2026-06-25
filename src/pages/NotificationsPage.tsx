@@ -166,6 +166,16 @@ const NotificationsPage = () => {
 
   if (loading) return <div className="h-[200px] w-full flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
 
+  const groupedNotifications = notifications.reduce((groups, n) => {
+    const d = new Date(n.date);
+    const monthYear = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (!groups[monthYear]) {
+      groups[monthYear] = [];
+    }
+    groups[monthYear].push(n);
+    return groups;
+  }, {} as Record<string, any[]>);
+
   return (
   <div>
     <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -188,71 +198,76 @@ const NotificationsPage = () => {
         )}
       </div>
     </div>
-    <div className="space-y-3">
-      {notifications.map(n => {
-        const Icon = iconMap[n.type as keyof typeof iconMap] || Info;
-        return (
-          <Card 
-            key={n._id} 
-            className={`animate-fade-in transition-all duration-300 ${!n.read ? "border-l-4 border-l-primary hover:bg-secondary/5" : "opacity-70"}`}
-          >
-            <CardContent className="p-4 flex items-start gap-4">
-              <div 
-                className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm cursor-pointer hover:scale-110 transition-transform ${colorMap[n.type as keyof typeof colorMap]}`}
-                onClick={() => toggleRead(n._id, n.read)}
+    <div className="space-y-8">
+      {Object.entries(groupedNotifications).map(([monthYear, monthNotifs]) => (
+        <div key={monthYear} className="space-y-3">
+          <h2 className="text-xs font-black text-muted-foreground uppercase tracking-widest px-1">{monthYear}</h2>
+          {monthNotifs.map(n => {
+            const Icon = iconMap[n.type as keyof typeof iconMap] || Info;
+            return (
+              <Card 
+                key={n._id} 
+                className={`animate-fade-in transition-all duration-300 ${!n.read ? "border-l-4 border-l-primary hover:bg-secondary/5" : "opacity-70"}`}
               >
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0 cursor-pointer hover:bg-black/5 p-2 rounded-xl transition-colors -m-2" onClick={() => setSelectedNotification(n)}>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className={`font-bold text-sm ${!n.read ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</p>
-                    {!n.read && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">New</Badge>}
-                    {user?.role === 'admin' && (
-                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
-                        {n.recipientRole === 'all'
-                          ? 'To: Everyone'
-                          : n.recipientRole === 'admin' 
-                          ? 'To: Admin' 
-                          : n.recipientRole === 'program_manager'
-                            ? n.recipientId 
-                              ? `To: ${adminsList.find(a => a._id === n.recipientId)?.name || 'Unknown Manager'}`
-                              : 'To: All Program Managers'
-                            : n.recipientId 
-                              ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || 'Unknown Fellow'}` 
-                              : 'To: All Fellows'}
-                      </Badge>
-                    )}
+                <CardContent className="p-4 flex items-start gap-4">
+                  <div 
+                    className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm cursor-pointer hover:scale-110 transition-transform ${colorMap[n.type as keyof typeof colorMap]}`}
+                    onClick={() => toggleRead(n._id, n.read)}
+                  >
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                      {new Date(n.date).toLocaleDateString('en-IN', { 
-                        day: '2-digit', 
-                        month: 'short', 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      {n.read && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => toggleRead(n._id, true)}>
-                          <Undo2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {user?.role === 'admin' && n.relatedEntityId && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); setReplyingTo(n); }}>
-                          <Reply className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                  <div className="flex-1 min-w-0 cursor-pointer hover:bg-black/5 p-2 rounded-xl transition-colors -m-2" onClick={() => setSelectedNotification(n)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className={`font-bold text-sm ${!n.read ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</p>
+                        {!n.read && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">New</Badge>}
+                        {user?.role === 'admin' && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
+                            {n.recipientRole === 'all'
+                              ? 'To: Everyone'
+                              : n.recipientRole === 'admin' 
+                              ? 'To: Admin' 
+                              : n.recipientRole === 'program_manager'
+                                ? n.recipientId 
+                                  ? `To: ${adminsList.find(a => a._id === n.recipientId)?.name || 'Unknown Manager'}`
+                                  : 'To: All Program Managers'
+                                : n.recipientId 
+                                  ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || 'Unknown Fellow'}` 
+                                  : 'To: All Fellows'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                          {new Date(n.date).toLocaleDateString('en-IN', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          {n.read && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); toggleRead(n._id, true); }}>
+                              <Undo2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {user?.role === 'admin' && n.relatedEntityId && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); setReplyingTo(n); }}>
+                              <Reply className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                    <p className={`text-sm mt-1 mb-1 line-clamp-2 ${!n.read ? "text-muted-foreground font-medium" : "text-muted-foreground/60"}`}>{n.message}</p>
                   </div>
-                </div>
-                <p className={`text-sm mt-1 mb-1 line-clamp-2 ${!n.read ? "text-muted-foreground font-medium" : "text-muted-foreground/60"}`}>{n.message}</p>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ))}
       {notifications.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="p-12 flex flex-col items-center justify-center text-center">
