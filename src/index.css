@@ -34,7 +34,7 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 9 100% 50%;
+    --ring: 9 80% 65%;
 
     --radius: 1rem;
 
@@ -82,7 +82,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 222 47% 12%;
     --input: 222 47% 12%;
-    --ring: 355 85% 55%;
+    --ring: 355 60% 65%;
     --sidebar-background: 222 47% 3%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 355 85% 55%;
