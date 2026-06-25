@@ -264,7 +264,7 @@ const StudentsPage = () => {
         const genderPart = r.gender.trim().toLowerCase();
         // Parse classSection like "8A", "6th B", "Class 7 C" → grade + section
         const rawClass = r.classSection.trim();
-        const classMatch = rawClass.match(/^([\d]+(?:st|nd|rd|th)?)?\s*([A-Za-z])?$/i);
+        const classMatch = rawClass.match(/^([\d]+(?:st|nd|rd|th)?)?\s*[-]?\s*([A-Za-z])?$/i);
         const parsedGrade = classMatch?.[1] ?? rawClass;
         const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
         return {
@@ -293,7 +293,10 @@ const StudentsPage = () => {
   };
 
   const handleCarryForwardSubmit = async () => {
-    if (carryForwardSelectedIds.length === 0) { toast.error("Please select students to carry forward"); return; }
+    if (carryForwardSelectedIds.length === 0) {
+      toast.error("Please select at least one student to carry forward");
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -617,7 +620,7 @@ const StudentsPage = () => {
                 </div>
                 <div className="p-10 bg-muted/20 border-t flex items-center justify-end gap-4">
                   <DialogClose asChild><Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</Button></DialogClose>
-                  <Button onClick={handleCarryForwardSubmit} disabled={isSubmitting || carryForwardSelectedIds.length === 0} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+                  <Button onClick={handleCarryForwardSubmit} disabled={isSubmitting} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
                     {isSubmitting ? "Processing..." : "Carry Forward"}
                   </Button>
                 </div>
@@ -707,6 +710,7 @@ const StudentsPage = () => {
                 <div className="p-6 bg-muted/10 border-t flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <button
+                      type="button"
                       onClick={() => setGridRows(prev => [...prev, ...Array.from({ length: 10 }, emptyRow)])}
                       className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors"
                     >
@@ -726,7 +730,7 @@ const StudentsPage = () => {
                     </DialogClose>
                     <Button
                       onClick={handleBulkSubmit}
-                      disabled={isSubmitting || gridRows.filter(r => r.name.trim()).length === 0}
+                      disabled={isSubmitting}
                       className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
                     >
                       {isSubmitting ? 'Processing...' : `Add ${gridRows.filter(r => r.name.trim()).length} Students`}
