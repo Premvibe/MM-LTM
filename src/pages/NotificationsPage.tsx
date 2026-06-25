@@ -134,7 +134,7 @@ const NotificationsPage = () => {
       
       if (targetRecipient === "all_users") {
         recipientRole = "all";
-      } else if (targetRecipient === "all_fellows") {
+      } else if (targetRecipient === "all_fellows" || targetRecipient === "all_my_fellows") {
         recipientRole = "fellow";
       } else if (targetRecipient === "all_program_managers") {
         recipientRole = "program_manager";
@@ -158,7 +158,7 @@ const NotificationsPage = () => {
       setIsNewDialogOpen(false);
       setNewTitle("");
       setNewMessage("");
-      setTargetRecipient("all_users");
+      setTargetRecipient(user?.role === 'program_manager' ? "all_my_fellows" : "all_users");
       fetchNotifications();
     } catch (error) {
       toast.error("Failed to send notification");
@@ -213,8 +213,8 @@ const NotificationsPage = () => {
             Mark All as Read
           </Button>
         )}
-        {user?.role === 'admin' && (
-          <Button onClick={() => setIsNewDialogOpen(true)} className="rounded-2xl px-6 shadow-lg shadow-primary/20">
+        {(user?.role === 'admin' || user?.role === 'program_manager') && (
+          <Button onClick={() => { setTargetRecipient(user?.role === 'program_manager' ? "all_my_fellows" : "all_users"); setIsNewDialogOpen(true); }} className="rounded-2xl px-6 shadow-lg shadow-primary/20">
             <Send className="h-4 w-4 mr-2" />
             Send Announcement
           </Button>
@@ -382,22 +382,32 @@ const NotificationsPage = () => {
             <Select value={targetRecipient} onValueChange={setTargetRecipient}>
               <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select recipient" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all_users">Everyone</SelectItem>
-                <SelectSeparator />
-                
-                <SelectGroup>
-                  <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Program Managers</SelectLabel>
-                  <SelectItem value="all_program_managers" className="font-bold">All Program Managers</SelectItem>
-                  {adminsList.map(a => <SelectItem key={a._id} value={a._id} className="pl-8">{a.name}</SelectItem>)}
-                </SelectGroup>
-                
-                <SelectSeparator />
+                {user?.role === 'admin' ? (
+                  <>
+                    <SelectItem value="all_users">Everyone</SelectItem>
+                    <SelectSeparator />
+                    
+                    <SelectGroup>
+                      <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Program Managers</SelectLabel>
+                      <SelectItem value="all_program_managers" className="font-bold">All Program Managers</SelectItem>
+                      {adminsList.map(a => <SelectItem key={a._id} value={a._id} className="pl-8">{a.name}</SelectItem>)}
+                    </SelectGroup>
+                    
+                    <SelectSeparator />
 
-                <SelectGroup>
-                  <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Fellows</SelectLabel>
-                  <SelectItem value="all_fellows" className="font-bold">All Fellows</SelectItem>
-                  {fellowsList.map(f => <SelectItem key={f._id} value={f._id} className="pl-8">{f.name}</SelectItem>)}
-                </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Fellows</SelectLabel>
+                      <SelectItem value="all_fellows" className="font-bold">All Fellows</SelectItem>
+                      {fellowsList.map(f => <SelectItem key={f._id} value={f._id} className="pl-8">{f.name}</SelectItem>)}
+                    </SelectGroup>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all_my_fellows" className="font-bold">All My Fellows</SelectItem>
+                    <SelectSeparator />
+                    {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
