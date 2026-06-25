@@ -102,7 +102,7 @@ const FeedbackPage = () => {
           <p className="text-muted-foreground font-black tracking-widest uppercase text-[10px] mt-2">Help us improve the sessions and the app</p>
         </div>
 
-        {user?.role === 'fellow' && (
+        {(user?.role === 'fellow' || user?.role === 'program_manager') && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
