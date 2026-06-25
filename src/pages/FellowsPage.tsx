@@ -183,18 +183,30 @@ const FellowsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredFellows.map(f => (
+        {filteredFellows.map(f => {
+          const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
+          const types = Array.from(new Set(fellowCentres.map(c => c.type)));
+          let fellowType = "Unassigned";
+          if (types.length === 1) fellowType = types[0];
+          else if (types.length > 1) fellowType = "Mixed";
+
+          return (
           <Card key={f._id} className="animate-fade-in hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                     <span className="text-sm font-semibold text-primary-foreground">{f.name.charAt(0)}</span>
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <CardTitle className="text-sm font-semibold">{f.name}</CardTitle>
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0">Batch {f.batch || "N/A"}</Badge>
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0 whitespace-nowrap">Batch {f.batch || "N/A"}</Badge>
+                      {fellowType !== "Unassigned" && (
+                        <Badge variant={fellowType === "In-school" ? "default" : fellowType === "After-school" ? "secondary" : "outline"} className="text-[10px] h-5 px-1.5 py-0 whitespace-nowrap">
+                          {fellowType}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">{f.email}</p>
                   </div>
@@ -206,8 +218,8 @@ const FellowsPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-1">
-                {centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id)).map(centre => (
-                  <Badge key={centre._id} variant="secondary" className="text-xs">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
+                {fellowCentres.map(centre => (
+                  <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -225,7 +237,7 @@ const FellowsPage = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+        )})}
       </div>
     </div>
   );
