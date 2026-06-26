@@ -79,7 +79,7 @@ const StudentsPage = () => {
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterFellow, setFilterFellow] = useState("all");
-  const [filterBatch, setFilterBatch] = useState("all");
+  const [filterBatch, setFilterBatch] = useState("2026-2027");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   type GridRow = { name: string; age: string; gender: string; classSection: string; phone: string };
   const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', classSection: '', phone: '' });

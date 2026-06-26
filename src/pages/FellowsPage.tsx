@@ -30,7 +30,7 @@ const FellowsPage = () => {
   const [batch, setBatch] = useState("2026-2027");
   const [password, setPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterBatch, setFilterBatch] = useState<string>("all");
+  const [filterBatch, setFilterBatch] = useState<string>("2026-2027");
   const [filterType, setFilterType] = useState<string>("all");
 
   const filteredFellows = useMemo(() => {

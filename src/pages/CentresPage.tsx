@@ -31,7 +31,7 @@ const CentresPage = () => {
   const [selectedFellowIds, setSelectedFellowIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterBatch, setFilterBatch] = useState<string>("all");
+  const [filterBatch, setFilterBatch] = useState<string>("2026-2027");
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
