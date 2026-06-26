@@ -31,7 +31,7 @@ const CentresPage = () => {
   const [selectedFellowIds, setSelectedFellowIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterBatch, setFilterBatch] = useState<string>("2026-2027");
+  const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -46,7 +46,7 @@ const CentresPage = () => {
                           c.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           assignedFellows.includes(searchQuery.toLowerCase());
       const matchesType = filterType === "all" || c.type === filterType;
-      const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
+      const matchesBatch = filterBatch === "all" || c.fellowIds.length === 0 || c.fellowIds.some(fid => {
         const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
         return fellow?.batch === filterBatch;
       });

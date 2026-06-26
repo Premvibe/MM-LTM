@@ -79,7 +79,7 @@ const StudentsPage = () => {
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterFellow, setFilterFellow] = useState("all");
-  const [filterBatch, setFilterBatch] = useState("2026-2027");
+  const [filterBatch, setFilterBatch] = useState("all");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   type GridRow = { name: string; age: string; gender: string; classSection: string; phone: string };
   const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', classSection: '', phone: '' });
@@ -473,7 +473,7 @@ const StudentsPage = () => {
                                    c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
                                    assignedFellows.includes(centreSearchQuery.toLowerCase());
               const matchesType = filterType === "all" || c.type === filterType;
-              const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
+              const matchesBatch = filterBatch === "all" || c.fellowIds.length === 0 || c.fellowIds.some(fid => {
                 const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
                 return fellow?.batch === filterBatch;
               });
