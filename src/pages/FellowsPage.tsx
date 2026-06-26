@@ -27,7 +27,7 @@ const FellowsPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [batch, setBatch] = useState("4.0");
+  const [batch, setBatch] = useState("2026-2027");
   const [password, setPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterBatch, setFilterBatch] = useState<string>("all");
@@ -68,10 +68,10 @@ const FellowsPage = () => {
     }
   };
 
-  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setPassword(""); setEditItem(null); };
+  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("2026-2027"); setPassword(""); setEditItem(null); };
 
   const openEdit = (f: Fellow) => {
-    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setPassword(""); setOpen(true);
+    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "2026-2027"); setPassword(""); setOpen(true);
   };
 
   const handleSubmit = async () => {
@@ -129,7 +129,7 @@ const FellowsPage = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fellow-batch">Batch Version</Label>
-                <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
+                <Input id="fellow-batch" placeholder="e.g. 2026-2027" value={batch} onChange={e => setBatch(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fellow-password">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
