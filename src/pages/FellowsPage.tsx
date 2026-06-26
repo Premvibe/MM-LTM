@@ -20,6 +20,7 @@ const FellowsPage = () => {
   const { user } = useAuth();
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
+  const [adminsList, setAdminsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Fellow | null>(null);
@@ -52,12 +53,14 @@ const FellowsPage = () => {
   const fetchData = async () => {
     try {
       const params = user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
-      const [fellowsRes, centresRes] = await Promise.all([
+      const [fellowsRes, centresRes, adminsRes] = await Promise.all([
         api.get(`/fellows${params}`),
-        api.get(`/centres${params}`)
+        api.get(`/centres${params}`),
+        user?.role === 'admin' ? api.get(`/admins`) : Promise.resolve({ data: [{ ...user, role: 'program_manager' }] })
       ]);
       setFellowsList(fellowsRes.data.sort((a: Fellow, b: Fellow) => a.name.localeCompare(b.name)));
       setCentresList(centresRes.data);
+      setAdminsList(adminsRes.data.filter((a: any) => a.role === 'program_manager'));
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -190,6 +193,14 @@ const FellowsPage = () => {
           if (types.length === 1) fellowType = types[0];
           else if (types.length > 1) fellowType = "Mixed";
 
+          const assignedPMs = adminsList.filter(pm => {
+            if (pm.assignedFellowIds?.includes(f._id) || pm.assignedFellowIds?.includes(f.id)) return true;
+            const fellowCentreIds = fellowCentres.map(c => c._id).concat(fellowCentres.map(c => c.id).filter(Boolean));
+            if (pm.assignedCentreIds?.some((cid: string) => fellowCentreIds.includes(cid))) return true;
+            return false;
+          });
+          const pmName = assignedPMs.length > 0 ? assignedPMs.map(pm => pm.name).join(', ') : "Unassigned";
+
           return (
           <Card key={f._id} className="animate-fade-in hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
@@ -222,6 +233,9 @@ const FellowsPage = () => {
                   <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
                 ))}
               </div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                PM: <span className="text-foreground">{pmName}</span>
+              </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs">Sessions</p>
