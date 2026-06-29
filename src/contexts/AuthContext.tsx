@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import api from "@/lib/api";
 
-export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager";
+export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
 interface User {
   id: string;
@@ -18,6 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isMEManager: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
@@ -60,11 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const isAdmin = user ? ["admin", "program_director", "program_lead", "program_manager"].includes(user.role) : false;
-  const isSuperAdmin = user ? ["admin", "program_director", "program_lead"].includes(user.role) : false;
+  const isAdmin = user ? ["admin", "program_director", "program_lead", "program_manager", "m_e_manager"].includes(user.role) : false;
+  const isSuperAdmin = user ? ["admin", "program_director", "program_lead", "m_e_manager"].includes(user.role) : false;
+  const isMEManager = user?.role === "m_e_manager";
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isAdmin, isSuperAdmin, login, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isAdmin, isSuperAdmin, isMEManager, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -39,7 +39,7 @@ type Centre = {
 };
 
 const AdminsPage = () => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, isMEManager } = useAuth();
   const [adminsList, setAdminsList] = useState<Admin[]>([]);
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
@@ -235,6 +235,8 @@ const AdminsPage = () => {
 
   const getRoleLabel = (roleVal: string) => {
     switch (roleVal) {
+      case "m_e_manager":
+        return "M&E Manager";
       case "program_director":
         return "Program Director";
       case "program_lead":
@@ -248,6 +250,7 @@ const AdminsPage = () => {
 
   const getRoleBadgeVariant = (roleVal: string) => {
     switch (roleVal) {
+      case "m_e_manager":
       case "program_director":
         return "default";
       case "program_lead":
@@ -353,6 +356,7 @@ const AdminsPage = () => {
                       <SelectValue placeholder="Select Privileged Role..." />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                      <SelectItem value="m_e_manager" className="rounded-lg text-xs font-bold text-primary">M&E Manager (Super Admin +)</SelectItem>
                       <SelectItem value="program_director" className="rounded-lg text-xs font-bold">Program Director (Super Admin)</SelectItem>
                       <SelectItem value="program_lead" className="rounded-lg text-xs font-bold">Program Lead (Super Admin)</SelectItem>
                       <SelectItem value="program_manager" className="rounded-lg text-xs font-bold">Program Manager (Admin - Scoped)</SelectItem>
@@ -640,14 +644,16 @@ const AdminsPage = () => {
                   >
                     <Pencil className="h-3 w-3 mr-1" />Edit Privileges
                   </Button>
-                  <Button 
-                    onClick={() => handleDelete(admin._id)} 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 hover:scale-105 active:scale-95 transition-all"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />Delete Account
-                  </Button>
+                  {isMEManager && (
+                    <Button 
+                      onClick={() => handleDelete(admin._id)} 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />Delete Account
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

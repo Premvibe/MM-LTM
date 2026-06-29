@@ -19,7 +19,7 @@ type Feedback = {
 };
 
 const FeedbackPage = () => {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [open, setOpen] = useState(false);
   const [sessionRating, setSessionRating] = useState(0);
@@ -202,7 +202,7 @@ const FeedbackPage = () => {
                       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{new Date(f.date).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  {user?.role === 'admin' && (
+                  {isMEManager && (
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(f._id)} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

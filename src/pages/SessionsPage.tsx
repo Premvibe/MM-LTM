@@ -18,7 +18,7 @@ type Centre = { _id: string; id: string; name: string; location: string; type: "
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
 
 const SessionsPage = () => {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sessionsList, setSessionsList] = useState<Session[]>([]);
@@ -474,7 +474,9 @@ const SessionsPage = () => {
                 </Button>
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDelete(s._id)}><Trash2 className="h-4 w-4" /></Button>
+                  {isMEManager && (
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDelete(s._id)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
                 </div>
               </div>
             </CardContent>
