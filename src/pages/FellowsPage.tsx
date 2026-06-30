@@ -13,11 +13,11 @@ import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; programManagers?: string[] };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
 const FellowsPage = () => {
-  const { user, isMEManager } = useAuth();
+  const { user, isMEManager, isSuperAdmin } = useAuth();
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,10 +232,19 @@ const FellowsPage = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-1">
-                {fellowCentres.map(centre => (
-                  <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
-                ))}
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-1">
+                  {fellowCentres.map(centre => (
+                    <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
+                  ))}
+                </div>
+                {isSuperAdmin && f.programManagers && f.programManagers.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {f.programManagers.map((pmName, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[9px] font-semibold py-0 h-4 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">PM: {pmName}</Badge>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
