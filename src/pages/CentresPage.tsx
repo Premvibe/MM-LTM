@@ -448,7 +448,7 @@ const CentresPage = () => {
                       ) : null;
                     })}
                   </div>
-                  {c.programManagers && c.programManagers.length > 0 && (
+                  {isSuperAdmin && c.programManagers && c.programManagers.length > 0 && (
                     <div className="flex flex-wrap gap-1 justify-end mt-1">
                       {c.programManagers.map((pmName, idx) => (
                         <Badge key={idx} variant="secondary" className="text-[9px] font-semibold py-0 h-4 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">PM: {pmName}</Badge>
