@@ -98,6 +98,7 @@ const StudentsPage = () => {
     return m < 6 ? `${y - 1}-${y}` : `${y}-${y + 1}`;
   };
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(getCurrentAcademicYear());
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!carryForwardYear) setCarryForwardYear(getCurrentAcademicYear());
@@ -159,6 +160,18 @@ const StudentsPage = () => {
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to delete student");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedStudentIds.length} students?`)) return;
+    try {
+      await api.post(`/students/bulk-delete`, { studentIds: selectedStudentIds });
+      toast.success("Students deleted successfully");
+      setSelectedStudentIds([]);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete students");
     }
   };
 
@@ -426,6 +439,17 @@ const StudentsPage = () => {
     
     return stats;
   }, [centreStudents, sessionsList, assessmentsList, selectedMonth, selectedYear, selectedCentreId]);
+
+  const filteredStudents = useMemo(() => {
+    return centreStudents.filter(s => {
+      if (!isEnrolledInMonth(s, selectedMonth, selectedYear)) return false;
+      const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesGender = filterGender === "all" || s.gender === filterGender;
+      const monthlyStatus = getStatusForMonth(s, selectedMonth, selectedYear);
+      const matchesStatus = filterStatus === "all" || monthlyStatus === filterStatus;
+      return matchesSearch && matchesGender && matchesStatus;
+    });
+  }, [centreStudents, selectedMonth, selectedYear, searchQuery, filterGender, filterStatus]);
 
   // Centre list view
   if (!selectedCentreId) {
@@ -812,19 +836,50 @@ const StudentsPage = () => {
       </div>
 
       <div className="space-y-4">
-        {centreStudents
-          .filter(s => {
-            if (!isEnrolledInMonth(s, selectedMonth, selectedYear)) return false;
-            const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesGender = filterGender === "all" || s.gender === filterGender;
-            const monthlyStatus = getStatusForMonth(s, selectedMonth, selectedYear);
-            const matchesStatus = filterStatus === "all" || monthlyStatus === filterStatus;
-            return matchesSearch && matchesGender && matchesStatus;
-          })
-          .map(s => (
+        {isMEManager && filteredStudents.length > 0 && (
+          <div className="flex items-center justify-between bg-white/40 p-4 rounded-2xl shadow-sm border border-primary/5">
+            <div className="flex items-center gap-3">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+                checked={selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedStudentIds(filteredStudents.map(s => s._id));
+                  } else {
+                    setSelectedStudentIds([]);
+                  }
+                }}
+              />
+              <span className="text-sm font-semibold text-foreground">Select All ({filteredStudents.length})</span>
+            </div>
+            {selectedStudentIds.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px]">
+                <Trash2 className="h-3 w-3 mr-2" /> Delete {selectedStudentIds.length} Selected
+              </Button>
+            )}
+          </div>
+        )}
+        {filteredStudents.map(s => (
             <Card key={s._id} className="glass-card-premium border-none hover:shadow-2xl transition-all group overflow-hidden">
-              <CardContent className="p-0 flex flex-col sm:flex-row items-stretch">
-                <div className="p-8 flex-1 flex items-center gap-8">
+              <CardContent className="p-0 flex flex-col sm:flex-row items-stretch relative">
+                {isMEManager && (
+                  <div className="absolute top-4 left-4 z-10">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+                      checked={selectedStudentIds.includes(s._id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedStudentIds([...selectedStudentIds, s._id]);
+                        } else {
+                          setSelectedStudentIds(selectedStudentIds.filter(id => id !== s._id));
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="p-8 flex-1 flex items-center gap-8 pl-12">
                 <div className="h-12 w-12 md:h-16 md:w-16 rounded-[1.5rem] bg-primary/10 flex items-center justify-center text-primary font-black text-xl md:text-2xl group-hover:rotate-6 transition-transform shrink-0">
                     {s.name.charAt(0)}
                   </div>
@@ -870,7 +925,7 @@ const StudentsPage = () => {
               </CardContent>
             </Card>
           ))}
-        {centreStudents.length === 0 && (
+        {filteredStudents.length === 0 && (
           <div className="text-center py-20 bg-muted/10 rounded-[3rem] border-2 border-dashed">
             <Users className="h-12 w-12 text-muted-foreground mx-auto opacity-20" />
             <p className="text-sm font-black text-muted-foreground mt-4 uppercase tracking-widest">No Learners Found</p>
