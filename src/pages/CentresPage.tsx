@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 
-type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number; status?: "active" | "paused"; startDate?: string; endDate?: string; pocName?: string; pocContact?: string; pocEmail?: string; };
+type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number; status?: "active" | "paused"; startDate?: string; endDate?: string; pocName?: string; pocContact?: string; pocEmail?: string; programManagers?: string[]; };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
 
 const CentresPage = () => {
@@ -439,13 +439,22 @@ const CentresPage = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1 justify-end">
-                  {c.fellowIds.map(fid => {
-                    const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
-                    return fellow ? (
-                      <Badge key={fid} variant="outline" className="text-[10px] font-medium py-0 h-4">{fellow.name}</Badge>
-                    ) : null;
-                  })}
+                <div className="flex flex-col gap-1 items-end">
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {c.fellowIds.map(fid => {
+                      const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
+                      return fellow ? (
+                        <Badge key={fid} variant="outline" className="text-[10px] font-medium py-0 h-4">{fellow.name}</Badge>
+                      ) : null;
+                    })}
+                  </div>
+                  {c.programManagers && c.programManagers.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-end mt-1">
+                      {c.programManagers.map((pmName, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-[9px] font-semibold py-0 h-4 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">PM: {pmName}</Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
