@@ -33,6 +33,7 @@ const CentresPage = () => {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterFellow, setFilterFellow] = useState<string>("all");
+  const [filterPM, setFilterPM] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [pocName, setPocName] = useState("");
@@ -51,9 +52,12 @@ const CentresPage = () => {
         return fellow?.batch === filterBatch;
       });
       const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
-      return matchesSearch && matchesType && matchesBatch && matchesFellow;
+      const matchesPM = filterPM === "all" || 
+                        (filterPM === "unassigned" ? (!c.programManagers || c.programManagers.length === 0) :
+                         (c.programManagers || []).includes(filterPM));
+      return matchesSearch && matchesType && matchesBatch && matchesFellow && matchesPM;
     });
-  }, [centres, fellowsList, searchQuery, filterType, filterBatch, filterFellow]);
+  }, [centres, fellowsList, searchQuery, filterType, filterBatch, filterFellow, filterPM]);
 
   useEffect(() => {
     fetchData();
@@ -295,7 +299,7 @@ const CentresPage = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className={`grid grid-cols-1 gap-4 mb-8 ${isSuperAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
@@ -329,6 +333,32 @@ const CentresPage = () => {
             </div>
           </CardContent>
         </Card>
+        {isSuperAdmin && (
+          <>
+            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-purple-600 uppercase tracking-wider">PM Assigned</p>
+                  <p className="text-2xl font-black mt-1">{centres.filter(c => c.programManagers && c.programManagers.length > 0).length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-purple-600" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Unassigned</p>
+                  <p className="text-2xl font-black mt-1">{centres.filter(c => !c.programManagers || c.programManagers.length === 0).length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-red-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg mb-8">
@@ -376,6 +406,18 @@ const CentresPage = () => {
               <SelectItem value="After-school">After-school</SelectItem>
             </SelectContent>
           </Select>
+          {isSuperAdmin && (
+            <Select value={filterPM} onValueChange={setFilterPM}>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[130px] md:w-[160px]"><SelectValue placeholder="All PMs" /></SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectItem value="all">All PMs</SelectItem>
+                <SelectItem value="unassigned">Unassigned Centres</SelectItem>
+                {Array.from(new Set(centres.flatMap(c => c.programManagers || []))).sort().map(pm => (
+                  <SelectItem key={pm} value={pm}>{pm}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
