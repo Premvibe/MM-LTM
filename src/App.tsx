@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { AppLayout } from "@/components/AppLayout";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -75,6 +76,7 @@ const App = () => (
           </BrowserRouter>
         </AuthProvider>
         <Toaster />
+        <SonnerToaster />
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

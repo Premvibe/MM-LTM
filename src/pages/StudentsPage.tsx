@@ -195,7 +195,7 @@ const StudentsPage = () => {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !age || !centreId) { toast.error("Please fill in all fields"); return; }
+    if (!name.trim() || !centreId) { toast.error("Please fill in required fields (Name and Centre)"); return; }
 
     // Parse combined classSection (e.g. "8A") into grade + section
     const rawClass = grade.trim();
@@ -205,7 +205,7 @@ const StudentsPage = () => {
 
     const studentData = { 
       name: name.trim(), 
-      age: parseInt(age), 
+      age: age ? parseInt(age) : undefined, 
       gender, 
       centreId,
       phone: phone.trim(),
