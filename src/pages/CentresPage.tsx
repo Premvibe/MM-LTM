@@ -34,6 +34,7 @@ const CentresPage = () => {
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [filterPM, setFilterPM] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [pocName, setPocName] = useState("");
@@ -54,10 +55,13 @@ const CentresPage = () => {
       const matchesFellow = filterFellow === "all" || c.fellowIds.includes(filterFellow);
       const matchesPM = filterPM === "all" || 
                         (filterPM === "unassigned" ? (!c.programManagers || c.programManagers.length === 0) :
+                         filterPM === "assigned" ? (c.programManagers && c.programManagers.length > 0) :
                          (c.programManagers || []).includes(filterPM));
-      return matchesSearch && matchesType && matchesBatch && matchesFellow && matchesPM;
+      const matchesStatus = filterStatus === "all" || 
+                            (filterStatus === "active" ? c.status !== "paused" : c.status === "paused");
+      return matchesSearch && matchesType && matchesBatch && matchesFellow && matchesPM && matchesStatus;
     });
-  }, [centres, fellowsList, searchQuery, filterType, filterBatch, filterFellow, filterPM]);
+  }, [centres, fellowsList, searchQuery, filterType, filterBatch, filterFellow, filterPM, filterStatus]);
 
   useEffect(() => {
     fetchData();
@@ -300,7 +304,10 @@ const CentresPage = () => {
       </div>
 
       <div className={`grid grid-cols-1 gap-4 mb-8 ${isSuperAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+        <Card 
+          className={`cursor-pointer transition-all ${filterStatus === 'all' && filterPM === 'all' ? 'ring-2 ring-primary' : ''} bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 hover:scale-[1.02]`}
+          onClick={() => { setFilterStatus("all"); setFilterPM("all"); }}
+        >
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-primary uppercase tracking-wider">Total Centres</p>
@@ -311,7 +318,10 @@ const CentresPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
+        <Card 
+          className={`cursor-pointer transition-all ${filterStatus === 'active' ? 'ring-2 ring-success' : ''} bg-gradient-to-br from-success/10 to-success/5 border-success/20 hover:scale-[1.02]`}
+          onClick={() => setFilterStatus(filterStatus === 'active' ? 'all' : 'active')}
+        >
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wider">Active</p>
@@ -322,7 +332,10 @@ const CentresPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20">
+        <Card 
+          className={`cursor-pointer transition-all ${filterStatus === 'paused' ? 'ring-2 ring-warning' : ''} bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20 hover:scale-[1.02]`}
+          onClick={() => setFilterStatus(filterStatus === 'paused' ? 'all' : 'paused')}
+        >
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-warning uppercase tracking-wider">Paused</p>
@@ -335,7 +348,10 @@ const CentresPage = () => {
         </Card>
         {isSuperAdmin && (
           <>
-            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+            <Card 
+              className={`cursor-pointer transition-all ${filterPM === 'assigned' ? 'ring-2 ring-purple-500' : ''} bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 hover:scale-[1.02]`}
+              onClick={() => setFilterPM(filterPM === 'assigned' ? 'all' : 'assigned')}
+            >
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-purple-600 uppercase tracking-wider">PM Assigned</p>
@@ -346,7 +362,10 @@ const CentresPage = () => {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
+            <Card 
+              className={`cursor-pointer transition-all ${filterPM === 'unassigned' ? 'ring-2 ring-red-500' : ''} bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20 hover:scale-[1.02]`}
+              onClick={() => setFilterPM(filterPM === 'unassigned' ? 'all' : 'unassigned')}
+            >
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Unassigned</p>
