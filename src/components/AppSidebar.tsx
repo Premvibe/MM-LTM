@@ -32,7 +32,7 @@ const navItems: NavItem[] = [
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "mne_officer"] },
   { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin", "fellow", "mne_officer"] },
   { title: "Feedback", url: "/feedback", icon: MessageSquarePlus, roles: ["admin", "fellow"] },
-  { title: "Managers", url: "/admins", icon: ShieldCheck, roles: ["admin", "program_director", "program_lead"] },
+  { title: "Managers", url: "/admins", icon: ShieldCheck, roles: ["admin", "program_director", "program_lead", "m_e_manager"] },
 ];
 
 export function AppSidebar() {
@@ -44,7 +44,7 @@ export function AppSidebar() {
   const filteredItems = navItems.filter(item => {
     if (!user) return false;
     if (item.roles.includes(user.role)) return true;
-    if (item.roles.includes("admin") && ["program_director", "program_lead", "program_manager"].includes(user.role)) {
+    if (item.roles.includes("admin") && ["program_director", "program_lead", "program_manager", "m_e_manager"].includes(user.role)) {
       return true;
     }
     return false;
@@ -97,7 +97,9 @@ export function AppSidebar() {
         {!collapsed && user && (
           <div className="mb-2 px-2">
             <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{user.role.replace("_", " ")}</p>
+            <p className="text-xs text-sidebar-foreground/60 capitalize">
+              {user.role === 'm_e_manager' ? 'M&E Manager' : user.role.replace(/_/g, " ")}
+            </p>
           </div>
         )}
         <SidebarMenu>
