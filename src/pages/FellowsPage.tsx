@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter } from "lucide-react";
@@ -17,20 +17,19 @@ type Fellow = { _id: string; id: string; name: string; email: string; phone: str
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
 const FellowsPage = () => {
-  const { user } = useAuth();
+  const { user, isMEManager } = useAuth();
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
-  const [adminsList, setAdminsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Fellow | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [batch, setBatch] = useState("2026-2027");
+  const [batch, setBatch] = useState("4.0");
   const [password, setPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterBatch, setFilterBatch] = useState<string>("2026-2027");
+  const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
 
   const filteredFellows = useMemo(() => {
@@ -53,14 +52,12 @@ const FellowsPage = () => {
   const fetchData = async () => {
     try {
       const params = user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
-      const [fellowsRes, centresRes, adminsRes] = await Promise.all([
+      const [fellowsRes, centresRes] = await Promise.all([
         api.get(`/fellows${params}`),
-        api.get(`/centres${params}`),
-        user?.role === 'admin' ? api.get(`/admins`) : Promise.resolve({ data: [{ ...user, role: 'program_manager' }] })
+        api.get(`/centres${params}`)
       ]);
       setFellowsList(fellowsRes.data.sort((a: Fellow, b: Fellow) => a.name.localeCompare(b.name)));
       setCentresList(centresRes.data);
-      setAdminsList(adminsRes.data.filter((a: any) => a.role === 'program_manager'));
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -68,10 +65,10 @@ const FellowsPage = () => {
     }
   };
 
-  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("2026-2027"); setPassword(""); setEditItem(null); };
+  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setPassword(""); setEditItem(null); };
 
   const openEdit = (f: Fellow) => {
-    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "2026-2027"); setPassword(""); setOpen(true);
+    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setPassword(""); setOpen(true);
   };
 
   const handleSubmit = async () => {
@@ -96,6 +93,18 @@ const FellowsPage = () => {
       setOpen(false);
     } catch (error) {
       toast.error("Failed to save fellow");
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to permanently delete this fellow?")) return;
+    try {
+      await api.delete(`/fellows/${id}`);
+      toast.success("Fellow deleted successfully");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete fellow");
     }
   };
 
@@ -129,7 +138,7 @@ const FellowsPage = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fellow-batch">Batch Version</Label>
-                <Input id="fellow-batch" placeholder="e.g. 2026-2027" value={batch} onChange={e => setBatch(e.target.value)} />
+                <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fellow-password">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
@@ -193,14 +202,6 @@ const FellowsPage = () => {
           if (types.length === 1) fellowType = types[0];
           else if (types.length > 1) fellowType = "Mixed";
 
-          const assignedPMs = adminsList.filter(pm => {
-            if (pm.assignedFellowIds?.includes(f._id) || pm.assignedFellowIds?.includes(f.id)) return true;
-            const fellowCentreIds = fellowCentres.map(c => c._id).concat(fellowCentres.map(c => c.id).filter(Boolean));
-            if (pm.assignedCentreIds?.some((cid: string) => fellowCentreIds.includes(cid))) return true;
-            return false;
-          });
-          const pmName = assignedPMs.length > 0 ? assignedPMs.map(pm => pm.name).join(', ') : "Unassigned";
-
           return (
           <Card key={f._id} className="animate-fade-in hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
@@ -223,7 +224,10 @@ const FellowsPage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(f)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(f); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                  {isMEManager && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => handleDelete(e, f._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -233,9 +237,6 @@ const FellowsPage = () => {
                   <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                PM: <span className="text-foreground">{pmName}</span>
-              </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs">Sessions</p>

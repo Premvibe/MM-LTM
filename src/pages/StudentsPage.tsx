@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck } from "lucide-react";
+import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -44,7 +44,7 @@ type Centre = { _id: string; id: string; name: string; location: string; type: "
 type Fellow = { _id: string; id: string; name: string; email: string; batch?: string };
 
 const StudentsPage = () => {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
@@ -148,6 +148,18 @@ const StudentsPage = () => {
     setMothersName(""); setMothersContact(""); setAddress("");
     setGrade(""); setSection(""); setStatus("Active");
     setEditItem(null); 
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to permanently delete this student?")) return;
+    try {
+      await api.delete(`/students/${id}`);
+      toast.success("Student deleted successfully");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete student");
+    }
   };
 
   const openEdit = (s: Student) => {
@@ -473,7 +485,7 @@ const StudentsPage = () => {
                                    c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
                                    assignedFellows.includes(centreSearchQuery.toLowerCase());
               const matchesType = filterType === "all" || c.type === filterType;
-              const matchesBatch = filterBatch === "all" || c.fellowIds.length === 0 || c.fellowIds.some(fid => {
+              const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
                 const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
                 return fellow?.batch === filterBatch;
               });
@@ -849,6 +861,11 @@ const StudentsPage = () => {
                   <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/10 hover:bg-primary hover:text-white transition-all" onClick={() => openEdit(s)}>
                     <Pencil className="h-4 w-4 mr-2" /> Edit Profile
                   </Button>
+                  {isMEManager && (
+                    <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all" onClick={(e) => handleDelete(e, s._id)}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

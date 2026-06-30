@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle, X } from "lucide-react";
+import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -18,7 +18,7 @@ type Centre = { _id: string; id: string; name: string; location: string; type: "
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
 
 const CentresPage = () => {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const navigate = useNavigate();
   const [centres, setCentres] = useState<Centre[]>([]);
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
@@ -46,7 +46,7 @@ const CentresPage = () => {
                           c.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           assignedFellows.includes(searchQuery.toLowerCase());
       const matchesType = filterType === "all" || c.type === filterType;
-      const matchesBatch = filterBatch === "all" || c.fellowIds.length === 0 || c.fellowIds.some(fid => {
+      const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
         const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
         return fellow?.batch === filterBatch;
       });
@@ -152,6 +152,18 @@ const CentresPage = () => {
       setOpen(false);
     } catch (error) {
       toast.error("Failed to save centre");
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to permanently delete this centre?")) return;
+    try {
+      await api.delete(`/centres/${id}`);
+      toast.success("Centre deleted successfully");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete centre");
     }
   };
 
@@ -401,6 +413,9 @@ const CentresPage = () => {
                     {c.status === "paused" ? <PlayCircle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
                   </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(c); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                  {isMEManager && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => handleDelete(e, c._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  )}
                 </div>
               </div>
                 <div className="flex items-center gap-2 mt-1">
