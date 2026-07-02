@@ -98,6 +98,9 @@ const StudentsPage = () => {
     return m < 6 ? `${y - 1}-${y}` : `${y}-${y + 1}`;
   };
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!carryForwardYear) setCarryForwardYear(getCurrentAcademicYear());
@@ -141,24 +144,35 @@ const StudentsPage = () => {
     setEditItem(null); 
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const confirmDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to permanently delete this student?")) return;
+    setDeleteStudentId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteStudentId) return;
     try {
-      await api.delete(`/students/${id}`);
+      await api.delete(`/students/${deleteStudentId}`);
       toast.success("Student deleted successfully");
+      setIsDeleteDialogOpen(false);
+      setDeleteStudentId(null);
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to delete student");
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to permanently delete ${selectedStudentIds.length} students?`)) return;
+  const confirmBulkDelete = () => {
+    setIsBulkDeleteDialogOpen(true);
+  };
+
+  const executeBulkDelete = async () => {
     try {
       await api.post(`/students/bulk-delete`, { studentIds: selectedStudentIds });
       toast.success("Students deleted successfully");
       setSelectedStudentIds([]);
+      setIsBulkDeleteDialogOpen(false);
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to delete students");
@@ -825,7 +839,7 @@ const StudentsPage = () => {
               <span className="text-sm font-semibold text-foreground">Select All ({filteredStudents.length})</span>
             </div>
             {selectedStudentIds.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px]">
+              <Button variant="destructive" size="sm" onClick={confirmBulkDelete} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px]">
                 <Trash2 className="h-3 w-3 mr-2" /> Delete {selectedStudentIds.length} Selected
               </Button>
             )}
@@ -888,7 +902,7 @@ const StudentsPage = () => {
                     <Pencil className="h-4 w-4 mr-2" /> Edit Profile
                   </Button>
                   {isMEManager && (
-                    <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all" onClick={(e) => handleDelete(e, s._id)}>
+                    <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all" onClick={(e) => confirmDelete(e, s._id)}>
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </Button>
                   )}
@@ -976,6 +990,52 @@ const StudentsPage = () => {
               {editItem ? "Save Changes" : "Confirm Enrollment"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Dialogs */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-sm rounded-[3rem] border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black tracking-tighter text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Confirm Deletion
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm font-semibold text-muted-foreground leading-relaxed">
+              Are you sure you want to permanently delete this student from {selectedCentre?.name || "this centre"}? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="sm:justify-between gap-3 sm:gap-0 mt-4">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={executeDelete} className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 w-full sm:w-auto shadow-xl shadow-destructive/20">
+              Delete Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <DialogContent className="max-w-sm rounded-[3rem] border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black tracking-tighter text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Confirm Bulk Deletion
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm font-semibold text-muted-foreground leading-relaxed">
+              Are you sure you want to permanently delete {selectedStudentIds.length} selected students from {selectedCentre?.name || "this centre"}? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="sm:justify-between gap-3 sm:gap-0 mt-4">
+            <Button variant="ghost" onClick={() => setIsBulkDeleteDialogOpen(false)} className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={executeBulkDelete} className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-11 w-full sm:w-auto shadow-xl shadow-destructive/20">
+              Delete {selectedStudentIds.length} Students
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
