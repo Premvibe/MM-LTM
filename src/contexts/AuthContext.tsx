@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user ? ["admin", "program_director", "program_lead", "program_manager", "m_e_manager"].includes(user.role) : false;
   const isSuperAdmin = user ? ["admin", "program_director", "program_lead", "m_e_manager"].includes(user.role) : false;
-  const isMEManager = user?.role === "m_e_manager";
+  const isMEManager = user?.role === "m_e_manager" || user?.role === "admin";
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isAdmin, isSuperAdmin, isMEManager, login, logout, updateProfile }}>
