@@ -3,17 +3,17 @@ import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/lib/api/../components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserCheck, UserX, UserMinus, ShieldX } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; programManagers?: string[] };
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; status?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; programManagers?: string[] };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
 const FellowsPage = () => {
@@ -27,23 +27,36 @@ const FellowsPage = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [batch, setBatch] = useState("4.0");
+  const [status, setStatus] = useState("Active");
   const [password, setPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const counts = { Active: 0, Inactive: 0, Left: 0, Terminated: 0, Total: fellowsList.length };
+    fellowsList.forEach(f => {
+      const s = f.status || "Active";
+      if (s in counts) counts[s as keyof typeof counts]++;
+    });
+    return counts;
+  }, [fellowsList]);
 
   const filteredFellows = useMemo(() => {
     return fellowsList.filter(f => {
       const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           f.email.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesBatch = filterBatch === "all" || f.batch === filterBatch;
+      const matchesStatus = filterStatus === "all" || (f.status || "Active") === filterStatus;
       
       const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
       const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
       
-      return matchesSearch && matchesBatch && matchesType;
+      return matchesSearch && matchesBatch && matchesType && matchesStatus;
     });
-  }, [fellowsList, centresList, searchQuery, filterBatch, filterType]);
+  }, [fellowsList, centresList, searchQuery, filterBatch, filterType, filterStatus]);
 
   useEffect(() => {
     fetchData();
@@ -65,17 +78,17 @@ const FellowsPage = () => {
     }
   };
 
-  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setPassword(""); setEditItem(null); };
+  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setStatus("Active"); setPassword(""); setEditItem(null); };
 
   const openEdit = (f: Fellow) => {
-    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setPassword(""); setOpen(true);
+    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setStatus(f.status || "Active"); setPassword(""); setOpen(true);
   };
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) { toast.error("Please fill in name, email, and phone"); return; }
     if (!editItem && !password.trim()) { toast.error("Password is required for new fellows"); return; }
     
-    const fellowData: any = { name: name.trim(), email: email.trim(), phone: phone.trim(), batch };
+    const fellowData: any = { name: name.trim(), email: email.trim(), phone: phone.trim(), batch, status };
     if (password.trim()) {
       fellowData.password = password.trim();
     }
@@ -108,6 +121,21 @@ const FellowsPage = () => {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "Active":
+        return <Badge className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 border-none hover:bg-emerald-200">Active</Badge>;
+      case "Inactive":
+        return <Badge className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-amber-100 text-amber-700 border-none hover:bg-amber-200">Inactive</Badge>;
+      case "Left":
+        return <Badge className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border-none hover:bg-slate-200">Left</Badge>;
+      case "Terminated":
+        return <Badge className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-red-100 text-red-700 border-none hover:bg-red-200">Terminated</Badge>;
+      default:
+        return <Badge className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 border-none hover:bg-emerald-200">Active</Badge>;
+    }
+  };
+
   return (
     <div>
       <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -136,9 +164,23 @@ const FellowsPage = () => {
                 <Label htmlFor="fellow-phone">Phone</Label>
                 <Input id="fellow-phone" placeholder="e.g. +91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="fellow-batch">Batch Version</Label>
-                <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fellow-batch">Batch Version</Label>
+                  <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                      <SelectItem value="Left">Left</SelectItem>
+                      <SelectItem value="Terminated">Terminated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fellow-password">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
@@ -151,6 +193,80 @@ const FellowsPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Status Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md border-2 ${filterStatus === 'all' ? 'border-primary shadow-md' : 'border-transparent'}`}
+          onClick={() => setFilterStatus('all')}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total</p>
+              <p className="text-2xl font-black text-primary">{statusCounts.Total}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md border-2 ${filterStatus === 'Active' ? 'border-emerald-500 shadow-md' : 'border-transparent'}`}
+          onClick={() => setFilterStatus(filterStatus === 'Active' ? 'all' : 'Active')}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <UserCheck className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Active</p>
+              <p className="text-2xl font-black text-emerald-600">{statusCounts.Active}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md border-2 ${filterStatus === 'Inactive' ? 'border-amber-500 shadow-md' : 'border-transparent'}`}
+          onClick={() => setFilterStatus(filterStatus === 'Inactive' ? 'all' : 'Inactive')}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center">
+              <UserMinus className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Inactive</p>
+              <p className="text-2xl font-black text-amber-600">{statusCounts.Inactive}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md border-2 ${filterStatus === 'Left' ? 'border-slate-500 shadow-md' : 'border-transparent'}`}
+          onClick={() => setFilterStatus(filterStatus === 'Left' ? 'all' : 'Left')}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center">
+              <UserX className="h-5 w-5 text-slate-600" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Left</p>
+              <p className="text-2xl font-black text-slate-600">{statusCounts.Left}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md border-2 ${filterStatus === 'Terminated' ? 'border-red-500 shadow-md' : 'border-transparent'}`}
+          onClick={() => setFilterStatus(filterStatus === 'Terminated' ? 'all' : 'Terminated')}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center">
+              <ShieldX className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Terminated</p>
+              <p className="text-2xl font-black text-red-600">{statusCounts.Terminated}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -213,6 +329,7 @@ const FellowsPage = () => {
                   <div>
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <CardTitle className="text-sm font-semibold">{f.name}</CardTitle>
+                      {getStatusBadge(f.status || "Active")}
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0 whitespace-nowrap">Batch {f.batch || "N/A"}</Badge>
                       {fellowType !== "Unassigned" && (
                         <Badge variant={fellowType === "In-school" ? "default" : fellowType === "After-school" ? "secondary" : "outline"} className="text-[10px] h-5 px-1.5 py-0 whitespace-nowrap">
