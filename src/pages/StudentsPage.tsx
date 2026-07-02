@@ -97,7 +97,6 @@ const StudentsPage = () => {
     const y = d.getFullYear();
     return m < 6 ? `${y - 1}-${y}` : `${y}-${y + 1}`;
   };
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState(getCurrentAcademicYear());
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -106,16 +105,7 @@ const StudentsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [selectedAcademicYear]);
-
-  useEffect(() => {
-    if (selectedAcademicYear) {
-      const [start, end] = selectedAcademicYear.split('-');
-      if (start && end) {
-        setSelectedYear(selectedMonth < 6 ? parseInt(end) : parseInt(start));
-      }
-    }
-  }, [selectedAcademicYear, selectedMonth]);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -125,7 +115,7 @@ const StudentsPage = () => {
           ? `?role=program_manager&email=${user.email}` 
           : '';
       const [studentsRes, centresRes, fellowsRes, sessionsRes, assessmentsRes] = await Promise.all([
-        api.get(`/students${params}${params ? '&' : '?'}academicYear=${selectedAcademicYear}`),
+        api.get(`/students${params}`),
         api.get(`/centres${params}`),
         api.get(`/fellows${params}`),
         api.get(`/sessions${params}`),
@@ -219,8 +209,7 @@ const StudentsPage = () => {
       section: selectedCentre?.type === "In-school" ? parsedSection : undefined,
       status,
       month: selectedMonth,
-      year: selectedYear,
-      academicYear: selectedAcademicYear
+      year: selectedYear
     };
 
     try {
@@ -305,7 +294,7 @@ const StudentsPage = () => {
         };
       });
 
-      await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear, academicYear: selectedAcademicYear });
+      await api.post("/students/bulk", { students, month: selectedMonth, year: selectedYear });
       toast.success(`Successfully added ${students.length} students`);
       fetchData();
       setIsBulkOpen(false);
@@ -472,14 +461,6 @@ const StudentsPage = () => {
           </div>
           {isAdmin && (
             <div className="flex gap-2">
-              <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
-                <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Academic Year" /></SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-xl">
-                  {['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'].map(ay => (
-                    <SelectItem key={ay} value={ay} className="rounded-lg text-xs font-bold">{ay}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={filterBatch} onValueChange={setFilterBatch}>
                 <SelectTrigger className="w-[140px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs"><SelectValue placeholder="Batch" /></SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-xl">
@@ -789,16 +770,6 @@ const StudentsPage = () => {
           />
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
-            <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
-              <SelectValue placeholder="Academic Year" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-xl">
-              {['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'].map(ay => (
-                <SelectItem key={ay} value={ay} className="rounded-lg text-xs font-bold">{ay}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
             <SelectTrigger className="w-[130px] h-11 rounded-2xl border-none shadow-sm bg-white/60 font-bold text-xs">
               <SelectValue placeholder="Month" />
