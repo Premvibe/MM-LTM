@@ -356,7 +356,9 @@ const AdminsPage = () => {
                       <SelectValue placeholder="Select Privileged Role..." />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-                      <SelectItem value="m_e_manager" className="rounded-lg text-xs font-bold text-primary">M&E Manager (Super Admin +)</SelectItem>
+                      {isMEManager && (
+                        <SelectItem value="m_e_manager" className="rounded-lg text-xs font-bold text-primary">M&E Manager (Super Admin +)</SelectItem>
+                      )}
                       <SelectItem value="program_director" className="rounded-lg text-xs font-bold">Program Director (Super Admin)</SelectItem>
                       <SelectItem value="program_lead" className="rounded-lg text-xs font-bold">Program Lead (Super Admin)</SelectItem>
                       <SelectItem value="program_manager" className="rounded-lg text-xs font-bold">Program Manager (Admin - Scoped)</SelectItem>
@@ -636,14 +638,16 @@ const AdminsPage = () => {
                 )}
 
                 <div className="flex items-center justify-end gap-2 border-t border-primary/5 pt-4">
-                  <Button 
-                    onClick={() => handleOpenEdit(admin)} 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest border-primary/10 bg-primary/5 text-primary hover:bg-primary hover:text-white hover:scale-105 active:scale-95 transition-all"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />Edit Privileges
-                  </Button>
+                  {(isMEManager || (admin.role !== 'm_e_manager' && admin.role !== 'admin')) && (
+                    <Button 
+                      onClick={() => handleOpenEdit(admin)} 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest border-primary/10 bg-primary/5 text-primary hover:bg-primary hover:text-white hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />Edit Privileges
+                    </Button>
+                  )}
                   {isMEManager && (
                     <Button 
                       onClick={() => handleDelete(admin._id)} 
