@@ -452,18 +452,19 @@ const CentresPage = () => {
           <Card key={c._id} className="animate-fade-in hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/centres/${c._id}`)}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Building2 className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">{c.name}</CardTitle>
-                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" />{c.location}
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-sm font-semibold truncate" title={c.name}>{c.name}</CardTitle>
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground" title={c.location}>
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{c.location}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <Button 
                     variant="ghost" 
                     size="icon" 
