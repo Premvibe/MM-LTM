@@ -467,11 +467,11 @@ const SessionsPage = () => {
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Drive Link</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
                     {s.documentationLink ? (
-                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline mt-0.5 flex items-center gap-1">View Drive <CheckCircle2 className="h-3 w-3" /></a>
+                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline mt-0.5 flex items-center gap-1">View Media <CheckCircle2 className="h-3 w-3" /></a>
                     ) : (
-                      <span className="text-xs font-bold text-destructive mt-0.5">Missing Link</span>
+                      <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
                     )}
                   </div>
                 </div>
