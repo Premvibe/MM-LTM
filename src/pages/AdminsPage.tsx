@@ -51,7 +51,7 @@ const AdminsPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"program_director" | "program_lead" | "program_manager">("program_manager");
+  const [role, setRole] = useState<"admin" | "program_director" | "program_lead" | "program_manager" | "m_e_manager">("program_manager");
   const [selectedFellowIds, setSelectedFellowIds] = useState<string[]>([]);
   const [selectedCentreIds, setSelectedCentreIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
