@@ -15,7 +15,7 @@ type Admin = {
   _id: string;
   name: string;
   email: string;
-  role: "program_director" | "program_lead" | "program_manager";
+  role: "admin" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
   assignedFellowIds?: string[];
   assignedCentreIds?: string[];
 };
