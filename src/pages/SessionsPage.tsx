@@ -320,82 +320,84 @@ const SessionsPage = () => {
           <Plus className="h-4 w-4 mr-2" />Log Session
         </Button>
       </DialogTrigger>
-      <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
-        <div className="bg-primary p-8 text-white">
+      <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="bg-primary p-6 md:p-8 text-white shrink-0">
           <DialogTitle className="text-2xl font-black tracking-tight">{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
           <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">Operation LTM · {selectedCentre?.name}</p>
         </div>
-        <div className="p-8 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+        <ScrollArea className="flex-1 overflow-y-auto max-h-[60vh] md:max-h-full">
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Duration (Min)</Label>
+                <Input type="number" placeholder="60" value={duration} onChange={e => setDuration(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Fellow</Label>
+                <Select value={fellowId} onValueChange={setFellowId}>
+                  <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
+                    <SelectValue placeholder="Select Fellow..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-2xl">
+                    {fellowsList.map(f => (
+                      <SelectItem key={f._id} value={f._id || f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Topic / Lesson Theme</Label>
+              <Input placeholder="e.g. Intro to Rhythm Patterns" value={topic} onChange={e => setTopic(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Duration (Min)</Label>
-              <Input type="number" placeholder="60" value={duration} onChange={e => setDuration(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan (Drive Link)</Label>
+              <Input placeholder="https://drive.google.com/..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
             </div>
-          </div>
-          {isAdmin && (
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Fellow</Label>
-              <Select value={fellowId} onValueChange={setFellowId}>
-                <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
-                  <SelectValue placeholder="Select Fellow..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-none shadow-2xl">
-                  {fellowsList.map(f => (
-                    <SelectItem key={f._id} value={f._id || f.id}>{f.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Documentation (Photos/Videos)</Label>
+              <Input placeholder="https://drive.google.com/..." value={documentationLink} onChange={e => setDocumentationLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
             </div>
-          )}
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Topic / Lesson Theme</Label>
-            <Input placeholder="e.g. Intro to Rhythm Patterns" value={topic} onChange={e => setTopic(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan (Drive Link)</Label>
-            <Input placeholder="https://drive.google.com/..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Documentation (Photos/Videos)</Label>
-            <Input placeholder="https://drive.google.com/..." value={documentationLink} onChange={e => setDocumentationLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-          </div>
 
-          <div className="pt-2 border-t border-muted/50 flex items-center justify-between pr-4">
-            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-muted/30 transition-colors">
-              <input type="checkbox" checked={isMusicBus} onChange={e => setIsMusicBus(e.target.checked)} className="h-5 w-5 rounded border-primary/20 text-primary focus:ring-primary/20 cursor-pointer" />
-              <span className="text-sm font-black tracking-tight flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /> Conducted in Music Bus</span>
-            </label>
-            {isMusicBus && date && (
-              <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase">
-                {(() => {
-                  const month = new Date(date).getMonth();
-                  if (month >= 3 && month <= 5) return "Q1";
-                  if (month >= 6 && month <= 8) return "Q2";
-                  if (month >= 9 && month <= 11) return "Q3";
-                  return "Q4";
-                })()} Visit
-              </Badge>
+            <div className="pt-2 border-t border-muted/50 flex items-center justify-between pr-4">
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                <input type="checkbox" checked={isMusicBus} onChange={e => setIsMusicBus(e.target.checked)} className="h-5 w-5 rounded border-primary/20 text-primary focus:ring-primary/20 cursor-pointer" />
+                <span className="text-sm font-black tracking-tight flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /> Conducted in Music Bus</span>
+              </label>
+              {isMusicBus && date && (
+                <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase">
+                  {(() => {
+                    const month = new Date(date).getMonth();
+                    if (month >= 3 && month <= 5) return "Q1";
+                    if (month >= 6 && month <= 8) return "Q2";
+                    if (month >= 9 && month <= 11) return "Q3";
+                    return "Q4";
+                  })()} Visit
+                </Badge>
+              )}
+            </div>
+
+            {isMusicBus && (
+              <div className="space-y-4 pt-2 animate-fade-in">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Observations</Label>
+                  <textarea placeholder="Key findings and highlights..." value={observations} onChange={e => setObservations(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[80px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Critical Issues (if any)</Label>
+                  <textarea placeholder="Any blockers or red flags..." value={issues} onChange={e => setIssues(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[60px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+                </div>
+              </div>
             )}
           </div>
-
-          {isMusicBus && (
-            <div className="space-y-4 pt-2 animate-fade-in">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Observations</Label>
-                <textarea placeholder="Key findings and highlights..." value={observations} onChange={e => setObservations(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[80px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Critical Issues (if any)</Label>
-                <textarea placeholder="Any blockers or red flags..." value={issues} onChange={e => setIssues(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[60px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="p-8 bg-muted/30 border-t flex justify-end gap-3">
+        </ScrollArea>
+        <div className="p-6 md:p-8 bg-muted/30 border-t flex justify-end gap-3 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
           <Button onClick={handleSubmit} className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px]">{editItem ? "Save Changes" : "Confirm Log"}</Button>
         </div>
