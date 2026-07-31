@@ -150,9 +150,10 @@ const AttendancePage = () => {
   }, [sessionForDate]);
 
   const handleSaveAttendance = async () => {
-    const d = new Date(attendanceDate).getDay();
-    if (d !== 1 && d !== 3 && d !== 5) {
-      toast.error("Attendance can only be marked for Monday, Wednesday, or Friday");
+    const dateObj = new Date(attendanceDate);
+    const day = dateObj.getDay();
+    if (day !== 1 && day !== 3 && day !== 5 && day !== 6) {
+      toast.error("Attendance can only be marked for Monday, Wednesday, Friday, or Saturday");
       return;
     }
     

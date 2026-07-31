@@ -133,11 +133,13 @@ const SessionsPage = () => {
     const finalFellowId = user?.role === 'fellow' ? user.id : fellowId;
     if (!date || !topic.trim() || !finalFellowId || !duration) { toast.error("Please fill in all fields including date"); return; }
     
-    const selectedDate = new Date(date);
-    const day = selectedDate.getDay();
-    if (day !== 1 && day !== 3 && day !== 5) {
-      toast.error("Sessions can only be scheduled on Monday, Wednesday, or Friday");
-      return;
+    const sessionDate = new Date(date);
+    if (sessionDate) {
+      const day = sessionDate.getDay();
+      if (day !== 1 && day !== 3 && day !== 5 && day !== 6) {
+        toast.error("Sessions can only be scheduled on Monday, Wednesday, Friday, or Saturday");
+        return;
+      }
     }
 
     const targetCentreId = selectedCentreId || centreId;
