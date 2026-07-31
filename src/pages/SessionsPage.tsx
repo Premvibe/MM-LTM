@@ -63,6 +63,7 @@ const SessionsPage = () => {
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
+  const [attendanceSearchQuery, setAttendanceSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCentreFellow, setFilterCentreFellow] = useState("all");
 
@@ -183,6 +184,7 @@ const SessionsPage = () => {
   const openAttendance = (session: Session) => {
     setActiveSession(session);
     setCheckedStudentIds(session.presentStudentIds || []);
+    setAttendanceSearchQuery("");
     setAttendanceOpen(true);
   };
 
@@ -509,7 +511,16 @@ const SessionsPage = () => {
             <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mt-1">
               {activeSession?.topic} · {activeSession?.date}
             </p>
-            <div className="flex gap-2 mt-6">
+            <div className="mt-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+              <Input 
+                placeholder="Search students..." 
+                className="pl-9 h-10 rounded-xl border-none bg-white text-primary placeholder:text-primary/40 text-sm font-bold" 
+                value={attendanceSearchQuery} 
+                onChange={(e) => setAttendanceSearchQuery(e.target.value)} 
+              />
+            </div>
+            <div className="flex gap-2 mt-4">
               <Button variant="secondary" size="sm" className="rounded-lg text-[10px] font-black uppercase h-8 px-4" onClick={() => setCheckedStudentIds(studentsList.filter(s => s.centreId === selectedCentreId).map(s => s._id))}>Select All</Button>
               <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-black uppercase h-8 px-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-primary" onClick={() => setCheckedStudentIds([])}>Clear All</Button>
             </div>
@@ -517,7 +528,7 @@ const SessionsPage = () => {
           <ScrollArea className="h-[400px] p-8">
             <div className="space-y-3">
               {studentsList
-                .filter(s => s.centreId === selectedCentreId)
+                .filter(s => s.centreId === selectedCentreId && s.name.toLowerCase().includes(attendanceSearchQuery.toLowerCase()))
                 .map(s => (
                   <div key={s._id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${checkedStudentIds.includes(s._id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} onClick={() => setCheckedStudentIds(prev => prev.includes(s._id) ? prev.filter(id => id !== s._id) : [...prev, s._id])}>
                     <div className="flex items-center gap-4">
