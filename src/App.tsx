@@ -23,6 +23,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const AdminsPage = lazy(() => import("./pages/AdminsPage"));
+const ChangeStoriesPage = lazy(() => import("./pages/ChangeStoriesPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageLoader = () => (
@@ -69,6 +70,7 @@ const App = () => (
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                 <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
                 <Route path="/admins" element={<ProtectedRoute><AdminsPage /></ProtectedRoute>} />
+                <Route path="/change-stories" element={<ProtectedRoute><ChangeStoriesPage /></ProtectedRoute>} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
