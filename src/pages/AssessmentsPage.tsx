@@ -118,7 +118,7 @@ const AssessmentsPage = () => {
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [activeCategory, setActiveCategory] = useState("SEL-Mid");
+  const [activeCategory, setActiveCategory] = useState("Monthly-Evaluation");
   const [activePhase, setActivePhase] = useState("Pre");
   const [activeQuarter, setActiveQuarter] = useState(() => {
     const m = new Date().getMonth();
@@ -143,6 +143,7 @@ const AssessmentsPage = () => {
   const [afterSchoolData, setAfterSchoolData] = useState<any>({});
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingAssessmentId, setEditingAssessmentId] = useState<string | null>(null);
 
   const getRoleParams = () => {
     return user?.role === 'fellow' 
@@ -177,7 +178,10 @@ const AssessmentsPage = () => {
     let finalCategory = activeCategory;
     let finalPhase = activePhase;
 
-    if (activeCategory === "SEL-Mid") {
+    if (activeCategory === "Monthly-Evaluation") {
+      payloadData = { selMid: selScores, musical: musicalScores };
+      finalPhase = "Continuous";
+    } else if (activeCategory === "SEL-Mid") {
       payloadData = { selMid: selScores };
       finalPhase = "Continuous";
     } else if (activeCategory === "Musical") {
@@ -202,22 +206,9 @@ const AssessmentsPage = () => {
 
     const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
     let dateStr = new Date().toISOString();
-    if (finalCategory === "SEL-Mid") {
-      dateStr = new Date(selectedYear, selectedMonth, 15).toISOString();
-    } else if (finalCategory === "Musical" || finalCategory === "Mid-Evaluation") {
-      const q = activeQuarter;
-      if (q === "Q1") dateStr = new Date(acadYear, 7, 15).toISOString();
-      else if (q === "Q2") dateStr = new Date(acadYear, 10, 15).toISOString();
-      else if (q === "Q3") dateStr = new Date(acadYear + 1, 1, 15).toISOString();
-      else if (q === "Q4") dateStr = new Date(acadYear + 1, 4, 15).toISOString();
-    } else {
-      const p = finalPhase;
-      if (p === "Pre") dateStr = new Date(acadYear, 6, 15).toISOString();
-      else if (p === "Post") dateStr = new Date(acadYear + 1, 5, 15).toISOString();
-    }
 
     try {
-      await api.post("/assessments", {
+      const payload = {
         studentId: selectedStudent._id || selectedStudent.id,
         centreId: selectedStudent.centreId,
         fellowId: user?.id,
@@ -227,8 +218,16 @@ const AssessmentsPage = () => {
         data: payloadData,
         date: dateStr,
         remarks
-      });
-      toast.success("Assessment logged successfully");
+      };
+
+      if (editingAssessmentId) {
+        await api.put(`/assessments/${editingAssessmentId}`, payload);
+        toast.success("Assessment updated successfully");
+      } else {
+        await api.post("/assessments", payload);
+        toast.success("Assessment logged successfully");
+      }
+      setEditingAssessmentId(null);
       setIsLogOpen(false);
       const aRes = await api.get(`/assessments${getRoleParams()}`);
       setAssessmentsData(aRes.data);
@@ -244,19 +243,6 @@ const AssessmentsPage = () => {
     try {
       const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
       let dateStr = new Date().toISOString();
-      if (activeCategory === "SEL-Mid") {
-        dateStr = new Date(selectedYear, selectedMonth, 15).toISOString();
-      } else if (activeCategory === "Musical" || activeCategory === "Mid-Evaluation") {
-        const q = activeQuarter;
-        if (q === "Q1") dateStr = new Date(acadYear, 7, 15).toISOString();
-        else if (q === "Q2") dateStr = new Date(acadYear, 10, 15).toISOString();
-        else if (q === "Q3") dateStr = new Date(acadYear + 1, 1, 15).toISOString();
-        else if (q === "Q4") dateStr = new Date(acadYear + 1, 4, 15).toISOString();
-      } else {
-        const p = activePhase;
-        if (p === "Pre") dateStr = new Date(acadYear, 6, 15).toISOString();
-        else if (p === "Post") dateStr = new Date(acadYear + 1, 5, 15).toISOString();
-      }
 
       const assessments = Object.entries(bulkScores).map(([studentId, data]) => ({
         studentId,
@@ -326,16 +312,40 @@ const AssessmentsPage = () => {
               onChange={(e) => setCentreSearchQuery(e.target.value)} 
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="w-[120px] h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[10px] uppercase tracking-widest">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                  <SelectItem key={m} value={String(i)} className="rounded-lg text-xs font-medium">{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectTrigger className="w-[90px] h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[10px] uppercase tracking-widest">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {[2025, 2026, 2027, 2028].map(y => (
+                  <SelectItem key={y} value={String(y)} className="rounded-lg text-xs font-medium">{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="h-6 w-px bg-primary/10 mx-1 hidden md:block" />
+
             <Select value={filterFellow} onValueChange={setFilterFellow}>
-              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[180px]"><SelectValue placeholder="All Fellows" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[160px]"><SelectValue placeholder="All Fellows" /></SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-2xl">
                 <SelectItem value="all">All Fellows</SelectItem>
                 {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[150px]"><SelectValue placeholder="Centre Type" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[130px]"><SelectValue placeholder="Centre Type" /></SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-2xl">
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="In-school">In-school</SelectItem>
@@ -357,7 +367,22 @@ const AssessmentsPage = () => {
               return matchesSearch && matchesType && matchesFellow;
             })
             .map(centre => {
-              const studentCount = students.filter(s => (s.centreId?._id || s.centreId) === (centre._id || centre.id)).length;
+              const centreStudents = students.filter(s => (s.centreId?._id || s.centreId) === (centre._id || centre.id));
+              const studentCount = centreStudents.length;
+              
+              const currentMonth = selectedMonth;
+              const currentYear = selectedYear;
+              
+              const assessedThisMonthCount = centreStudents.filter(s => {
+                const sId = s._id || s.id;
+                return assessmentsData.some(a => {
+                  if ((a.studentId?._id || a.studentId) !== sId) return false;
+                  const d = new Date(a.date);
+                  return d.getMonth() === currentMonth && d.getFullYear() === currentYear && a.phase === "Continuous";
+                });
+              }).length;
+              
+              const assessedPercentage = studentCount > 0 ? Math.round((assessedThisMonthCount / studentCount) * 100) : 0;
               const cId = centre._id || centre.id;
               
               return (
@@ -389,9 +414,9 @@ const AssessmentsPage = () => {
                           <Users className="h-3 w-3" />
                           <span>{studentCount} Students Enrolled</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-primary">
+                        <div className={`flex items-center gap-1.5 ${assessedPercentage >= 80 ? 'text-success' : assessedPercentage > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
                           <GraduationCap className="h-3 w-3" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Progress Tracking Active</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{assessedPercentage}% Assessed This Month</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1 justify-end max-w-[120px]">
@@ -412,6 +437,15 @@ const AssessmentsPage = () => {
     );
   }
 
+  const innerAssessedCount = centreStudents.filter(s => {
+    const sId = s._id || s.id;
+    return assessmentsData.some(a => {
+      if ((a.studentId?._id || a.studentId) !== sId) return false;
+      const d = new Date(a.date);
+      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear && a.phase === "Continuous";
+    });
+  }).length;
+
   return (
     <div className="animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -425,6 +459,8 @@ const AssessmentsPage = () => {
               <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full text-[10px] uppercase tracking-widest font-black">{selectedCentre?.type}</Badge>
               <span className="opacity-20">|</span>
               <span className="text-sm font-bold">{centreStudents.length} Students Enrolled</span>
+              <span className="opacity-20">|</span>
+              <span className="text-sm font-bold text-primary">{innerAssessedCount} Assessed This Month</span>
             </div>
           </div>
         </div>
@@ -469,7 +505,7 @@ const AssessmentsPage = () => {
               className="rounded-xl h-10 px-6 font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg hover:shadow-primary/20 transition-all ml-1"
               onClick={() => {
                 setBulkScores({});
-                setActiveCategory("SEL-Mid");
+                setActiveCategory("Monthly-Evaluation");
                 setActivePhase("Continuous");
                 setIsBulkOpen(true);
               }}
@@ -483,59 +519,88 @@ const AssessmentsPage = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8 p-1.5 bg-white/50 backdrop-blur-xl rounded-[1.5rem] border border-white/20 shadow-xl h-14">
-          <TabsTrigger value="SEL" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white">Session Logs (SEL)</TabsTrigger>
+          <TabsTrigger value="SEL" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white">Session Logs (Monthly)</TabsTrigger>
           <TabsTrigger value="Milestones" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white">Annual Milestones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="SEL" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 gap-4">
             {processedAssessments.map((a) => {
-              const records = a.records.filter(r => r.category === "SEL-Mid" && r.phase === "Continuous");
-              const monthlyRecord = records.find(r => {
+              const records = a.records.filter(r => r.phase === "Continuous");
+              let monthlyRecord = records.find(r => {
                 const d = new Date(r.date);
                 return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
               });
               
               const isAssessedThisMonth = monthlyRecord !== undefined;
+              let isPreviousRecord = false;
+              let previousMonthName = "";
+              
+              if (!monthlyRecord) {
+                const pastRecords = records.filter(r => {
+                   const d = new Date(r.date);
+                   return d.getFullYear() < selectedYear || (d.getFullYear() === selectedYear && d.getMonth() < selectedMonth);
+                }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                
+                if (pastRecords.length > 0) {
+                  monthlyRecord = pastRecords[0];
+                  isPreviousRecord = true;
+                  previousMonthName = new Date(monthlyRecord.date).toLocaleString('default', { month: 'short' });
+                }
+              }
+
               const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear();
 
               return (
                 <Card key={a.id} className="glass-card-premium border-none shadow-xl hover:shadow-2xl transition-all rounded-[2rem] overflow-hidden group">
                   <CardContent className="p-0">
                     <div className="flex flex-col lg:flex-row lg:items-center">
-                      <div className="p-8 lg:w-[280px] bg-primary/5 group-hover:bg-primary/10 transition-colors">
-                        <h4 className="font-black text-lg tracking-tight mb-1 group-hover:text-primary transition-colors">{a.student}</h4>
-                        <div className="flex items-center gap-2 mt-2">
+                      <div className="p-6 lg:w-[200px] shrink-0 bg-primary/5 group-hover:bg-primary/10 transition-colors">
+                        <h4 className="font-black text-base tracking-tight mb-1 group-hover:text-primary transition-colors">{a.student}</h4>
+                        <div className="flex items-center flex-wrap gap-2 mt-2">
                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{records.length} TOTAL LOGS</Badge>
-                           {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[8px] font-black uppercase tracking-widest">CURRENT MONTH SYNCED</Badge>}
+                           <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{a.raw.attendancePercent || 0}% ATTENDANCE</Badge>
+                           {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[8px] font-black uppercase tracking-widest">SYNCED</Badge>}
+                           {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[8px] font-black uppercase tracking-widest">PREVIOUS: {previousMonthName}</Badge>}
                         </div>
                       </div>
-                      <div className="p-8 flex-1 flex flex-wrap items-center gap-12">
-                        <div className="text-center group/score"><p className="text-[10px] font-black text-muted-foreground/50 uppercase mb-3 tracking-widest group-hover/score:text-primary transition-colors">Involvement</p><ScoreCell score={monthlyRecord?.data.selMid?.involvement} /></div>
-                        <div className="text-center group/score"><p className="text-[10px] font-black text-muted-foreground/50 uppercase mb-3 tracking-widest group-hover/score:text-primary transition-colors">Emotion</p><ScoreCell score={monthlyRecord?.data.selMid?.emotion} /></div>
-                        <div className="text-center group/score"><p className="text-[10px] font-black text-muted-foreground/50 uppercase mb-3 tracking-widest group-hover/score:text-primary transition-colors">Creativity</p><ScoreCell score={monthlyRecord?.data.selMid?.creativity} /></div>
-                        <div className="text-center group/score"><p className="text-[10px] font-black text-muted-foreground/50 uppercase mb-3 tracking-widest group-hover/score:text-primary transition-colors">Interaction</p><ScoreCell score={monthlyRecord?.data.selMid?.interaction} /></div>
+                      <div className="p-4 flex-1 grid grid-cols-8 items-center justify-items-center">
+                        {[
+                          { label: "Sur", value: monthlyRecord?.data.musical?.sur },
+                          { label: "Laya", value: monthlyRecord?.data.musical?.laya },
+                          { label: "Word", value: monthlyRecord?.data.musical?.word },
+                          { label: "Bhav", value: monthlyRecord?.data.musical?.bhav },
+                          { label: "Involvement", value: monthlyRecord?.data.selMid?.involvement },
+                          { label: "Emotion", value: monthlyRecord?.data.selMid?.emotion },
+                          { label: "Creativity", value: monthlyRecord?.data.selMid?.creativity },
+                          { label: "Interaction", value: monthlyRecord?.data.selMid?.interaction },
+                        ].map((item, i) => (
+                          <div key={i} className={`text-center w-full ${isPreviousRecord ? 'opacity-40' : ''}`}>
+                            <p className="text-[9px] font-black text-muted-foreground/50 uppercase mb-2">{item.label}</p>
+                            <ScoreCell score={item.value} />
+                          </div>
+                        ))}
                       </div>
-                      <div className="p-8 lg:border-l border-primary/5 flex items-center gap-4 bg-muted/5 min-w-[200px] justify-center">
+                      <div className="p-4 lg:border-l border-primary/5 flex items-center bg-muted/5 shrink-0 justify-center">
                         {isAssessedThisMonth ? (
                           <div className="flex flex-col items-center gap-2">
                             <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center text-success">
                                <CheckCircle2 className="h-5 w-5" />
                             </div>
-                            <p className="text-[10px] font-black text-success uppercase tracking-widest">LOGGED {new Date(monthlyRecord.date).toLocaleDateString()}</p>
+                            <p className="text-[9px] font-black text-success uppercase tracking-widest">LOGGED {new Date(monthlyRecord.date).toLocaleDateString()}</p>
                           </div>
                         ) : (
                           <Button 
-                            className="rounded-2xl h-14 px-8 font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all"
+                            className="rounded-2xl h-11 px-4 font-black uppercase tracking-widest text-[9px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all whitespace-nowrap"
                             onClick={() => {
                               setSelectedStudent(a.raw);
-                              setActiveCategory("SEL-Mid");
+                              setActiveCategory("Monthly-Evaluation");
                               setActivePhase("Continuous");
                               setIsLogOpen(true);
                             }}
                           >
-                            <ClipboardCheck className="mr-2 h-4 w-4" />
-                            Log SEL Scores
+                            <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
+                            Log Score
                           </Button>
                         )}
                       </div>
@@ -550,14 +615,10 @@ const AssessmentsPage = () => {
         <TabsContent value="Milestones" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div className="rounded-2xl border border-primary/5 overflow-hidden bg-white shadow-lg">
               {/* Header row */}
-              <div className="grid grid-cols-[1fr_repeat(6,100px)] gap-0 bg-muted/40 border-b border-primary/10 px-5 py-3">
+              <div className="grid grid-cols-[1fr_repeat(2,160px)] gap-0 bg-muted/40 border-b border-primary/10 px-5 py-3">
                 <span className="text-xs font-black uppercase tracking-wide text-muted-foreground">Student</span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Pre</span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-primary">Q1<span className="block text-[9px] font-bold text-muted-foreground/50 normal-case">Jul-Sep</span></span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-primary">Q2<span className="block text-[9px] font-bold text-muted-foreground/50 normal-case">Oct-Dec</span></span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-primary">Q3<span className="block text-[9px] font-bold text-muted-foreground/50 normal-case">Jan-Mar</span></span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-primary">Q4<span className="block text-[9px] font-bold text-muted-foreground/50 normal-case">Apr-Jun</span></span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Post</span>
+                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Pre Assessment</span>
+                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Post Assessment</span>
               </div>
               {/* Student rows */}
               {processedAssessments.map((a) => {
@@ -576,13 +637,25 @@ const AssessmentsPage = () => {
 
                 const pre = academicYearRecords.find(r => r.phase === "Pre" && milestoneCategories.includes(r.category));
                 const post = academicYearRecords.find(r => r.phase === "Post" && milestoneCategories.includes(r.category));
-                const midQ1 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q1");
-                const midQ2 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q2");
-                const midQ3 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q3");
-                const midQ4 = academicYearRecords.find(r => (r.category === "Musical" || r.category === "Mid-Evaluation") && r.phase === "Mid" && r.quarter === "Q4");
                 
+                const openEditModal = (record: any, phase: string) => {
+                  setSelectedStudent(a.raw);
+                  setActiveCategory(record.category);
+                  setActivePhase(phase);
+                  setEditingAssessmentId(record._id || record.id);
+                  // Pre-fill form with existing data
+                  if (record.data?.leading) {
+                    setLeadingScores(record.data.leading);
+                  }
+                  if (record.data?.afterSchool) {
+                    setAfterSchoolData(record.data.afterSchool);
+                  }
+                  setRemarks(record.remarks || "");
+                  setIsLogOpen(true);
+                };
+
                 return (
-                  <div key={a.id} className="grid grid-cols-[1fr_repeat(6,100px)] gap-0 items-center px-5 py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">
+                  <div key={a.id} className="grid grid-cols-[1fr_repeat(2,160px)] gap-0 items-center px-5 py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-black text-primary">{a.student.charAt(0)}</div>
                       <div>
@@ -591,33 +664,19 @@ const AssessmentsPage = () => {
                     </div>
                     {/* Pre */}
                     <div className="text-center">
-                      {pre ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3">Done</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
+                      {pre ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3 cursor-pointer hover:bg-success/20 transition-colors" onClick={() => openEditModal(pre, "Pre")}>Done ✎</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
                         setSelectedStudent(a.raw);
+                        setEditingAssessmentId(null);
                         setActiveCategory(selectedCentre?.type === "In-school" ? "InSchool-PrePost" : "AfterSchool-PrePost");
                         setActivePhase("Pre");
                         setIsLogOpen(true);
                       }}>Pending</Badge>}
                     </div>
-                    {/* Q1-Q4 */}
-                    {[{data: midQ1, q: "Q1"}, {data: midQ2, q: "Q2"}, {data: midQ3, q: "Q3"}, {data: midQ4, q: "Q4"}].map(({data, q}) => (
-                      <div key={q} className="text-center">
-                        {data ? (
-                          <Badge className="bg-primary/10 text-primary border-none text-xs font-bold px-3">{data.averageScore?.toFixed(1)}</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5 hover:text-primary" onClick={() => {
-                            setSelectedStudent(a.raw);
-                            setActiveCategory("Musical");
-                            setActivePhase("Mid");
-                            setActiveQuarter(q);
-                            setIsLogOpen(true);
-                          }}>Log</Badge>
-                        )}
-                      </div>
-                    ))}
                     {/* Post */}
                     <div className="text-center">
-                      {post ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3">Done</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
+                      {post ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3 cursor-pointer hover:bg-success/20 transition-colors" onClick={() => openEditModal(post, "Post")}>Done ✎</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
                         setSelectedStudent(a.raw);
+                        setEditingAssessmentId(null);
                         setActiveCategory(selectedCentre?.type === "In-school" ? "InSchool-PrePost" : "AfterSchool-PrePost");
                         setActivePhase("Post");
                         setIsLogOpen(true);
@@ -637,7 +696,7 @@ const AssessmentsPage = () => {
             <DialogHeader>
               <DialogTitle className="text-2xl font-[950] tracking-tight">Record Performance: {selectedStudent?.name}</DialogTitle>
               <DialogDescription className="text-primary-foreground/70 font-medium text-sm">
-                Logging {activeCategory === "SEL-Mid" ? `Monthly SEL Assessment` : activeCategory === "Musical" ? `Quarterly Musical Assessment — ${activeQuarter}` : `${activeCategory} Assessment Phase`}
+                Logging {activeCategory === "Monthly-Evaluation" ? `Monthly Assessment (SEL & Musical)` : activeCategory === "SEL-Mid" ? `Monthly SEL Assessment` : activeCategory === "Musical" ? `Quarterly Musical Assessment — ${activeQuarter}` : `${activeCategory} Assessment Phase`}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -645,34 +704,52 @@ const AssessmentsPage = () => {
           <ScrollArea className="max-h-[70vh]">
             <div className="p-8 space-y-8">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</Label>
-                  <Select value={activeCategory} onValueChange={(v) => {
-                    setActiveCategory(v);
-                    if (v === "SEL-Mid") setActivePhase("Continuous");
-                    else if (v === "Musical") setActivePhase("Mid");
-                  }}>
-                    <SelectTrigger className="rounded-2xl h-12 bg-muted border-none font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent className="rounded-2xl border-none shadow-2xl">
-                      <SelectItem value="SEL-Mid">SEL Progress (Monthly)</SelectItem>
-                      <SelectItem value="Musical">Musical Proficiency (Quarterly)</SelectItem>
-                      {selectedCentre?.type === "In-school" && <SelectItem value="InSchool-PrePost">In-School Pre/Post</SelectItem>}
-                      {selectedCentre?.type === "After-school" && <SelectItem value="AfterSchool-PrePost">After-School Pre/Post</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {(activeCategory === "InSchool-PrePost" || activeCategory === "AfterSchool-PrePost") && (
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Evaluation Phase</Label>
-                    <Select value={activePhase} onValueChange={setActivePhase}>
-                      <SelectTrigger className="rounded-2xl h-12 bg-muted border-none font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent className="rounded-2xl border-none shadow-2xl">
-                        <SelectItem value="Pre">Pre-Assessment (Survey)</SelectItem>
-                        <SelectItem value="Mid">Mid-Assessment (Combined Evaluation)</SelectItem>
-                        <SelectItem value="Post">Post-Assessment (Survey)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {(activeCategory === "InSchool-PrePost" || activeCategory === "AfterSchool-PrePost") ? (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</Label>
+                      <div className="rounded-2xl h-12 bg-muted/50 px-4 flex items-center text-sm font-bold text-muted-foreground">
+                        {activeCategory === "InSchool-PrePost" ? "In-School Pre/Post" : "After-School Pre/Post"}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Evaluation Phase</Label>
+                      <div className="rounded-2xl h-12 bg-muted/50 px-4 flex items-center text-sm font-bold text-muted-foreground">
+                        {activePhase}-Assessment (Survey)
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</Label>
+                      <Select value={activeCategory} onValueChange={(v) => {
+                        setActiveCategory(v);
+                        if (v === "SEL-Mid" || v === "Monthly-Evaluation") setActivePhase("Continuous");
+                        else if (v === "Musical") setActivePhase("Mid");
+                      }}>
+                        <SelectTrigger className="rounded-2xl h-12 bg-muted border-none font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-2xl border-none shadow-2xl">
+                          <SelectItem value="Monthly-Evaluation">Monthly Progress (SEL & Musical)</SelectItem>
+                          {selectedCentre?.type === "In-school" && <SelectItem value="InSchool-PrePost">In-School Pre/Post</SelectItem>}
+                          {selectedCentre?.type === "After-school" && <SelectItem value="AfterSchool-PrePost">After-School Pre/Post</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {(activeCategory === "InSchool-PrePost" || activeCategory === "AfterSchool-PrePost") && (
+                      <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Evaluation Phase</Label>
+                        <Select value={activePhase} onValueChange={setActivePhase}>
+                          <SelectTrigger className="rounded-2xl h-12 bg-muted border-none font-bold"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-2xl border-none shadow-2xl">
+                            <SelectItem value="Pre">Pre-Assessment (Survey)</SelectItem>
+                            <SelectItem value="Mid">Mid-Assessment (Combined Evaluation)</SelectItem>
+                            <SelectItem value="Post">Post-Assessment (Survey)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               {/* Quarter selector for mid assessments */}
@@ -718,10 +795,10 @@ const AssessmentsPage = () => {
                 </div>
               )}
 
-              {(activeCategory === "SEL-Mid" || (activePhase === "Mid" && activeCategory !== "Musical")) && (
+              {(activeCategory === "SEL-Mid" || activeCategory === "Monthly-Evaluation" || (activePhase === "Mid" && activeCategory !== "Musical")) && (
                  <div className="space-y-8 animate-in fade-in duration-500">
                     <div className="p-6 bg-accent/5 rounded-[2.5rem] border border-accent/10">
-                       <h5 className="font-black text-sm mb-6 flex items-center gap-2"><Sparkles className="h-4 w-4 text-accent" /> {activeCategory === "SEL-Mid" ? "Quarterly SEL Rubrics" : "Quantitative SEL Rubrics"}</h5>
+                       <h5 className="font-black text-sm mb-6 flex items-center gap-2"><Sparkles className="h-4 w-4 text-accent" /> {activeCategory === "SEL-Mid" || activeCategory === "Monthly-Evaluation" ? "Monthly SEL Rubrics" : "Quantitative SEL Rubrics"}</h5>
                        <div className="space-y-6">
                           {SEL_CATEGORIES.map((key) => (
                             <div key={key} className="space-y-3">
@@ -888,14 +965,14 @@ const AssessmentsPage = () => {
       </Dialog>
 
       <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
-        <DialogContent className={`rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl ${activeCategory === "Mid-Evaluation" ? "max-w-[98vw] w-full" : "max-w-[95vw] w-[1100px]"}`}>
+        <DialogContent className={`rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl ${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "max-w-[98vw] w-full" : "max-w-[95vw] w-[1100px]"}`}>
           <div className="bg-primary p-6 text-white flex items-center justify-between">
             <div>
               <DialogTitle className="text-xl font-[950] tracking-tight">Bulk Assessment: {selectedCentre?.name}</DialogTitle>
               <DialogDescription className="sr-only">Bulk score entry for all students at this centre</DialogDescription>
               <div className="flex items-center gap-4 mt-2">
                 <Badge className="bg-white/20 text-white border-none rounded-lg text-[10px] font-black uppercase tracking-widest px-3 py-1 h-7">
-                   {activeCategory === "SEL-Mid" ? "Monthly SEL Progress" : "Quarterly Musical Progress"}
+                   {activeCategory === "Monthly-Evaluation" ? "Monthly Evaluation (SEL & Musical)" : activeCategory === "SEL-Mid" ? "Monthly SEL Progress" : "Quarterly Musical Progress"}
                 </Badge>
               </div>
             </div>
@@ -917,10 +994,10 @@ const AssessmentsPage = () => {
                 <TableHeader className="bg-muted/50 sticky top-0 z-20">
                   <TableRow>
                     <TableHead className="w-[140px] min-w-[140px] font-black text-[10px] uppercase tracking-widest pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
-                    {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
+                    {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
                       <TableHead key={k} className="text-center font-black text-[10px] uppercase tracking-widest">{k}</TableHead>
                     ))}
-                    {(activeCategory === "SEL-Mid" || activeCategory === "Mid-Evaluation") && ["Invol.", "Emot.", "Creat.", "Inter."].map(k => (
+                    {(activeCategory === "SEL-Mid" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Involvement", "Emotion", "Creativity", "Interaction"].map(k => (
                       <TableHead key={k} className="text-center font-black text-[10px] uppercase tracking-widest text-accent">{k}</TableHead>
                     ))}
                     <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Avg</TableHead>
@@ -941,7 +1018,7 @@ const AssessmentsPage = () => {
                       } else if (activeCategory === "SEL-Mid") {
                         if (!sel.involvement && !sel.emotion && !sel.creativity && !sel.interaction) return 0;
                         return (sel.involvement + sel.emotion + sel.creativity + sel.interaction) / 4;
-                      } else if (activeCategory === "Mid-Evaluation") {
+                      } else if (activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") {
                         const total = (m.sur+m.laya+m.word+m.bhav + sel.involvement+sel.emotion+sel.creativity+sel.interaction);
                         return total > 0 ? total / 8 : 0;
                       }
@@ -953,7 +1030,7 @@ const AssessmentsPage = () => {
                     return (
                       <TableRow key={sId} className="hover:bg-primary/5 transition-colors group">
                         <TableCell className="font-bold text-xs pl-4 sticky left-0 bg-white z-10 group-hover:bg-primary/5">{s.name}</TableCell>
-                        {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => (
+                        {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => (
                           <TableCell key={k} className="text-center p-1">
                             <div className="flex items-center justify-center gap-px">
                               {[1, 2, 3, 4, 5].map(v => (
@@ -965,7 +1042,7 @@ const AssessmentsPage = () => {
                                     next[sId].musical[k] = v;
                                     setBulkScores(next);
                                   }}
-                                  className={`${activeCategory === "Mid-Evaluation" ? "h-6 w-6 text-[9px]" : "h-7 w-7 text-[10px]"} rounded-lg font-black transition-all ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
+                                  className={`${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "h-6 w-6 text-[9px]" : "h-7 w-7 text-[10px]"} rounded-lg font-black transition-all ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
                                 >
                                   {v}
                                 </button>
@@ -973,7 +1050,7 @@ const AssessmentsPage = () => {
                             </div>
                           </TableCell>
                         ))}
-                        {activeCategory === "Mid-Evaluation" && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
+                        {(activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
                           <TableCell key={k} className="text-center p-1">
                             <div className="flex items-center justify-center gap-px">
                               {[1, 2, 3, 4, 5].map(v => (
