@@ -32,6 +32,20 @@ type Visit = {
 };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
+const formatDateDMY = (dateStr?: string) => {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y.slice(-2)}`;
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+};
+
 const FieldVisitsPage = () => {
   const { user } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -335,7 +349,10 @@ const FieldVisitsPage = () => {
                         })}
                         <td className="px-8 py-6 text-right">
                           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                            {centreVisits.length > 0 ? centreVisits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].date : "No visits"}
+                            {(() => {
+                              const sorted = centreVisits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                              return sorted.length > 0 ? formatDateDMY(sorted[0].date) : "No visits";
+                            })()}
                           </span>
                         </td>
                       </tr>
@@ -362,7 +379,7 @@ const FieldVisitsPage = () => {
                           <Badge className="h-10 w-12 rounded-xl bg-primary/10 text-primary border-none flex items-center justify-center text-xs font-black">{v.quarter}</Badge>
                           <div>
                              <h4 className="font-black text-sm">{v.centre}</h4>
-                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{v.date} • {v.observer}</p>
+                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{formatDateDMY(v.date)} • {v.observer}</p>
                           </div>
                        </div>
                        <div className="flex-1 px-12">

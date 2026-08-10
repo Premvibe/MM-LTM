@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -13,9 +14,23 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; };
+type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+
+const formatDateDMY = (dateStr?: string) => {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y.slice(-2)}`;
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+};
 
 const SessionsPage = () => {
   const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
@@ -62,6 +77,7 @@ const SessionsPage = () => {
   const [checkedStudentIds, setCheckedStudentIds] = useState<string[]>([]);
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewPlanText, setViewPlanText] = useState<string | null>(null);
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [attendanceSearchQuery, setAttendanceSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -70,6 +86,21 @@ const SessionsPage = () => {
   useEffect(() => {
     fetchData();
   }, [filterMonth, filterYear]);
+
+  useEffect(() => {
+    if (!editItem) {
+      const today = new Date();
+      const isCurrentPeriod = today.getMonth().toString() === filterMonth && today.getFullYear().toString() === filterYear;
+      if (isCurrentPeriod) {
+        setDate(today.toISOString().split("T")[0]);
+      } else {
+        const monthNum = parseInt(filterMonth);
+        const yearNum = parseInt(filterYear);
+        const formattedMonth = String(monthNum + 1).padStart(2, "0");
+        setDate(`${yearNum}-${formattedMonth}-01`);
+      }
+    }
+  }, [filterMonth, filterYear, editItem]);
 
   const fetchData = async () => {
     try {
@@ -106,7 +137,18 @@ const SessionsPage = () => {
     setCentreId(""); 
     setFellowId(user?.role === 'fellow' ? user.id : ""); 
     setDuration(""); 
-    setDate(new Date().toISOString().split("T")[0]); 
+    
+    const today = new Date();
+    const isCurrentPeriod = today.getMonth().toString() === filterMonth && today.getFullYear().toString() === filterYear;
+    if (isCurrentPeriod) {
+      setDate(today.toISOString().split("T")[0]);
+    } else {
+      const monthNum = parseInt(filterMonth);
+      const yearNum = parseInt(filterYear);
+      const formattedMonth = String(monthNum + 1).padStart(2, "0");
+      setDate(`${yearNum}-${formattedMonth}-01`);
+    }
+
     setSessionPlanLink(""); 
     setDocumentationLink(""); 
     setIsMusicBus(false);
@@ -189,7 +231,12 @@ const SessionsPage = () => {
   };
 
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
-  const centreSessionsList = useMemo(() => selectedCentreId ? sessionsList.filter(s => (s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId)) : [], [sessionsList, selectedCentreId]);
+  const centreSessionsList = useMemo(() => selectedCentreId ? sessionsList.filter(s => {
+    const matchesCentre = s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId;
+    if (!matchesCentre) return false;
+    const d = new Date(s.date);
+    return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
+  }) : [], [sessionsList, selectedCentreId, filterMonth, filterYear]);
 
   if (!selectedCentreId) {
     return (
@@ -259,7 +306,12 @@ const SessionsPage = () => {
               return matchesSearch && matchesType && matchesFellow;
             })
             .map(centre => {
-              const sessionsCount = sessionsList.filter(s => ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id)).length;
+              const sessionsCount = sessionsList.filter(s => {
+                const matchesCentre = ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id);
+                if (!matchesCentre) return false;
+                const d = new Date(s.date);
+                return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
+              }).length;
               const studentCount = studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id)).length;
               const cId = centre._id || centre.id;
               
@@ -359,8 +411,8 @@ const SessionsPage = () => {
               <Input placeholder="e.g. Intro to Rhythm Patterns" value={topic} onChange={e => setTopic(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan (Drive Link)</Label>
-              <Input placeholder="https://drive.google.com/..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan</Label>
+              <Textarea placeholder="Write or paste your session plan here..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[100px] resize-y" />
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Documentation (Photos/Videos)</Label>
@@ -428,14 +480,30 @@ const SessionsPage = () => {
         </div>
       </div>
 
-      <div className="relative max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
-        <Input 
-          placeholder="Filter sessions by topic or theme..." 
-          className="pl-12 h-14 rounded-[1.5rem] border-none shadow-xl bg-white text-lg font-bold tracking-tight focus:ring-primary/20" 
-          value={searchQuery} 
-          onChange={(e) => setSearchQuery(e.target.value)} 
-        />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 min-w-0 sm:max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+          <Input 
+            placeholder="Filter sessions by topic or theme..." 
+            className="pl-12 h-12 rounded-xl border-none shadow-lg bg-white font-bold tracking-tight focus:ring-primary/20" 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={filterMonth} onValueChange={setFilterMonth}>
+            <SelectTrigger className="h-12 rounded-xl border-none shadow-lg bg-white font-bold text-xs w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectContent className="rounded-2xl border-none shadow-2xl">
+              {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterYear} onValueChange={setFilterYear}>
+            <SelectTrigger className="h-12 rounded-xl border-none shadow-lg bg-white font-bold text-xs w-[90px]"><SelectValue /></SelectTrigger>
+            <SelectContent className="rounded-2xl border-none shadow-2xl">
+              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -450,7 +518,12 @@ const SessionsPage = () => {
               <div className="p-8 flex-1 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">{s.date}</Badge>
+                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">{formatDateDMY(s.date)}</Badge>
+                    {s.createdAt && (
+                      <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-muted-foreground/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
+                        Logged: {formatDateDMY(s.createdAt)}
+                      </Badge>
+                    )}
                     {s.isMusicBus && <Badge className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-500/20 rounded-lg px-2 py-1 font-black text-[10px] uppercase tracking-widest flex items-center gap-1"><Truck className="h-3 w-3" /> Music Bus</Badge>}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -467,7 +540,7 @@ const SessionsPage = () => {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Session Plan</span>
                     {s.sessionPlanLink ? (
-                      <a href={s.sessionPlanLink.startsWith('http') ? s.sessionPlanLink : `https://${s.sessionPlanLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline mt-0.5 flex items-center gap-1">View Plan <CheckCircle2 className="h-3 w-3" /></a>
+                      <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success mt-0.5 flex items-center gap-1 hover:underline cursor-pointer"><CheckCircle2 className="h-3 w-3" /> View Plan</button>
                     ) : (
                       <span className="text-xs font-bold text-destructive mt-0.5">Missing Plan</span>
                     )}
@@ -475,7 +548,7 @@ const SessionsPage = () => {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
                     {s.documentationLink ? (
-                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline mt-0.5 flex items-center gap-1">View Media <CheckCircle2 className="h-3 w-3" /></a>
+                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">View Media <CheckCircle2 className="h-3 w-3" /></a>
                     ) : (
                       <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
                     )}
@@ -547,6 +620,27 @@ const SessionsPage = () => {
               <Button className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px]" onClick={handleSaveAttendance} disabled={isSubmittingAttendance}>{isSubmittingAttendance ? "Saving..." : "Save Attendance"}</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* View Session Plan Dialog */}
+      <Dialog open={viewPlanText !== null} onOpenChange={(o) => { if (!o) setViewPlanText(null); }}>
+        <DialogContent className="rounded-[2rem] border-none shadow-2xl max-w-lg">
+          <DialogHeader className="bg-gradient-to-r from-primary to-primary/80 text-white p-6 -m-6 mb-0 rounded-t-[2rem]">
+            <DialogTitle className="text-lg font-black tracking-tight">Session Plan</DialogTitle>
+            <DialogDescription className="text-white/70 text-xs font-bold uppercase tracking-widest">Plan Details</DialogDescription>
+          </DialogHeader>
+          <div className="p-2 pt-6">
+            <div className="bg-muted/30 rounded-xl p-4 max-h-[400px] overflow-y-auto">
+              {viewPlanText && (viewPlanText.startsWith('http://') || viewPlanText.startsWith('https://')) ? (
+                <a href={viewPlanText} target="_blank" rel="noreferrer" className="text-sm font-bold text-primary hover:underline break-all">{viewPlanText}</a>
+              ) : (
+                <p className="text-sm font-medium whitespace-pre-wrap leading-relaxed">{viewPlanText}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="px-2 pb-2">
+            <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Close</Button></DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

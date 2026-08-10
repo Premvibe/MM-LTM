@@ -91,6 +91,20 @@ const ScoreCell = ({ score }: { score: number }) => {
   );
 };
 
+const formatDateDMY = (dateStr?: string) => {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y.slice(-2)}`;
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+};
+
 const AssessmentsPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -587,7 +601,7 @@ const AssessmentsPage = () => {
                             <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center text-success">
                                <CheckCircle2 className="h-5 w-5" />
                             </div>
-                            <p className="text-[9px] font-black text-success uppercase tracking-widest">LOGGED {new Date(monthlyRecord.date).toLocaleDateString()}</p>
+                             <p className="text-[9px] font-black text-success uppercase tracking-widest">LOGGED {formatDateDMY(monthlyRecord.date)}</p>
                           </div>
                         ) : (
                           <Button 

@@ -388,7 +388,7 @@ const CentreDetailPage = () => {
                     <div>
                       <p className="text-sm font-bold">{s.topic}</p>
                       <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                        <Clock className="h-3 w-3" /> {format(new Date(s.date), "dd MMM yyyy")} · {s.duration} mins
+                        <Clock className="h-3 w-3" /> {format(new Date(s.date), "dd/MM/yy")} · {s.duration} mins
                       </div>
                     </div>
                   </div>
