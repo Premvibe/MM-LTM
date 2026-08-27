@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileUpload, DriveFile } from "@/components/ui/file-upload";
+import { FileGallery } from "@/components/ui/file-gallery";
 
 type Quality = { 
   _id: string; 
@@ -32,6 +34,7 @@ type Quality = {
   assessmentPercentage: number;
   videoObservation: number;
   score: number;
+  files?: Array<{ fileId: string; fileName: string; fileUrl: string; mimeType?: string; thumbnailLink?: string }>;
 };
 
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number };
@@ -62,6 +65,7 @@ const QualityPage = () => {
   const [planSel, setPlanSel] = useState("3");
   const [planMusical, setPlanMusical] = useState("3");
   const [planCurriculum, setPlanCurriculum] = useState("3");
+  const [qualityFiles, setQualityFiles] = useState<DriveFile[]>([]);
 
   const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
   const [studentsList, setStudentsList] = useState<any[]>([]);
@@ -170,6 +174,7 @@ const QualityPage = () => {
     setPlanSel("3");
     setPlanMusical("3");
     setPlanCurriculum("3");
+    setQualityFiles([]);
     setEditItem(null);
   };
 
@@ -189,6 +194,7 @@ const QualityPage = () => {
     setPlanSel(String(q.sessionPlan.sel));
     setPlanMusical(String(q.sessionPlan.musical));
     setPlanCurriculum(String(q.sessionPlan.curriculumAlignment));
+    setQualityFiles(q.files || []);
     setOpen(true);
   };
 
@@ -236,7 +242,8 @@ const QualityPage = () => {
       centreId: formCentreId,
       centre: centre?.name || "",
       fellow: fellow?.name || "Unassigned",
-      date: auditDate
+      date: auditDate,
+      files: qualityFiles
     };
     
     try {
@@ -377,6 +384,16 @@ const QualityPage = () => {
                             </div>
                           </div>
                         ))}
+
+                        <FileUpload
+                          files={qualityFiles}
+                          onFilesChange={setQualityFiles}
+                          centreId={formCentreId || undefined}
+                          centreName={centresList.find(c => c._id === formCentreId)?.name}
+                          context="Quality"
+                          label="Attach Video Observations / Documents"
+                          maxFiles={3}
+                        />
                       </div>
                     </div>
 
@@ -448,6 +465,11 @@ const QualityPage = () => {
                     <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60"><LayoutGrid className="h-3 w-3" /> {q.centre}</p>
                     <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60"><ClipboardCheck className="h-3 w-3" /> {q.date}</p>
                   </div>
+                  {q.files && q.files.length > 0 && (
+                    <div className="mt-4">
+                      <FileGallery files={q.files} title="Quality Attachments" />
+                    </div>
+                  )}
                   <div className="mt-6 pt-6 border-t border-primary/5">
                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Overall Quality</p>
                      <div className="flex items-baseline gap-1">

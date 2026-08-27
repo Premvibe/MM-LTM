@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { FileUpload, DriveFile } from "@/components/ui/file-upload";
+import { FileGallery } from "@/components/ui/file-gallery";
 
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string };
@@ -27,6 +29,7 @@ type ChangeStory = {
   status: "pending" | "approved" | "revision_needed";
   reviewedBy: string;
   reviewComment: string;
+  files?: Array<{ fileId: string; fileName: string; fileUrl: string; mimeType?: string; thumbnailLink?: string }>;
   createdAt?: string;
 };
 
@@ -77,6 +80,7 @@ const ChangeStoriesPage = () => {
   const [title, setTitle] = useState("");
   const [studentName, setStudentName] = useState("");
   const [storyText, setStoryText] = useState("");
+  const [storyFiles, setStoryFiles] = useState<DriveFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Review state
@@ -134,6 +138,7 @@ const ChangeStoriesPage = () => {
     setTitle("");
     setStudentName("");
     setStoryText("");
+    setStoryFiles([]);
     setEditingStory(null);
   };
 
@@ -146,12 +151,13 @@ const ChangeStoriesPage = () => {
     try {
       const payload = {
         centreId: selectedCentreId,
-        fellowId: user?.id || user?._id,
+        fellowId: user?.id || (user as any)?._id || "",
         month: parseInt(filterMonth),
         year: parseInt(filterYear),
         studentName,
         title,
         story: storyText,
+        files: storyFiles
       };
       if (editingStory) {
         await api.put(`/change-stories/${editingStory._id}`, payload);
@@ -204,6 +210,7 @@ const ChangeStoriesPage = () => {
     setTitle(story.title);
     setStudentName(story.studentName);
     setStoryText(story.story);
+    setStoryFiles(story.files || []);
     setFormOpen(true);
   };
 
@@ -391,8 +398,14 @@ const ChangeStoriesPage = () => {
             </div>
 
             {/* Story body */}
-            <div className="p-8">
-              <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{centreStory.story}</p>
+            <div className="p-8 space-y-6">
+              <div className="prose prose-sm max-w-none text-foreground font-medium leading-relaxed whitespace-pre-wrap">
+                {centreStory.story}
+              </div>
+
+              {centreStory.files && centreStory.files.length > 0 && (
+                <FileGallery files={centreStory.files} title="Media & Attachments" />
+              )}
             </div>
 
             {/* Review info */}
@@ -443,6 +456,16 @@ const ChangeStoriesPage = () => {
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Change Story *</Label>
               <Textarea placeholder="Write the change story here..." value={storyText} onChange={e => setStoryText(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[180px] resize-y" />
             </div>
+            <FileUpload
+              files={storyFiles}
+              onFilesChange={setStoryFiles}
+              centreId={selectedCentreId || undefined}
+              centreName={selectedCentre?.name}
+              context="ChangeStories"
+              monthYear={`${months.find(m => m.value === filterMonth)?.label} ${filterYear}`}
+              label="Attach Photos / Videos / Documents"
+              maxFiles={5}
+            />
           </div>
           <DialogFooter className="p-6 pt-0 flex gap-3">
             <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>

@@ -13,8 +13,10 @@ import api from "@/lib/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileUpload, DriveFile } from "@/components/ui/file-upload";
+import { FileGallery } from "@/components/ui/file-gallery";
 
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; };
+type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
 
@@ -72,6 +74,7 @@ const SessionsPage = () => {
   const [isMusicBus, setIsMusicBus] = useState(false);
   const [observations, setObservations] = useState("");
   const [issues, setIssues] = useState("");
+  const [sessionFiles, setSessionFiles] = useState<DriveFile[]>([]);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [checkedStudentIds, setCheckedStudentIds] = useState<string[]>([]);
@@ -154,11 +157,24 @@ const SessionsPage = () => {
     setIsMusicBus(false);
     setObservations("");
     setIssues("");
+    setSessionFiles([]);
     setEditItem(null); 
   };
 
-  const openEdit = (s: Session) => {
-    setEditItem(s); setTopic(s.topic); setCentreId(s.centreId); setFellowId(s.fellowId); setDuration(String(s.duration)); setDate(s.date); setSessionPlanLink(s.sessionPlanLink || ""); setDocumentationLink(s.documentationLink || ""); setIsMusicBus(s.isMusicBus || false); setObservations(s.observations || ""); setIssues(s.issues || ""); setOpen(true);
+  const openEdit = (session: Session) => {
+    setEditItem(session); 
+    setTopic(session.topic); 
+    setCentreId(session.centreId); 
+    setFellowId(session.fellowId); 
+    setDuration(String(session.duration)); 
+    setDate(session.date); 
+    setSessionPlanLink(session.sessionPlanLink || ""); 
+    setDocumentationLink(session.documentationLink || "");    
+    setIsMusicBus(session.isMusicBus || false);
+    setObservations(session.observations || "");
+    setIssues(session.issues || "");
+    setSessionFiles(session.files || []);
+    setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -188,7 +204,7 @@ const SessionsPage = () => {
     const targetCentreId = selectedCentreId || centreId;
     if (!targetCentreId) { toast.error("Please select a centre"); return; }
 
-    const sessionData = { date, centreId: targetCentreId, fellowId: finalFellowId, topic: topic.trim(), duration: parseInt(duration), sessionPlanLink: sessionPlanLink.trim(), documentationLink: documentationLink.trim(), isMusicBus, observations: isMusicBus ? observations.trim() : "", issues: isMusicBus ? issues.trim() : "" };
+    const sessionData = { date, centreId: targetCentreId, fellowId: finalFellowId, topic: topic.trim(), duration: parseInt(duration), sessionPlanLink: sessionPlanLink.trim(), documentationLink: documentationLink.trim(), files: sessionFiles, isMusicBus, observations: isMusicBus ? observations.trim() : "", issues: isMusicBus ? issues.trim() : "" };
 
     try {
       if (editItem) {
@@ -449,6 +465,17 @@ const SessionsPage = () => {
                 </div>
               </div>
             )}
+
+            <FileUpload
+              files={sessionFiles}
+              onFilesChange={setSessionFiles}
+              centreId={selectedCentreId || centreId || undefined}
+              centreName={selectedCentre?.name}
+              context="Sessions"
+              monthYear={`${months.find(m => m.value === filterMonth)?.label} ${filterYear}`}
+              label="Attach Session Plans / Photos / Videos"
+              maxFiles={5}
+            />
           </div>
         </ScrollArea>
         <div className="p-6 md:p-8 bg-muted/30 border-t flex justify-end gap-3 shrink-0">
@@ -554,6 +581,10 @@ const SessionsPage = () => {
                     )}
                   </div>
                 </div>
+
+                {s.files && s.files.length > 0 && (
+                  <FileGallery files={s.files} title="Drive Media & Attachments" />
+                )}
               </div>
               <div className="bg-muted/30 sm:w-64 p-8 flex flex-col justify-center gap-3 border-l">
                 <Button className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={() => openAttendance(s)}>

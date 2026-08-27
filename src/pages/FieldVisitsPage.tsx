@@ -13,6 +13,8 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { FileUpload, DriveFile } from "@/components/ui/file-upload";
+import { FileGallery } from "@/components/ui/file-gallery";
 
 type Visit = { 
   _id: string; 
@@ -28,6 +30,7 @@ type Visit = {
   quarter?: string;
   sessionPlanLink?: string;
   documentationLink?: string;
+  files?: Array<{ fileId: string; fileName: string; fileUrl: string; mimeType?: string; thumbnailLink?: string }>;
   isSession?: boolean;
 };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
@@ -55,6 +58,7 @@ const FieldVisitsPage = () => {
   const [quarter, setQuarter] = useState("Q1");
   const [sessionPlanLink, setSessionPlanLink] = useState("");
   const [documentationLink, setDocumentationLink] = useState("");
+  const [visitFiles, setVisitFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const quarterlyStats = React.useMemo(() => {
@@ -140,6 +144,7 @@ const FieldVisitsPage = () => {
     setQuarter("Q1");
     setSessionPlanLink("");
     setDocumentationLink("");
+    setVisitFiles([]);
     setEditItem(null); 
   };
 
@@ -152,6 +157,7 @@ const FieldVisitsPage = () => {
     setQuarter(v.quarter || "Q1");
     setSessionPlanLink(v.sessionPlanLink || "");
     setDocumentationLink(v.documentationLink || "");
+    setVisitFiles(v.files || []);
     setOpen(true);
   };
 
@@ -170,6 +176,7 @@ const FieldVisitsPage = () => {
       quarter: quarter,
       sessionPlanLink: (sessionPlanLink || "").trim(),
       documentationLink: (documentationLink || "").trim(),
+      files: visitFiles,
       observer: user?.name || "Admin"
     };
     
@@ -265,6 +272,15 @@ const FieldVisitsPage = () => {
                   <Input placeholder="Resource/Photo link..." value={documentationLink} onChange={e => setDocumentationLink(e.target.value)} className="rounded-xl h-11 bg-muted/30 border-none font-bold" />
                 </div>
               </div>
+              <FileUpload
+                files={visitFiles}
+                onFilesChange={setVisitFiles}
+                centreId={centreId || undefined}
+                centreName={centresList.find(c => (c._id || c.id) === centreId)?.name}
+                context="FieldVisits"
+                label="Attach Field Visit Photos / Reports / Files"
+                maxFiles={5}
+              />
             </div>
             <div className="p-8 bg-muted/30 border-t flex justify-end gap-3">
               <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
@@ -396,6 +412,11 @@ const FieldVisitsPage = () => {
                               </a>
                             )}
                           </div>
+                           {v.files && v.files.length > 0 && (
+                             <div className="mt-2">
+                               <FileGallery files={v.files} title="Attachments" />
+                             </div>
+                           )}
                        </div>
                        {!v.isSession ? (
                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/5 hover:text-primary shrink-0" onClick={() => openEdit(v)}><Pencil className="h-4 w-4" /></Button>

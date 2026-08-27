@@ -121,6 +121,7 @@ const AssessmentsPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [fellowsList, setFellowsList] = useState<any[]>([]);
   const [assessmentsData, setAssessmentsData] = useState<any[]>([]);
+  const [sessionsData, setSessionsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
@@ -173,13 +174,15 @@ const AssessmentsPage = () => {
       api.get(`/students${params}`), 
       api.get(`/centres${params}`),
       api.get(`/fellows${params}`),
-      api.get(`/assessments${params}`)
+      api.get(`/assessments${params}`),
+      api.get(`/sessions${params}`)
     ])
-      .then(([sRes, cRes, fRes, aRes]) => {
+      .then(([sRes, cRes, fRes, aRes, sessRes]) => {
         setStudents(sRes.data);
         setCentres(cRes.data);
         setFellowsList(fRes.data);
         setAssessmentsData(aRes.data);
+        setSessionsData(sessRes.data);
       })
       .finally(() => setLoading(false));
   }, [user]);
@@ -219,7 +222,8 @@ const AssessmentsPage = () => {
     }
 
     const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
-    let dateStr = new Date().toISOString();
+    const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear();
+    let dateStr = isCurrentMonth ? new Date().toISOString() : new Date(selectedYear, selectedMonth, 15).toISOString();
 
     try {
       const payload = {
@@ -252,11 +256,24 @@ const AssessmentsPage = () => {
     }
   };
 
+  const handleStatusChange = async (studentId: string, newStatus: string) => {
+    try {
+      await api.put(`/students/${studentId}`, { status: newStatus, month: selectedMonth, year: selectedYear });
+      setStudents(prev => prev.map(s => (s._id || s.id) === studentId ? { ...s, status: newStatus } : s));
+      toast.success("Student status updated");
+    } catch (error) {
+      toast.error("Failed to update status");
+    }
+  };
+
+  const activeCentresCount = centres.length;
+
   const handleBulkSubmit = async () => {
     setIsSubmitting(true);
     try {
       const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
-      let dateStr = new Date().toISOString();
+      const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear();
+      let dateStr = isCurrentMonth ? new Date().toISOString() : new Date(selectedYear, selectedMonth, 15).toISOString();
 
       const assessments = Object.entries(bulkScores).map(([studentId, data]) => ({
         studentId,
@@ -460,6 +477,13 @@ const AssessmentsPage = () => {
     });
   }).length;
 
+  const monthlyCentreSessions = sessionsData.filter(sess => {
+    if ((sess.centreId?._id || sess.centreId) !== selectedCentreId) return false;
+    const d = new Date(sess.date);
+    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+  });
+  const totalMonthlySessionsCount = monthlyCentreSessions.length;
+
   return (
     <div className="animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -475,6 +499,8 @@ const AssessmentsPage = () => {
               <span className="text-sm font-bold">{centreStudents.length} Students Enrolled</span>
               <span className="opacity-20">|</span>
               <span className="text-sm font-bold text-primary">{innerAssessedCount} Assessed This Month</span>
+              <span className="opacity-20">|</span>
+              <span className="text-sm font-bold text-success">{totalMonthlySessionsCount} Sessions Logged</span>
             </div>
           </div>
         </div>
@@ -518,7 +544,22 @@ const AssessmentsPage = () => {
             <Button 
               className="rounded-xl h-10 px-6 font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg hover:shadow-primary/20 transition-all ml-1"
               onClick={() => {
-                setBulkScores({});
+                const initialBulkScores: Record<string, any> = {};
+                centreStudents.forEach(s => {
+                  const sId = s._id || s.id;
+                  const sAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === sId && a.phase === "Continuous");
+                  const monthlyRecord = sAssessments.find(a => {
+                    const d = new Date(a.date);
+                    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+                  });
+                  if (monthlyRecord && monthlyRecord.data) {
+                    initialBulkScores[sId] = {
+                      musical: monthlyRecord.data.musical || { sur: 0, laya: 0, word: 0, bhav: 0 },
+                      selMid: monthlyRecord.data.selMid || { involvement: 0, emotion: 0, creativity: 0, interaction: 0 }
+                    };
+                  }
+                });
+                setBulkScores(initialBulkScores);
                 setActiveCategory("Monthly-Evaluation");
                 setActivePhase("Continuous");
                 setIsBulkOpen(true);
@@ -563,22 +604,46 @@ const AssessmentsPage = () => {
                 }
               }
 
+              const monthlyLogsCount = records.filter(r => {
+                const d = new Date(r.date);
+                return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+              }).length;
+
               const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear();
+              const isInactive = a.raw.status === "Inactive" || a.raw.status === "Left";
+
+              const presentCount = monthlyCentreSessions.filter(sess => 
+                sess.presentStudentIds && sess.presentStudentIds.includes(a.id)
+              ).length;
+              const monthlyAttendancePercent = totalMonthlySessionsCount > 0 
+                ? Math.round((presentCount / totalMonthlySessionsCount) * 100) 
+                : 0;
 
               return (
-                <Card key={a.id} className="glass-card-premium border-none shadow-xl hover:shadow-2xl transition-all rounded-[2rem] overflow-hidden group">
+                <Card key={a.id} className={`glass-card-premium border-none shadow-xl hover:shadow-2xl transition-all rounded-[2rem] overflow-hidden group ${isInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                   <CardContent className="p-0">
                     <div className="flex flex-col lg:flex-row lg:items-center">
                       <div className="p-6 lg:w-[200px] shrink-0 bg-primary/5 group-hover:bg-primary/10 transition-colors">
-                        <h4 className="font-black text-base tracking-tight mb-1 group-hover:text-primary transition-colors">{a.student}</h4>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-black text-base tracking-tight group-hover:text-primary transition-colors truncate">{a.student}</h4>
+                          <Select value={a.raw.status || "Active"} onValueChange={(val) => handleStatusChange(a.id, val)}>
+                            <SelectTrigger className="h-6 px-2 w-[80px] shrink-0 text-[9px] font-black uppercase tracking-widest bg-white/50 border-primary/20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Active" className="text-[10px] font-bold">Active</SelectItem>
+                              <SelectItem value="Inactive" className="text-[10px] font-bold">Inactive</SelectItem>
+                              <SelectItem value="Left" className="text-[10px] font-bold">Left</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex items-center flex-wrap gap-2 mt-2">
-                           <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{records.length} TOTAL LOGS</Badge>
-                           <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{a.raw.attendancePercent || 0}% ATTENDANCE</Badge>
+                           <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{monthlyAttendancePercent}% ATTENDANCE</Badge>
                            {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[8px] font-black uppercase tracking-widest">SYNCED</Badge>}
                            {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[8px] font-black uppercase tracking-widest">PREVIOUS: {previousMonthName}</Badge>}
                         </div>
                       </div>
-                      <div className="p-4 flex-1 grid grid-cols-8 items-center justify-items-center">
+                      <div className="p-4 flex-1 grid grid-cols-8 min-w-[300px] overflow-x-auto items-center justify-items-center">
                         {[
                           { label: "Sur", value: monthlyRecord?.data.musical?.sur },
                           { label: "Laya", value: monthlyRecord?.data.musical?.laya },
@@ -993,6 +1058,13 @@ const AssessmentsPage = () => {
             <div className="flex items-center gap-3">
               <Button variant="ghost" onClick={() => setIsBulkOpen(false)} className="text-white hover:bg-white/10 rounded-xl h-10 px-4 font-bold"><X className="mr-2 h-4 w-4" /> Cancel</Button>
               <Button 
+                variant="ghost"
+                onClick={() => setBulkScores({})}
+                className="text-white hover:bg-white/10 rounded-xl h-10 px-4 font-black uppercase tracking-widest text-[10px] border border-white/30"
+              >
+                Clear All
+              </Button>
+              <Button 
                 onClick={handleBulkSubmit}
                 disabled={isSubmitting}
                 className="bg-white text-primary hover:bg-white/90 rounded-xl h-10 px-6 font-black uppercase tracking-widest text-[10px] shadow-xl"
@@ -1003,11 +1075,11 @@ const AssessmentsPage = () => {
           </div>
           
           <div className="p-0">
-            <ScrollArea className="h-[75vh]">
+            <ScrollArea className="h-[75vh]" scrollbars="both">
               <Table>
                 <TableHeader className="bg-muted/50 sticky top-0 z-20">
                   <TableRow>
-                    <TableHead className="w-[140px] min-w-[140px] font-black text-[10px] uppercase tracking-widest pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
+                    <TableHead className="w-[180px] min-w-[180px] font-black text-[10px] uppercase tracking-widest pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
                     {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
                       <TableHead key={k} className="text-center font-black text-[10px] uppercase tracking-widest">{k}</TableHead>
                     ))}
@@ -1040,10 +1112,61 @@ const AssessmentsPage = () => {
                     };
 
                     const avg = calculateAvg();
+                    const isInactive = s.status === "Inactive" || s.status === "Left";
+
+                    const presentCount = monthlyCentreSessions.filter(sess => 
+                      sess.presentStudentIds && sess.presentStudentIds.includes(sId)
+                    ).length;
+                    const monthlyAttendancePercent = totalMonthlySessionsCount > 0 
+                      ? Math.round((presentCount / totalMonthlySessionsCount) * 100) 
+                      : 0;
+
+                    const sAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === sId && a.phase === "Continuous");
+                    let monthlyRecord = sAssessments.find(a => {
+                      const d = new Date(a.date);
+                      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+                    });
+                    
+                    const isAssessedThisMonth = monthlyRecord !== undefined;
+                    let isPreviousRecord = false;
+                    let previousMonthName = "";
+                    
+                    if (!monthlyRecord) {
+                      const pastRecords = sAssessments.filter(a => {
+                         const d = new Date(a.date);
+                         return d.getFullYear() < selectedYear || (d.getFullYear() === selectedYear && d.getMonth() < selectedMonth);
+                      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                      
+                      if (pastRecords.length > 0) {
+                        isPreviousRecord = true;
+                        previousMonthName = new Date(pastRecords[0].date).toLocaleString('default', { month: 'short' });
+                      }
+                    }
 
                     return (
-                      <TableRow key={sId} className="hover:bg-primary/5 transition-colors group">
-                        <TableCell className="font-bold text-xs pl-4 sticky left-0 bg-white z-10 group-hover:bg-primary/5">{s.name}</TableCell>
+                      <TableRow key={sId} className={`hover:bg-primary/5 transition-colors group ${isInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                        <TableCell className="font-bold text-xs pl-4 sticky left-0 bg-white z-10 group-hover:bg-primary/5 w-[180px] min-w-[180px]">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <div className="flex items-start justify-between gap-2 w-full">
+                              <span className="truncate flex-1" title={s.name}>{s.name}</span>
+                              <Select value={s.status || "Active"} onValueChange={(val) => handleStatusChange(sId, val)}>
+                                <SelectTrigger className="h-5 px-1.5 w-[65px] shrink-0 text-[8px] font-black uppercase tracking-widest bg-muted border-none">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Active" className="text-[10px] font-bold">Active</SelectItem>
+                                  <SelectItem value="Inactive" className="text-[10px] font-bold">Inactive</SelectItem>
+                                  <SelectItem value="Left" className="text-[10px] font-bold">Left</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center flex-wrap gap-1 mt-0.5">
+                               <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest border-primary/20 px-1 py-0 h-4 ${monthlyAttendancePercent < 50 ? 'text-destructive' : 'text-primary/60'}`}>{monthlyAttendancePercent}% ATT</Badge>
+                               {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[7px] font-black uppercase tracking-widest px-1 py-0 h-4">SYNCED</Badge>}
+                               {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[7px] font-black uppercase tracking-widest px-1 py-0 h-4">PREV: {previousMonthName}</Badge>}
+                            </div>
+                          </div>
+                        </TableCell>
                         {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => (
                           <TableCell key={k} className="text-center p-1">
                             <div className="flex items-center justify-center gap-px">
