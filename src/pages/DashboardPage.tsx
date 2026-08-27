@@ -76,16 +76,17 @@ const DashboardPage = () => {
   useEffect(() => {
     if (!user) return;
     const roleParams = user.role === 'fellow' 
-      ? `&role=fellow&email=${user.email}` 
+      ? `role=fellow&email=${user.email}` 
       : user.role === 'program_manager' 
-        ? `&role=program_manager&email=${user.email}` 
+        ? `role=program_manager&email=${user.email}` 
         : '';
-    const dateParams = `&month=${filterMonth}&year=${filterYear}`;
+    const dateParams = `month=${filterMonth}&year=${filterYear}`;
     const adminParams = isAdmin 
-      ? `&centreId=${filterCentre}&fellowId=${filterFellow}` 
+      ? `centreId=${filterCentre}&fellowId=${filterFellow}` 
       : '';
     
-    api.get(`/dashboard/stats?${roleParams}${dateParams}${adminParams}`)
+    const queryString = [roleParams, dateParams, adminParams].filter(Boolean).join('&');
+    api.get(`/dashboard/stats?${queryString}`)
       .then(res => setStats(res.data))
       .catch(() => {});
   }, [user, filterMonth, filterYear, filterCentre, filterFellow]);
