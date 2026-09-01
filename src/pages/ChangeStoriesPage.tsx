@@ -316,7 +316,7 @@ const ChangeStoriesPage = () => {
   }
 
   // ───────── INNER: Centre detail view ─────────
-  const fellowName = fellows.find(f => centreStory && (f._id === centreStory.fellowId || f.id === centreStory.fellowId))?.name;
+  const centreStories = stories.filter(s => s.centreId === selectedCentreId && s.month === parseInt(filterMonth) && s.year === parseInt(filterYear));
   const isFellow = user?.role === "fellow";
 
   return (
@@ -350,86 +350,95 @@ const ChangeStoriesPage = () => {
         </div>
       </div>
 
-      {/* Story content */}
-      {centreStory ? (
-        <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-          <CardContent className="p-0">
-            {/* Story header */}
-            <div className="p-8 border-b border-muted/50">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(() => {
-                      const sc = statusConfig[centreStory.status];
-                      return <Badge className={`${sc.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest flex items-center gap-1`}><sc.icon className="h-3 w-3" />{sc.label}</Badge>;
-                    })()}
-                    {centreStory.createdAt && (
-                      <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-muted-foreground/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
-                        Submitted: {formatDateDMY(centreStory.createdAt)}
-                      </Badge>
+      {/* Story content list */}
+      {centreStories.length > 0 ? (
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            {(isFellow || isAdmin) && (
+              <Button className="rounded-xl h-10 px-5 font-black uppercase tracking-widest text-[10px] shadow-sm" onClick={() => { resetForm(); setFormOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" /> Add Another Story
+              </Button>
+            )}
+          </div>
+          {centreStories.map(story => {
+            const fellowName = fellows.find(f => f._id === story.fellowId || f.id === story.fellowId)?.name;
+            const sc = statusConfig[story.status];
+            return (
+              <Card key={story._id} className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+                <CardContent className="p-0">
+                  {/* Story header */}
+                  <div className="p-8 border-b border-muted/50">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={`${sc.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest flex items-center gap-1`}>
+                            <sc.icon className="h-3 w-3" />{sc.label}
+                          </Badge>
+                          {story.createdAt && (
+                            <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-muted-foreground/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
+                              Submitted: {formatDateDMY(story.createdAt)}
+                            </Badge>
+                          )}
+                        </div>
+                        <h2 className="text-2xl font-[950] tracking-tight">{story.title}</h2>
+                        {story.studentName && (
+                          <p className="text-sm font-bold text-muted-foreground">Student: <span className="text-foreground">{story.studentName}</span></p>
+                        )}
+                        {fellowName && (
+                          <p className="text-xs font-bold text-muted-foreground">By: {fellowName}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {(isFellow || isAdmin) && (story.status !== "approved") && (
+                          <Button variant="outline" size="sm" className="rounded-xl font-bold text-xs" onClick={() => openEdit(story)}>
+                            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button variant="outline" size="sm" className="rounded-xl font-bold text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(story._id)}>
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                          </Button>
+                        )}
+                        {isAdmin && story.status === "pending" && (
+                          <Button size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px]" onClick={() => { setReviewingStory(story); setReviewComment(""); setReviewOpen(true); }}>
+                            Review
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Story body */}
+                  <div className="p-8 space-y-6">
+                    <div className="prose prose-sm max-w-none text-foreground font-medium leading-relaxed whitespace-pre-wrap">
+                      {story.story}
+                    </div>
+
+                    {story.files && story.files.length > 0 && (
+                      <FileGallery files={story.files} title="Media & Attachments" />
                     )}
                   </div>
-                  <h2 className="text-2xl font-[950] tracking-tight">{centreStory.title}</h2>
-                  {centreStory.studentName && (
-                    <p className="text-sm font-bold text-muted-foreground">Student: <span className="text-foreground">{centreStory.studentName}</span></p>
-                  )}
-                  {fellowName && (
-                    <p className="text-xs font-bold text-muted-foreground">By: {fellowName}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {(isFellow || isAdmin) && (centreStory.status !== "approved") && (
-                    <Button variant="outline" size="sm" className="rounded-xl font-bold text-xs" onClick={() => openEdit(centreStory)}>
-                      <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-                    </Button>
-                  )}
-                  {isAdmin && (
-                    <Button variant="outline" size="sm" className="rounded-xl font-bold text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(centreStory._id)}>
-                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
-                    </Button>
-                  )}
-                  {isAdmin && centreStory.status === "pending" && (
-                    <Button size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px]" onClick={() => { setReviewingStory(centreStory); setReviewComment(""); setReviewOpen(true); }}>
-                      Review
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            {/* Story body */}
-            <div className="p-8 space-y-6">
-              <div className="prose prose-sm max-w-none text-foreground font-medium leading-relaxed whitespace-pre-wrap">
-                {centreStory.story}
-              </div>
-
-              {centreStory.files && centreStory.files.length > 0 && (
-                <FileGallery files={centreStory.files} title="Media & Attachments" />
-              )}
-            </div>
-
-            {/* Review info */}
-            {centreStory.reviewedBy && (
-              <div className="px-8 pb-8">
-                <div className="bg-muted/30 rounded-xl p-4 space-y-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Review by {centreStory.reviewedBy}</p>
-                  {centreStory.reviewComment && <p className="text-sm font-medium text-muted-foreground italic">"{centreStory.reviewComment}"</p>}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  {/* Review info */}
+                  {story.reviewedBy && (
+                    <div className="px-8 pb-8">
+                      <div className="bg-muted/30 rounded-xl p-4 space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Review by {story.reviewedBy}</p>
+                        {story.reviewComment && <p className="text-sm font-medium text-muted-foreground italic">"{story.reviewComment}"</p>}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <Card className="border-none shadow-sm bg-white/40 rounded-[2rem] p-20 text-center border-2 border-dashed">
           <BookHeart className="h-16 w-16 text-muted-foreground mx-auto opacity-10 mb-4" />
           <p className="text-sm font-bold text-muted-foreground">No change story for {months.find(m => m.value === filterMonth)?.label} {filterYear}</p>
-          {isFellow && (
-            <Button className="mt-4 rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px]" onClick={() => { resetForm(); setFormOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" /> Write Change Story
-            </Button>
-          )}
-          {isAdmin && (
-            <Button className="mt-4 rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px]" onClick={() => { resetForm(); setFormOpen(true); }}>
+          {(isFellow || isAdmin) && (
+            <Button className="mt-4 rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-md" onClick={() => { resetForm(); setFormOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Add Change Story
             </Button>
           )}

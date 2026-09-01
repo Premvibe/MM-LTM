@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Building2, MapPin, Users, ArrowLeft, User, Calendar, Clock, BookOpen, Plus } from "lucide-react";
+import { Building2, MapPin, Users, ArrowLeft, User, Calendar, Clock, BookOpen, Plus, BookHeart } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -62,6 +62,8 @@ const CentreDetailPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
+  const [changeStoriesList, setChangeStoriesList] = useState<any[]>([]);
+  const [studentStatusFilter, setStudentStatusFilter] = useState<"all" | "Active" | "Inactive">("all");
 
   useEffect(() => {
     fetchData();
@@ -70,18 +72,20 @@ const CentreDetailPage = () => {
 
   const fetchData = async () => {
     try {
-      const [centreRes, fellowsRes, studentsRes, sessionsRes, assessmentsRes] = await Promise.all([
+      const [centreRes, fellowsRes, studentsRes, sessionsRes, assessmentsRes, storiesRes] = await Promise.all([
         api.get(`/centres/${id}`),
         api.get("/fellows"),
         api.get("/students"),
         api.get("/sessions"),
         api.get("/assessments"),
+        api.get("/change-stories"),
       ]);
       setCentre(centreRes.data);
       setAllFellows(fellowsRes.data);
       setAllStudents(studentsRes.data);
       setAllSessions(sessionsRes.data);
       setAssessmentsList(assessmentsRes.data);
+      setChangeStoriesList(storiesRes.data);
     } catch (err) {
       setError(true);
       toast.error("Failed to load centre details");
@@ -164,6 +168,14 @@ const CentreDetailPage = () => {
     getStatusForMonth(s, selectedMonth, selectedYear) !== "Left"
   );
 
+  const activeStudentCount = centreStudents.filter(s => getStatusForMonth(s, selectedMonth, selectedYear) === "Active").length;
+  const inactiveStudentCount = centreStudents.filter(s => getStatusForMonth(s, selectedMonth, selectedYear) === "Inactive").length;
+
+  const displayedStudents = centreStudents.filter(s => {
+    if (studentStatusFilter === "all") return true;
+    return getStatusForMonth(s, selectedMonth, selectedYear) === studentStatusFilter;
+  });
+
   const activeStudentsForSession = (() => {
     const session = allSessions.find(sess => sess._id === selectedSessionId);
     if (!session) return [];
@@ -194,6 +206,12 @@ const CentreDetailPage = () => {
       const d = new Date(a.date);
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
     });
+
+  const monthlyChangeStories = changeStoriesList.filter(cs =>
+    (cs.centreId === centreId || cs.centreId === centreIdAlt) &&
+    cs.month === selectedMonth &&
+    cs.year === selectedYear
+  );
 
   const avgAttendance = monthlySessions.length > 0
     ? Math.round(monthlySessions.reduce((sum, s) => sum + (s.studentsPresent || 0), 0) / (monthlySessions.length * (centreStudents.length || 1)) * 100)
@@ -305,7 +323,12 @@ const CentreDetailPage = () => {
           <CardContent className="pt-4 pb-4 flex flex-col items-center">
             <Users className="h-5 w-5 text-primary mb-1" />
             <p className="text-2xl font-bold">{centreStudents.length}</p>
-            <p className="text-xs text-muted-foreground">Students</p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap justify-center">
+              <span className="text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">{activeStudentCount} Active</span>
+              {inactiveStudentCount > 0 && (
+                <span className="text-[10px] font-black text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">{inactiveStudentCount} Inactive</span>
+              )}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -372,7 +395,7 @@ const CentreDetailPage = () => {
       <Card className="mb-6">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Sessions in {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][selectedMonth]} ({monthlySessions.length})</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => navigate("/sessions")}>View All</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/sessions?centre=${centre._id}`)}>View All</Button>
         </CardHeader>
         <CardContent>
           {monthlySessions.length === 0 ? (
@@ -408,10 +431,104 @@ const CentreDetailPage = () => {
         </CardContent>
       </Card>
 
-      {/* Students */}
+      {/* Change Stories */}
       <Card className="mb-6">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Students ({centreStudents.length})</CardTitle>
+          <div className="flex items-center gap-2">
+            <BookHeart className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">
+              Change Stories in {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][selectedMonth]} ({monthlyChangeStories.length})
+            </CardTitle>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/change-stories?centre=${centre._id}`)}>
+            View All Change Stories
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {monthlyChangeStories.length === 0 ? (
+            <div className="text-center py-6 border border-dashed rounded-xl">
+              <p className="text-sm font-medium text-muted-foreground">No change story logged for {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][selectedMonth]} {selectedYear}</p>
+              <Button size="sm" className="mt-3 rounded-xl font-bold text-xs" onClick={() => navigate(`/change-stories?centre=${centre._id}`)}>
+                <Plus className="h-4 w-4 mr-1.5" /> Write Change Story
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {monthlyChangeStories.map(story => {
+                const fellowName = allFellows.find(f => f._id === story.fellowId || f.id === story.fellowId)?.name;
+                const statusColors: Record<string, string> = {
+                  approved: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+                  pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                  revision_needed: "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                };
+                return (
+                  <div key={story._id} className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <Badge variant="outline" className={`text-[10px] font-black uppercase tracking-widest ${statusColors[story.status] || ''}`}>
+                            {story.status}
+                          </Badge>
+                          {story.studentName && (
+                            <span className="text-xs font-bold text-muted-foreground">Student: <span className="text-foreground">{story.studentName}</span></span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-foreground">{story.title}</h4>
+                      </div>
+                      {fellowName && (
+                        <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">By: {fellowName}</span>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium text-muted-foreground line-clamp-3 leading-relaxed">
+                      {story.story}
+                    </p>
+                    {story.files && story.files.length > 0 && (
+                      <div className="pt-1">
+                        <Badge variant="secondary" className="text-[10px] font-bold">
+                          📎 {story.files.length} attachment(s)
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Students */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <CardTitle className="text-base">Students ({displayedStudents.length})</CardTitle>
+            <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border">
+              <Button
+                variant={studentStatusFilter === "all" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-black uppercase tracking-wider px-2.5 rounded-lg"
+                onClick={() => setStudentStatusFilter("all")}
+              >
+                All ({centreStudents.length})
+              </Button>
+              <Button
+                variant={studentStatusFilter === "Active" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-black uppercase tracking-wider px-2.5 rounded-lg text-emerald-600 hover:text-emerald-700"
+                onClick={() => setStudentStatusFilter("Active")}
+              >
+                Active ({activeStudentCount})
+              </Button>
+              <Button
+                variant={studentStatusFilter === "Inactive" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-black uppercase tracking-wider px-2.5 rounded-lg text-amber-600 hover:text-amber-700"
+                onClick={() => setStudentStatusFilter("Inactive")}
+              >
+                Inactive ({inactiveStudentCount})
+              </Button>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             {monthlySessions.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => openAttendance(monthlySessions[0])} className="border-primary/20 text-primary hover:bg-primary/5">
@@ -467,8 +584,8 @@ const CentreDetailPage = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {centreStudents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No students enrolled.</p>
+          {displayedStudents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No {studentStatusFilter !== 'all' ? studentStatusFilter.toLowerCase() : ''} students found for this period.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -482,12 +599,14 @@ const CentreDetailPage = () => {
                       <TableHead>Section</TableHead>
                     </>
                   )}
+                  <TableHead>Status</TableHead>
                   <TableHead>Attendance</TableHead>
                   <TableHead>Last Score</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {centreStudents.map(s => {
+                {displayedStudents.map(s => {
+                  const status = getStatusForMonth(s, selectedMonth, selectedYear);
                   const studentSessions = monthlySessions.filter(sess => sess.presentStudentIds && sess.presentStudentIds.includes(s._id || s.id));
                   const attendance = monthlySessions.length > 0 ? Math.round((studentSessions.length / monthlySessions.length) * 100) : 0;
                   const assessment = monthlyAssessments.find(a => (a.studentId?._id || a.studentId) === (s._id || s.id));
@@ -503,6 +622,18 @@ const CentreDetailPage = () => {
                           <TableCell className="text-xs">{s.section || "-"}</TableCell>
                         </>
                       )}
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] font-black uppercase tracking-wider ${
+                            status === "Active" 
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                              : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          }`}
+                        >
+                          {status}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={attendance >= 85 ? "default" : "destructive"} className="text-[10px] font-black">{attendance}%</Badge>
                       </TableCell>

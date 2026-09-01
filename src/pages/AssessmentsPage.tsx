@@ -486,96 +486,93 @@ const AssessmentsPage = () => {
 
   return (
     <div className="animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="flex items-center gap-3 md:gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedCentreId(null)} className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-white shadow-sm hover:bg-primary hover:text-white transition-all shrink-0">
-            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+      <div className="flex flex-col gap-4 sm:gap-6 mb-6 sm:mb-10">
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setSelectedCentreId(null)} className="h-9 w-9 sm:h-12 sm:w-12 rounded-2xl bg-white shadow-sm hover:bg-primary hover:text-white transition-all shrink-0 mt-0.5">
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl md:text-3xl font-[950] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
-            <div className="text-muted-foreground font-medium flex items-center gap-2 mt-1">
-              <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full text-[10px] uppercase tracking-widest font-black">{selectedCentre?.type}</Badge>
-              <span className="opacity-20">|</span>
-              <span className="text-sm font-bold">{centreStudents.length} Students Enrolled</span>
-              <span className="opacity-20">|</span>
-              <span className="text-sm font-bold text-primary">{innerAssessedCount} Assessed This Month</span>
-              <span className="opacity-20">|</span>
-              <span className="text-sm font-bold text-success">{totalMonthlySessionsCount} Sessions Logged</span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-3xl font-[950] tracking-tighter text-foreground truncate">{selectedCentre?.name}</h1>
+            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+              <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full text-[8px] sm:text-[10px] uppercase tracking-widest font-black">{selectedCentre?.type}</Badge>
+              <span className="text-[10px] sm:text-xs font-bold text-muted-foreground">{centreStudents.length} Students</span>
+              <span className="text-[10px] sm:text-xs font-bold text-primary">{innerAssessedCount} Assessed</span>
+              <span className="text-[10px] sm:text-xs font-bold text-success">{totalMonthlySessionsCount} Sessions</span>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
-          <div className="relative min-w-0 flex-1 sm:flex-none sm:min-w-[200px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-xl sm:rounded-[1.5rem] border border-white/20 shadow-lg">
+          <div className="relative min-w-0 w-full sm:w-auto sm:min-w-[200px]">
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
             <Input 
               placeholder="Find student..." 
-              className="pl-10 rounded-xl bg-white/60 border-none h-10 shadow-sm focus:ring-primary/20 font-bold text-xs"
+              className="pl-9 sm:pl-10 rounded-xl bg-white/60 border-none h-9 sm:h-10 shadow-sm focus:ring-primary/20 font-bold text-xs"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
-          <div className="h-8 w-px bg-primary/10 mx-1" />
 
-          <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="w-[120px] h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[10px] uppercase tracking-widest">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-              {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
-                <SelectItem key={m} value={String(i)} className="rounded-lg text-xs font-medium">{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="w-[110px] sm:w-[120px] h-9 sm:h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[9px] sm:text-[10px] uppercase tracking-widest">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                  <SelectItem key={m} value={String(i)} className="rounded-lg text-xs font-medium">{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-            <SelectTrigger className="w-[90px] h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[10px] uppercase tracking-widest">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-              {[2025, 2026, 2027, 2028].map(y => (
-                <SelectItem key={y} value={String(y)} className="rounded-lg text-xs font-medium">{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectTrigger className="w-[80px] sm:w-[90px] h-9 sm:h-10 rounded-xl bg-white/60 border-none shadow-sm font-black text-[9px] sm:text-[10px] uppercase tracking-widest">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {[2025, 2026, 2027, 2028].map(y => (
+                  <SelectItem key={y} value={String(y)} className="rounded-lg text-xs font-medium">{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {activeTab === "SEL" && (
-            <Button 
-              className="rounded-xl h-10 px-6 font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg hover:shadow-primary/20 transition-all ml-1"
-              onClick={() => {
-                const initialBulkScores: Record<string, any> = {};
-                centreStudents.forEach(s => {
-                  const sId = s._id || s.id;
-                  const sAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === sId && a.phase === "Continuous");
-                  const monthlyRecord = sAssessments.find(a => {
-                    const d = new Date(a.date);
-                    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+            {activeTab === "SEL" && (
+              <Button 
+                className="rounded-xl h-9 sm:h-10 px-4 sm:px-6 font-black uppercase tracking-widest text-[9px] sm:text-[10px] bg-primary text-white shadow-lg hover:shadow-primary/20 transition-all"
+                onClick={() => {
+                  const initialBulkScores: Record<string, any> = {};
+                  centreStudents.forEach(s => {
+                    const sId = s._id || s.id;
+                    const sAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === sId && a.phase === "Continuous");
+                    const monthlyRecord = sAssessments.find(a => {
+                      const d = new Date(a.date);
+                      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+                    });
+                    if (monthlyRecord && monthlyRecord.data) {
+                      initialBulkScores[sId] = {
+                        musical: monthlyRecord.data.musical || { sur: 0, laya: 0, word: 0, bhav: 0 },
+                        selMid: monthlyRecord.data.selMid || { involvement: 0, emotion: 0, creativity: 0, interaction: 0 }
+                      };
+                    }
                   });
-                  if (monthlyRecord && monthlyRecord.data) {
-                    initialBulkScores[sId] = {
-                      musical: monthlyRecord.data.musical || { sur: 0, laya: 0, word: 0, bhav: 0 },
-                      selMid: monthlyRecord.data.selMid || { involvement: 0, emotion: 0, creativity: 0, interaction: 0 }
-                    };
-                  }
-                });
-                setBulkScores(initialBulkScores);
-                setActiveCategory("Monthly-Evaluation");
-                setActivePhase("Continuous");
-                setIsBulkOpen(true);
-              }}
-            >
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Bulk Log
-            </Button>
-          )}
+                  setBulkScores(initialBulkScores);
+                  setActiveCategory("Monthly-Evaluation");
+                  setActivePhase("Continuous");
+                  setIsBulkOpen(true);
+                }}
+              >
+                <LayoutGrid className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Bulk Log
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-8 p-1.5 bg-white/50 backdrop-blur-xl rounded-[1.5rem] border border-white/20 shadow-xl h-14">
-          <TabsTrigger value="SEL" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white">Session Logs (Monthly)</TabsTrigger>
-          <TabsTrigger value="Milestones" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white">Annual Milestones</TabsTrigger>
+        <TabsList className="mb-6 sm:mb-8 p-1 sm:p-1.5 bg-white/50 backdrop-blur-xl rounded-xl sm:rounded-[1.5rem] border border-white/20 shadow-xl h-11 sm:h-14 w-full sm:w-auto">
+          <TabsTrigger value="SEL" className="rounded-lg sm:rounded-xl h-8 sm:h-10 px-3 sm:px-8 font-black uppercase tracking-widest text-[8px] sm:text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white flex-1 sm:flex-none">Session Logs (Monthly)</TabsTrigger>
+          <TabsTrigger value="Milestones" className="rounded-lg sm:rounded-xl h-8 sm:h-10 px-3 sm:px-8 font-black uppercase tracking-widest text-[8px] sm:text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white flex-1 sm:flex-none">Annual Milestones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="SEL" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -620,14 +617,15 @@ const AssessmentsPage = () => {
                 : 0;
 
               return (
-                <Card key={a.id} className={`glass-card-premium border-none shadow-xl hover:shadow-2xl transition-all rounded-[2rem] overflow-hidden group ${isInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                <Card key={a.id} className={`glass-card-premium border-none shadow-xl hover:shadow-2xl transition-all rounded-2xl sm:rounded-[2rem] overflow-hidden group ${isInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                   <CardContent className="p-0">
-                    <div className="flex flex-col lg:flex-row lg:items-center">
-                      <div className="p-6 lg:w-[200px] shrink-0 bg-primary/5 group-hover:bg-primary/10 transition-colors">
+                    <div className="flex flex-col">
+                      {/* Student Info Header */}
+                      <div className="p-4 sm:p-6 bg-primary/5 group-hover:bg-primary/10 transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-black text-base tracking-tight group-hover:text-primary transition-colors truncate">{a.student}</h4>
+                          <h4 className="font-black text-sm sm:text-base tracking-tight group-hover:text-primary transition-colors truncate">{a.student}</h4>
                           <Select value={a.raw.status || "Active"} onValueChange={(val) => handleStatusChange(a.id, val)}>
-                            <SelectTrigger className="h-6 px-2 w-[80px] shrink-0 text-[9px] font-black uppercase tracking-widest bg-white/50 border-primary/20">
+                            <SelectTrigger className="h-6 px-1.5 sm:px-2 w-[70px] sm:w-[80px] shrink-0 text-[8px] sm:text-[9px] font-black uppercase tracking-widest bg-white/50 border-primary/20">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -637,40 +635,44 @@ const AssessmentsPage = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex items-center flex-wrap gap-2 mt-2">
-                           <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{monthlyAttendancePercent}% ATTENDANCE</Badge>
-                           {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[8px] font-black uppercase tracking-widest">SYNCED</Badge>}
-                           {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[8px] font-black uppercase tracking-widest">PREVIOUS: {previousMonthName}</Badge>}
+                        <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+                           <Badge variant="outline" className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{monthlyAttendancePercent}% ATT</Badge>
+                           {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[7px] sm:text-[8px] font-black uppercase tracking-widest">SYNCED</Badge>}
+                           {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[7px] sm:text-[8px] font-black uppercase tracking-widest">PREV: {previousMonthName}</Badge>}
                         </div>
                       </div>
-                      <div className="p-4 flex-1 grid grid-cols-8 min-w-[300px] overflow-x-auto items-center justify-items-center">
-                        {[
-                          { label: "Sur", value: monthlyRecord?.data.musical?.sur },
-                          { label: "Laya", value: monthlyRecord?.data.musical?.laya },
-                          { label: "Word", value: monthlyRecord?.data.musical?.word },
-                          { label: "Bhav", value: monthlyRecord?.data.musical?.bhav },
-                          { label: "Involvement", value: monthlyRecord?.data.selMid?.involvement },
-                          { label: "Emotion", value: monthlyRecord?.data.selMid?.emotion },
-                          { label: "Creativity", value: monthlyRecord?.data.selMid?.creativity },
-                          { label: "Interaction", value: monthlyRecord?.data.selMid?.interaction },
-                        ].map((item, i) => (
-                          <div key={i} className={`text-center w-full ${isPreviousRecord ? 'opacity-40' : ''}`}>
-                            <p className="text-[9px] font-black text-muted-foreground/50 uppercase mb-2">{item.label}</p>
-                            <ScoreCell score={item.value} />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-4 lg:border-l border-primary/5 flex items-center bg-muted/5 shrink-0 justify-center">
-                        {isAssessedThisMonth ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center text-success">
-                               <CheckCircle2 className="h-5 w-5" />
+                      {/* Score Grid - Horizontally scrollable on mobile */}
+                      <div className="overflow-x-auto">
+                        <div className={`p-3 sm:p-4 grid grid-cols-8 min-w-[500px] items-center justify-items-center gap-1 ${isPreviousRecord ? 'opacity-40' : ''}`}>
+                          {[
+                            { label: "Sur", value: monthlyRecord?.data.musical?.sur },
+                            { label: "Laya", value: monthlyRecord?.data.musical?.laya },
+                            { label: "Word", value: monthlyRecord?.data.musical?.word },
+                            { label: "Bhav", value: monthlyRecord?.data.musical?.bhav },
+                            { label: "Involve", value: monthlyRecord?.data.selMid?.involvement },
+                            { label: "Emotion", value: monthlyRecord?.data.selMid?.emotion },
+                            { label: "Create", value: monthlyRecord?.data.selMid?.creativity },
+                            { label: "Interact", value: monthlyRecord?.data.selMid?.interaction },
+                          ].map((item, i) => (
+                            <div key={i} className="text-center w-full">
+                              <p className="text-[7px] sm:text-[9px] font-black text-muted-foreground/50 uppercase mb-1.5 sm:mb-2 truncate">{item.label}</p>
+                              <ScoreCell score={item.value} />
                             </div>
-                             <p className="text-[9px] font-black text-success uppercase tracking-widest">LOGGED {formatDateDMY(monthlyRecord.date)}</p>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Action Button */}
+                      <div className="p-3 sm:p-4 border-t border-primary/5 flex items-center bg-muted/5 shrink-0 justify-center">
+                        {isAssessedThisMonth ? (
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-success/10 flex items-center justify-center text-success">
+                               <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                            </div>
+                             <p className="text-[8px] sm:text-[9px] font-black text-success uppercase tracking-widest">LOGGED {formatDateDMY(monthlyRecord.date)}</p>
                           </div>
                         ) : (
                           <Button 
-                            className="rounded-2xl h-11 px-4 font-black uppercase tracking-widest text-[9px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all whitespace-nowrap"
+                            className="rounded-2xl h-10 sm:h-11 px-5 sm:px-6 font-black uppercase tracking-widest text-[9px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all whitespace-nowrap"
                             onClick={() => {
                               setSelectedStudent(a.raw);
                               setActiveCategory("Monthly-Evaluation");
@@ -692,12 +694,12 @@ const AssessmentsPage = () => {
         </TabsContent>
 
         <TabsContent value="Milestones" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="rounded-2xl border border-primary/5 overflow-hidden bg-white shadow-lg">
+           <div className="rounded-2xl border border-primary/5 overflow-x-auto bg-white shadow-lg">
               {/* Header row */}
-              <div className="grid grid-cols-[1fr_repeat(2,160px)] gap-0 bg-muted/40 border-b border-primary/10 px-5 py-3">
-                <span className="text-xs font-black uppercase tracking-wide text-muted-foreground">Student</span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Pre Assessment</span>
-                <span className="text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Post Assessment</span>
+              <div className="grid grid-cols-[1fr_repeat(2,120px)] sm:grid-cols-[1fr_repeat(2,160px)] min-w-[400px] gap-0 bg-muted/40 border-b border-primary/10 px-3 sm:px-5 py-2.5 sm:py-3">
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-muted-foreground">Student</span>
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Pre Assessment</span>
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-center text-muted-foreground">Post Assessment</span>
               </div>
               {/* Student rows */}
               {processedAssessments.map((a) => {
@@ -734,7 +736,7 @@ const AssessmentsPage = () => {
                 };
 
                 return (
-                  <div key={a.id} className="grid grid-cols-[1fr_repeat(2,160px)] gap-0 items-center px-5 py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">
+                  <div key={a.id} className="grid grid-cols-[1fr_repeat(2,120px)] sm:grid-cols-[1fr_repeat(2,160px)] min-w-[400px] gap-0 items-center px-3 sm:px-5 py-2.5 sm:py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-black text-primary">{a.student.charAt(0)}</div>
                       <div>
@@ -1044,50 +1046,50 @@ const AssessmentsPage = () => {
       </Dialog>
 
       <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
-        <DialogContent className={`rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl ${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "max-w-[98vw] w-full" : "max-w-[95vw] w-[1100px]"}`}>
-          <div className="bg-primary p-6 text-white flex items-center justify-between">
-            <div>
-              <DialogTitle className="text-xl font-[950] tracking-tight">Bulk Assessment: {selectedCentre?.name}</DialogTitle>
+        <DialogContent className={`rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl max-h-[100dvh] sm:max-h-[95vh] ${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "max-w-[100vw] sm:max-w-[98vw] w-full" : "max-w-[100vw] sm:max-w-[95vw] w-full sm:w-[1100px]"}`}>
+          <div className="bg-primary p-4 sm:p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle className="text-base sm:text-xl font-[950] tracking-tight truncate">Bulk Assessment: {selectedCentre?.name}</DialogTitle>
               <DialogDescription className="sr-only">Bulk score entry for all students at this centre</DialogDescription>
-              <div className="flex items-center gap-4 mt-2">
-                <Badge className="bg-white/20 text-white border-none rounded-lg text-[10px] font-black uppercase tracking-widest px-3 py-1 h-7">
+              <div className="flex items-center gap-4 mt-1.5 sm:mt-2">
+                <Badge className="bg-white/20 text-white border-none rounded-lg text-[8px] sm:text-[10px] font-black uppercase tracking-widest px-2 sm:px-3 py-0.5 sm:py-1 h-5 sm:h-7">
                    {activeCategory === "Monthly-Evaluation" ? "Monthly Evaluation (SEL & Musical)" : activeCategory === "SEL-Mid" ? "Monthly SEL Progress" : "Quarterly Musical Progress"}
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => setIsBulkOpen(false)} className="text-white hover:bg-white/10 rounded-xl h-10 px-4 font-bold"><X className="mr-2 h-4 w-4" /> Cancel</Button>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap shrink-0">
+              <Button variant="ghost" onClick={() => setIsBulkOpen(false)} className="text-white hover:bg-white/10 rounded-xl h-8 sm:h-10 px-3 sm:px-4 font-bold text-xs"><X className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Cancel</Button>
               <Button 
                 variant="ghost"
                 onClick={() => setBulkScores({})}
-                className="text-white hover:bg-white/10 rounded-xl h-10 px-4 font-black uppercase tracking-widest text-[10px] border border-white/30"
+                className="text-white hover:bg-white/10 rounded-xl h-8 sm:h-10 px-3 sm:px-4 font-black uppercase tracking-widest text-[8px] sm:text-[10px] border border-white/30"
               >
                 Clear All
               </Button>
               <Button 
                 onClick={handleBulkSubmit}
                 disabled={isSubmitting}
-                className="bg-white text-primary hover:bg-white/90 rounded-xl h-10 px-6 font-black uppercase tracking-widest text-[10px] shadow-xl"
+                className="bg-white text-primary hover:bg-white/90 rounded-xl h-8 sm:h-10 px-4 sm:px-6 font-black uppercase tracking-widest text-[8px] sm:text-[10px] shadow-xl"
               >
-                {isSubmitting ? "Saving..." : "Save All Records"}
+                {isSubmitting ? "Saving..." : "Save All"}
               </Button>
             </div>
           </div>
           
-          <div className="p-0">
-            <ScrollArea className="h-[75vh]" scrollbars="both">
-              <Table>
+          <div className="p-0 overflow-hidden">
+            <ScrollArea className="h-[calc(100dvh-180px)] sm:h-[75vh]" scrollbars="both">
+              <Table className="min-w-max">
                 <TableHeader className="bg-muted/50 sticky top-0 z-20">
                   <TableRow>
-                    <TableHead className="w-[180px] min-w-[180px] font-black text-[10px] uppercase tracking-widest pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
+                    <TableHead className="w-[150px] sm:w-[180px] min-w-[150px] sm:min-w-[180px] font-black text-[9px] sm:text-[10px] uppercase tracking-widest pl-3 sm:pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
                     {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
-                      <TableHead key={k} className="text-center font-black text-[10px] uppercase tracking-widest">{k}</TableHead>
+                      <TableHead key={k} className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest">{k}</TableHead>
                     ))}
                     {(activeCategory === "SEL-Mid" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Involvement", "Emotion", "Creativity", "Interaction"].map(k => (
-                      <TableHead key={k} className="text-center font-black text-[10px] uppercase tracking-widest text-accent">{k}</TableHead>
+                      <TableHead key={k} className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest text-accent">{k}</TableHead>
                     ))}
-                    <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Avg</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase tracking-widest pr-8">Status</TableHead>
+                    <TableHead className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest">Avg</TableHead>
+                    <TableHead className="font-black text-[9px] sm:text-[10px] uppercase tracking-widest pr-4 sm:pr-8">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1145,12 +1147,12 @@ const AssessmentsPage = () => {
 
                     return (
                       <TableRow key={sId} className={`hover:bg-primary/5 transition-colors group ${isInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-                        <TableCell className="font-bold text-xs pl-4 sticky left-0 bg-white z-10 group-hover:bg-primary/5 w-[180px] min-w-[180px]">
-                          <div className="flex flex-col gap-1.5 items-start">
-                            <div className="flex items-start justify-between gap-2 w-full">
+                        <TableCell className="font-bold text-[10px] sm:text-xs pl-3 sm:pl-4 sticky left-0 bg-white z-10 group-hover:bg-primary/5 w-[150px] sm:w-[180px] min-w-[150px] sm:min-w-[180px]">
+                          <div className="flex flex-col gap-1 items-start">
+                            <div className="flex items-start justify-between gap-1.5 w-full">
                               <span className="truncate flex-1" title={s.name}>{s.name}</span>
                               <Select value={s.status || "Active"} onValueChange={(val) => handleStatusChange(sId, val)}>
-                                <SelectTrigger className="h-5 px-1.5 w-[65px] shrink-0 text-[8px] font-black uppercase tracking-widest bg-muted border-none">
+                                <SelectTrigger className="h-5 px-1 w-[55px] sm:w-[65px] shrink-0 text-[7px] sm:text-[8px] font-black uppercase tracking-widest bg-muted border-none">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1160,15 +1162,15 @@ const AssessmentsPage = () => {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="flex items-center flex-wrap gap-1 mt-0.5">
-                               <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest border-primary/20 px-1 py-0 h-4 ${monthlyAttendancePercent < 50 ? 'text-destructive' : 'text-primary/60'}`}>{monthlyAttendancePercent}% ATT</Badge>
-                               {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[7px] font-black uppercase tracking-widest px-1 py-0 h-4">SYNCED</Badge>}
-                               {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[7px] font-black uppercase tracking-widest px-1 py-0 h-4">PREV: {previousMonthName}</Badge>}
+                            <div className="flex items-center flex-wrap gap-0.5 sm:gap-1">
+                               <Badge variant="outline" className={`text-[6px] sm:text-[7px] font-black uppercase tracking-widest border-primary/20 px-1 py-0 h-3.5 sm:h-4 ${monthlyAttendancePercent < 50 ? 'text-destructive' : 'text-primary/60'}`}>{monthlyAttendancePercent}% ATT</Badge>
+                               {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[6px] sm:text-[7px] font-black uppercase tracking-widest px-1 py-0 h-3.5 sm:h-4">SYNCED</Badge>}
+                               {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[6px] sm:text-[7px] font-black uppercase tracking-widest px-1 py-0 h-3.5 sm:h-4">PREV: {previousMonthName}</Badge>}
                             </div>
                           </div>
                         </TableCell>
                         {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => (
-                          <TableCell key={k} className="text-center p-1">
+                          <TableCell key={k} className="text-center p-0.5 sm:p-1">
                             <div className="flex items-center justify-center gap-px">
                               {[1, 2, 3, 4, 5].map(v => (
                                 <button
@@ -1179,7 +1181,7 @@ const AssessmentsPage = () => {
                                     next[sId].musical[k] = v;
                                     setBulkScores(next);
                                   }}
-                                  className={`${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "h-6 w-6 text-[9px]" : "h-7 w-7 text-[10px]"} rounded-lg font-black transition-all ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
+                                  className={`${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "h-5 w-5 sm:h-6 sm:w-6 text-[8px] sm:text-[9px]" : "h-6 w-6 sm:h-7 sm:w-7 text-[9px] sm:text-[10px]"} rounded-lg font-black transition-all ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
                                 >
                                   {v}
                                 </button>
@@ -1188,7 +1190,7 @@ const AssessmentsPage = () => {
                           </TableCell>
                         ))}
                         {(activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
-                          <TableCell key={k} className="text-center p-1">
+                          <TableCell key={k} className="text-center p-0.5 sm:p-1">
                             <div className="flex items-center justify-center gap-px">
                               {[1, 2, 3, 4, 5].map(v => (
                                 <button
@@ -1199,7 +1201,7 @@ const AssessmentsPage = () => {
                                     next[sId].selMid[k] = v;
                                     setBulkScores(next);
                                   }}
-                                  className={`h-6 w-6 rounded text-[9px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
+                                  className={`h-5 w-5 sm:h-6 sm:w-6 rounded text-[8px] sm:text-[9px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
                                 >
                                   {v}
                                 </button>
@@ -1208,8 +1210,8 @@ const AssessmentsPage = () => {
                           </TableCell>
                         ))}
                         {activeCategory === "SEL-Mid" && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
-                          <TableCell key={k} className="text-center p-2">
-                            <div className="flex items-center justify-center gap-1">
+                          <TableCell key={k} className="text-center p-1 sm:p-2">
+                            <div className="flex items-center justify-center gap-0.5 sm:gap-1">
                               {[1, 2, 3, 4, 5].map(v => (
                                 <button
                                   key={v}
@@ -1219,7 +1221,7 @@ const AssessmentsPage = () => {
                                     newScores[sId].selMid[k] = v;
                                     setBulkScores(newScores);
                                   }}
-                                  className={`h-7 w-7 rounded-lg text-[10px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-md' : 'bg-muted hover:bg-muted/80'}`}
+                                  className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg text-[9px] sm:text-[10px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-md' : 'bg-muted hover:bg-muted/80'}`}
                                 >
                                   {v}
                                 </button>
@@ -1228,15 +1230,15 @@ const AssessmentsPage = () => {
                           </TableCell>
                         ))}
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={`rounded-xl font-black tabular-nums border-none ${avg > 0 ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground/30'}`}>
+                          <Badge variant="outline" className={`rounded-xl font-black tabular-nums border-none text-[10px] sm:text-xs ${avg > 0 ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground/30'}`}>
                             {avg > 0 ? avg.toFixed(1) : "-"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="pr-8">
+                        <TableCell className="pr-4 sm:pr-8">
                           {avg > 0 ? (
-                            <Badge className="bg-success/20 text-success border-none text-[8px] uppercase tracking-widest font-black rounded-full px-2 py-0">Ready</Badge>
+                            <Badge className="bg-success/20 text-success border-none text-[7px] sm:text-[8px] uppercase tracking-widest font-black rounded-full px-1.5 sm:px-2 py-0">Ready</Badge>
                           ) : (
-                            <Badge className="bg-muted text-muted-foreground/40 border-none text-[8px] uppercase tracking-widest font-black rounded-full px-2 py-0">Pending</Badge>
+                            <Badge className="bg-muted text-muted-foreground/40 border-none text-[7px] sm:text-[8px] uppercase tracking-widest font-black rounded-full px-1.5 sm:px-2 py-0">Pending</Badge>
                           )}
                         </TableCell>
                       </TableRow>
@@ -1246,9 +1248,9 @@ const AssessmentsPage = () => {
               </Table>
             </ScrollArea>
           </div>
-          <div className="p-4 bg-muted/20 border-t flex items-center gap-3 px-8">
-             <Info className="h-4 w-4 text-primary" />
-             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Bulk logging will update the last assessment score on student profiles immediately.</p>
+          <div className="p-3 sm:p-4 bg-muted/20 border-t flex items-center gap-2 sm:gap-3 px-4 sm:px-8">
+             <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+             <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Bulk logging will update scores on student profiles immediately.</p>
           </div>
         </DialogContent>
       </Dialog>
