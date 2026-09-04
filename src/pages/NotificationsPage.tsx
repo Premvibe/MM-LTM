@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const iconMap = {
   warning: AlertTriangle,
@@ -28,6 +29,7 @@ const colorMap = {
 
 const NotificationsPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,7 +285,14 @@ const NotificationsPage = () => {
                         </div>
                       </div>
                     </div>
-                    <p className={`text-sm mt-1 mb-1 line-clamp-2 ${!n.read ? "text-muted-foreground font-medium" : "text-muted-foreground/60"}`}>{n.message}</p>
+                    <p className={`text-sm mt-1 mb-1 line-clamp-2 ${!n.read ? "text-muted-foreground font-medium" : "text-muted-foreground/60"}`}>{n.message?.replace('Session Plan link', 'Session Plan')}</p>
+                    {n.actionUrl && (
+                      <div className="mt-2">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); navigate(n.actionUrl); }}>
+                          View Session
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -316,7 +325,7 @@ const NotificationsPage = () => {
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4 text-foreground">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedNotification?.message}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedNotification?.message?.replace('Session Plan link', 'Session Plan')}</p>
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pt-4 border-t border-muted">
             Received: {selectedNotification?.date && new Date(selectedNotification.date).toLocaleString()}
           </p>
@@ -340,7 +349,7 @@ const NotificationsPage = () => {
         <div className="space-y-4 py-4">
           <div className="p-3 bg-muted/50 rounded-2xl text-xs border border-muted">
             <p className="font-bold text-muted-foreground uppercase tracking-tighter mb-1">Context</p>
-            <p className="italic">"{replyingTo?.message}"</p>
+            <p className="italic">"{replyingTo?.message?.replace('Session Plan link', 'Session Plan')}"</p>
           </div>
           <div className="space-y-2">
             <Label>Your Message</Label>

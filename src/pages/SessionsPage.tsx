@@ -44,8 +44,8 @@ const SessionsPage = () => {
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [filterMonth, setFilterMonth] = useState<string>(new Date().getMonth().toString());
-  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState<string>(searchParams.get("month") || new Date().getMonth().toString());
+  const [filterYear, setFilterYear] = useState<string>(searchParams.get("year") || new Date().getFullYear().toString());
 
   const months = [
     { value: "0", label: "January" }, { value: "1", label: "February" }, { value: "2", label: "March" },
@@ -176,6 +176,19 @@ const SessionsPage = () => {
     setSessionFiles(session.files || []);
     setOpen(true);
   };
+
+  useEffect(() => {
+    const targetSessionId = searchParams.get("session");
+    if (targetSessionId && sessionsList.length > 0) {
+      const targetSession = sessionsList.find(s => s._id === targetSessionId);
+      if (targetSession && !open) {
+        openEdit(targetSession);
+        // We don't remove the param from URL here because it might cause a flicker or reload in some setups,
+        // but it's safe to keep it, or we can just leave it as is since !open prevents looping.
+      }
+    }
+  }, [sessionsList, searchParams, open]);
+
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this session?")) return;

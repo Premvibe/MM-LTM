@@ -40,6 +40,8 @@ const AttendancePage = () => {
   };
   const [selected, setSelected] = useState<string[]>([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [filterMonth, setFilterMonth] = useState<string>(new Date().getMonth().toString());
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
   const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [sessionsList, setSessionsList] = useState<Session[]>([]);
@@ -49,6 +51,58 @@ const AttendancePage = () => {
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterFellow, setFilterFellow] = useState("all");
+
+  const months = [
+    { value: "0", label: "January" },
+    { value: "1", label: "February" },
+    { value: "2", label: "March" },
+    { value: "3", label: "April" },
+    { value: "4", label: "May" },
+    { value: "5", label: "June" },
+    { value: "6", label: "July" },
+    { value: "7", label: "August" },
+    { value: "8", label: "September" },
+    { value: "9", label: "October" },
+    { value: "10", label: "November" },
+    { value: "11", label: "December" },
+  ];
+
+  const years = ["2023", "2024", "2025", "2026"];
+
+  const handleMonthChange = (m: string, y: string) => {
+    setFilterMonth(m);
+    const monthNum = parseInt(m);
+    const yearNum = parseInt(y);
+    const today = new Date();
+    if (today.getMonth() === monthNum && today.getFullYear() === yearNum) {
+      setAttendanceDate(today.toISOString().split("T")[0]);
+    } else {
+      setAttendanceDate(`${y}-${String(monthNum + 1).padStart(2, '0')}-01`);
+    }
+  };
+
+  const handleYearChange = (m: string, y: string) => {
+    setFilterYear(y);
+    const monthNum = parseInt(m);
+    const yearNum = parseInt(y);
+    const today = new Date();
+    if (today.getMonth() === monthNum && today.getFullYear() === yearNum) {
+      setAttendanceDate(today.toISOString().split("T")[0]);
+    } else {
+      setAttendanceDate(`${y}-${String(monthNum + 1).padStart(2, '0')}-01`);
+    }
+  };
+
+  const handleAttendanceDateChange = (newDateStr: string) => {
+    setAttendanceDate(newDateStr);
+    if (newDateStr) {
+      const d = new Date(newDateStr);
+      if (!isNaN(d.getTime())) {
+        setFilterMonth(d.getMonth().toString());
+        setFilterYear(d.getFullYear().toString());
+      }
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -184,9 +238,35 @@ const AttendancePage = () => {
             <h1 className="page-title">Attendance Registry</h1>
             <p className="page-description uppercase tracking-[0.2em] text-[10px]">Daily student log & monthly stability matrix</p>
           </div>
-          <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
-             <CalendarDays className="h-4 w-4 text-primary/40 ml-3" />
-             <Input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="w-[150px] h-9 rounded-xl bg-white/60 border-none shadow-sm text-xs font-bold" />
+          <div className="flex flex-wrap items-center gap-2 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-xl border border-primary/5 text-primary">
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Period</span>
+            </div>
+            <Select value={filterMonth} onValueChange={(m) => handleMonthChange(m, filterYear)}>
+              <SelectTrigger className="w-[125px] h-9 rounded-xl bg-white/60 border-none shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {months.map(m => (
+                  <SelectItem key={m.value} value={m.value} className="rounded-lg text-xs font-medium">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterYear} onValueChange={(y) => handleYearChange(filterMonth, y)}>
+              <SelectTrigger className="w-[85px] h-9 rounded-xl bg-white/60 border-none shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {years.map(y => (
+                  <SelectItem key={y} value={y} className="rounded-lg text-xs font-medium">
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -231,9 +311,32 @@ const AttendancePage = () => {
               return matchesSearch && matchesType && matchesFellow;
             })
             .map(centre => {
-              const count = studentsList.filter(s => (s.centreId?._id || s.centreId) === (centre._id || centre.id)).length;
-              const avgAttendance = count > 0 ? Math.round(studentsList.filter(s => (s.centreId?._id || s.centreId) === (centre._id || centre.id)).reduce((sum, s) => sum + s.attendancePercent, 0) / count) : 0;
               const cId = centre._id || centre.id;
+              const activeStudentsInMonth = studentsList.filter(s => 
+                (s.centreId?._id || s.centreId) === cId &&
+                isEnrolledInMonth(s, parseInt(filterMonth), parseInt(filterYear)) &&
+                getStatusForMonth(s, parseInt(filterMonth), parseInt(filterYear)) === "Active"
+              );
+              const count = activeStudentsInMonth.length;
+
+              const centreMonthSessions = sessionsList.filter(s => {
+                const isCentre = (s.centreId === centre._id || s.centreId === centre.id);
+                if (!isCentre || !s.date) return false;
+                const d = new Date(s.date);
+                return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
+              });
+
+              let avgAttendance = 0;
+              if (centreMonthSessions.length > 0 && activeStudentsInMonth.length > 0) {
+                let totalPresent = 0;
+                centreMonthSessions.forEach(sess => {
+                  const presentIds = sess.presentStudentIds || [];
+                  totalPresent += activeStudentsInMonth.filter(s => presentIds.includes(s._id)).length;
+                });
+                avgAttendance = Math.round((totalPresent / (centreMonthSessions.length * activeStudentsInMonth.length)) * 100);
+              } else if (activeStudentsInMonth.length > 0) {
+                avgAttendance = Math.round(activeStudentsInMonth.reduce((sum, s) => sum + (s.attendancePercent || 0), 0) / activeStudentsInMonth.length);
+              }
               
               return (
                 <Card 
@@ -381,7 +484,7 @@ const AttendancePage = () => {
                     <Input
                       type="date"
                       value={attendanceDate}
-                      onChange={(e) => setAttendanceDate(e.target.value)}
+                      onChange={(e) => handleAttendanceDateChange(e.target.value)}
                       className="bg-white/10 border-none h-14 rounded-2xl text-xl font-black text-white focus-visible:ring-white/20 transition-all cursor-pointer"
                     />
                   </div>
@@ -425,15 +528,40 @@ const AttendancePage = () => {
 
         <TabsContent value="sheet" className="mt-0">
           <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
+            <CardHeader className="p-8 border-b bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-xl font-black uppercase tracking-tight">Monthly Stability Matrix</CardTitle>
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">Detailed day-wise audit</p>
               </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="rounded-xl px-4 py-2 bg-white font-black text-[10px] uppercase tracking-widest h-10 border-primary/10 text-primary">
-                  {new Date(attendanceDate).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
-                </Badge>
+              <div className="flex items-center gap-2 bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-primary/10 shadow-sm">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-xl border border-primary/5 text-primary">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Period</span>
+                </div>
+                <Select value={filterMonth} onValueChange={(m) => handleMonthChange(m, filterYear)}>
+                  <SelectTrigger className="w-[125px] h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                    {months.map(m => (
+                      <SelectItem key={m.value} value={m.value} className="rounded-lg text-xs font-medium">
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterYear} onValueChange={(y) => handleYearChange(filterMonth, y)}>
+                  <SelectTrigger className="w-[85px] h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                    {years.map(y => (
+                      <SelectItem key={y} value={y} className="rounded-lg text-xs font-medium">
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -442,7 +570,7 @@ const AttendancePage = () => {
                   <thead className="bg-muted/30 border-b">
                     <tr>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-md z-20 border-r border-white/50 w-[240px]">Student Identity</th>
-                      {Array.from({ length: new Date(new Date(attendanceDate).getFullYear(), new Date(attendanceDate).getMonth() + 1, 0).getDate() }, (_, i) => i + 1).map(d => (
+                      {Array.from({ length: new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0).getDate() }, (_, i) => i + 1).map(d => (
                         <th key={d} className="px-3 py-6 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[45px]">{d}</th>
                       ))}
                     </tr>
@@ -454,8 +582,8 @@ const AttendancePage = () => {
                            <p className="font-black text-sm tracking-tight group-hover:text-primary transition-colors">{s.name}</p>
                            <p className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">{s.gender}</p>
                         </td>
-                        {Array.from({ length: new Date(new Date(attendanceDate).getFullYear(), new Date(attendanceDate).getMonth() + 1, 0).getDate() }, (_, i) => i + 1).map(d => {
-                          const dateStr = `${new Date(attendanceDate).getFullYear()}-${String(new Date(attendanceDate).getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        {Array.from({ length: new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0).getDate() }, (_, i) => i + 1).map(d => {
+                          const dateStr = `${filterYear}-${String(parseInt(filterMonth) + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                           const daySession = sessionsList.find(sess => sess.date === dateStr && (sess.centreId === selectedCentreId || sess.centreId === selectedCentre?._id || sess.centreId === selectedCentre?.id));
                           
                           let icon = null;
