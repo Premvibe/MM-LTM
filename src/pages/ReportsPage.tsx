@@ -69,7 +69,7 @@ const ReportsPage = () => {
   const exportCSV = () => {
     if (!stats || !stats.centreComparison) return;
     
-    const headers = ["Centre Name", "Attendance %", "Learning Score", "Quality Index"];
+    const headers = ["Centre Name", "Attendance %", "Assessment Average", "Quality Index"];
     const rows = stats.centreComparison.map((c: any) => [
       c.name,
       c.attendance,
@@ -164,7 +164,7 @@ const ReportsPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { title: "Avg Attendance", value: `${stats.avgAttendance}%`, icon: Users, color: "text-blue-600 bg-blue-50" },
-          { title: "Learning Score", value: stats.avgScore, icon: GraduationCap, color: "text-purple-600 bg-purple-50" },
+          { title: "Assessment Average", value: stats.avgScore, icon: GraduationCap, color: "text-purple-600 bg-purple-50" },
           { title: "Assessed Students", value: `${stats.assessmentCoverage}%`, icon: ShieldCheck, color: "text-emerald-600 bg-emerald-50" },
           { title: "Total Sessions", value: stats.totalSessions, icon: TrendingUp, color: "text-orange-600 bg-orange-50" },
         ].map((card, i) => (
@@ -198,7 +198,7 @@ const ReportsPage = () => {
                 <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} />
                 <Legend />
                 <Bar dataKey="attendance" name="Attendance %" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="learning" name="Learning Score" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="learning" name="Assessment Average" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -243,7 +243,7 @@ const ReportsPage = () => {
               <TableRow className="border-none">
                 <TableHead className="w-[300px] pl-8 font-black uppercase tracking-widest text-[10px]">Centre Name</TableHead>
                 <TableHead className="font-black uppercase tracking-widest text-[10px]">Attendance %</TableHead>
-                <TableHead className="font-black uppercase tracking-widest text-[10px]">Learning Score</TableHead>
+                <TableHead className="font-black uppercase tracking-widest text-[10px]">Assessment Average</TableHead>
                 <TableHead className="font-black uppercase tracking-widest text-[10px]">Quality Index</TableHead>
                 <TableHead className="font-black uppercase tracking-widest text-[10px]">Status</TableHead>
               </TableRow>

@@ -1077,11 +1077,11 @@ const AssessmentsPage = () => {
           </div>
           
           <div className="p-0 overflow-hidden">
-            <ScrollArea className="h-[calc(100dvh-180px)] sm:h-[75vh]" scrollbars="both">
-              <Table className="min-w-max">
-                <TableHeader className="bg-muted/50 sticky top-0 z-20">
+            <div className="h-[calc(100dvh-180px)] sm:h-[75vh] overflow-auto">
+              <table className="min-w-max w-full caption-bottom text-sm">
+                <TableHeader className="bg-white sticky top-0 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                   <TableRow>
-                    <TableHead className="w-[150px] sm:w-[180px] min-w-[150px] sm:min-w-[180px] font-black text-[9px] sm:text-[10px] uppercase tracking-widest pl-3 sm:pl-4 sticky left-0 bg-muted/50 z-30">Student Name</TableHead>
+                    <TableHead className="w-[150px] sm:w-[180px] min-w-[150px] sm:min-w-[180px] font-black text-[9px] sm:text-[10px] uppercase tracking-widest pl-3 sm:pl-4 sticky left-0 bg-white z-30">Student Name</TableHead>
                     {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
                       <TableHead key={k} className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest">{k}</TableHead>
                     ))}
@@ -1245,8 +1245,8 @@ const AssessmentsPage = () => {
                     );
                   })}
                 </TableBody>
-              </Table>
-            </ScrollArea>
+              </table>
+            </div>
           </div>
           <div className="p-3 sm:p-4 bg-muted/20 border-t flex items-center gap-2 sm:gap-3 px-4 sm:px-8">
              <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />

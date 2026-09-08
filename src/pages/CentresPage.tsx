@@ -789,7 +789,7 @@ const CentresPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40" title={c.avgAssessmentScore ? `Score: ${c.avgAssessmentScore} / 5` : undefined}>
+                  <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40" title={c.avgAssessmentScore !== undefined ? `Score: ${c.avgAssessmentScore} / 5 (${c.assessmentPercent}%)` : undefined}>
                     <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                       <Award className="h-3.5 w-3.5 text-amber-600" />
                     </div>

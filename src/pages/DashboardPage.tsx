@@ -183,9 +183,11 @@ const DashboardPage = () => {
         <StatCard title="Students" value={stats.totalStudents} icon={GraduationCap} subtitle="Enrolled" color="bg-success/10 text-success" />
         <StatCard title="Sessions" value={stats.totalSessions} icon={CalendarDays} subtitle="Total Logged" color="bg-accent/10 text-accent" />
         <StatCard title="Attendance" value={`${stats.avgAttendance}%`} icon={TrendingUp} subtitle="Average" color="bg-warning/10 text-warning" />
-        <StatCard title="Learning Score" value={stats.avgScore} icon={ShieldCheck} subtitle="Out of 5" color="bg-destructive/10 text-destructive" />
+        <StatCard title="Assessment Average" value={stats.avgScore} icon={ShieldCheck} subtitle={`Out of 5 (${Math.round(Number(stats.avgScore || 0) * 20)}%)`} color="bg-destructive/10 text-destructive" />
         <StatCard title="Assessed" value={`${stats.assessmentCoverage}%`} icon={ClipboardCheck} subtitle="Coverage" color="bg-primary/10 text-primary" />
         <StatCard title="Total Reviews" value={stats.assessmentTrend?.reduce((a: any, b: any) => a + b.count, 0) || 0} icon={FileCheck} subtitle="Evaluations" color="bg-indigo/10 text-indigo" />
+        <StatCard title="Pre Assessed" value={stats.preAssessmentCount || 0} icon={ClipboardCheck} subtitle="Students" color="bg-orange-500/10 text-orange-600" />
+        <StatCard title="Post Assessed" value={stats.postAssessmentCount || 0} icon={ClipboardCheck} subtitle="Students" color="bg-emerald-500/10 text-emerald-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
