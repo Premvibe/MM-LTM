@@ -229,7 +229,7 @@ const AssessmentsPage = () => {
       const payload = {
         studentId: selectedStudent._id || selectedStudent.id,
         centreId: selectedStudent.centreId,
-        fellowId: user?.id,
+        fellowId: user?.role === 'fellow' ? user?.id : (selectedCentre?.fellowIds?.[0] || user?.id),
         category: finalCategory,
         phase: finalPhase,
         quarter: (finalPhase === "Mid" || finalCategory === "Mid-Evaluation") ? activeQuarter : undefined,
@@ -278,7 +278,7 @@ const AssessmentsPage = () => {
       const assessments = Object.entries(bulkScores).map(([studentId, data]) => ({
         studentId,
         centreId: selectedCentreId,
-        fellowId: user?.id,
+        fellowId: user?.role === 'fellow' ? user?.id : (selectedCentre?.fellowIds?.[0] || user?.id),
         category: activeCategory,
         phase: activePhase,
         quarter: (activePhase === "Mid" || activeCategory === "Mid-Evaluation") ? activeQuarter : undefined,
