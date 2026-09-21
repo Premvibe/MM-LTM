@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye } from "lucide-react";
+import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye, User } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams } from "react-router-dom";
@@ -292,19 +292,32 @@ const ChangeStoriesPage = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="border-t border-primary/5 pt-4">
-                      {story ? (
-                        <div className="flex items-center gap-2">
-                          {sc && <sc.icon className="h-4 w-4" />}
-                          <Badge className={`${sc?.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest`}>{sc?.label}</Badge>
-                          <span className="text-[10px] font-bold text-muted-foreground ml-auto truncate max-w-[120px]">{story.title}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-muted-foreground/60">
-                          <BookHeart className="h-4 w-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">No story this month</span>
-                        </div>
-                      )}
+                    <div className="flex items-end justify-between border-t border-primary/5 pt-4">
+                      <div className="flex-1 min-w-0 pr-2">
+                        {story ? (
+                          <div className="flex items-center gap-2">
+                            {sc && <sc.icon className="h-4 w-4 flex-shrink-0" />}
+                            <Badge className={`${sc?.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest flex-shrink-0`}>{sc?.label}</Badge>
+                            <span className="text-[10px] font-bold text-muted-foreground truncate">{story.title}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-muted-foreground/60">
+                            <BookHeart className="h-4 w-4 flex-shrink-0" />
+                            <span className="text-[10px] font-black uppercase tracking-widest truncate">No story this month</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 justify-end max-w-[40%] flex-shrink-0">
+                        {centre.fellowIds?.map(fid => {
+                          const fellow = fellows.find(f => (f._id === fid || f.id === fid));
+                          return fellow ? (
+                            <Badge key={fid} variant="outline" className="text-[9px] font-black uppercase tracking-wider py-0.5 px-2 bg-primary/5 text-primary border-primary/10 h-fit rounded-full">
+                              {fellow.name}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -389,7 +402,7 @@ const ChangeStoriesPage = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {(isFellow || isAdmin) && (story.status !== "approved") && (
+                        {(isFellow || isAdmin) && (
                           <Button variant="outline" size="sm" className="rounded-xl font-bold text-xs" onClick={() => openEdit(story)}>
                             <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
                           </Button>

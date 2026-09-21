@@ -458,6 +458,8 @@ const DashboardPage = () => {
                     <th className="text-left py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Centre</th>
                     <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Attendance</th>
                     <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Learning<br/>(Avg. Score)</th>
+                    <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">SEL</th>
+                    <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Music</th>
                     <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Sessions</th>
                     <th className="text-center py-2 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Status</th>
                   </tr>
@@ -480,6 +482,8 @@ const DashboardPage = () => {
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold">{c.attendance}%</td>
                       <td className="py-2.5 px-2 text-center font-bold">{c.learning} / 5</td>
+                      <td className="py-2.5 px-2 text-center font-bold">{c.selScore} / 5</td>
+                      <td className="py-2.5 px-2 text-center font-bold">{c.musicScore} / 5</td>
                       <td className="py-2.5 px-2 text-center font-medium">{c.sessions} / {c.sessionsTarget}</td>
                       <td className="py-2.5 px-2 text-center">{statusBadge(c.status)}</td>
                     </tr>

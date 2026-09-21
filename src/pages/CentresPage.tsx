@@ -234,8 +234,8 @@ const CentresPage = () => {
 
   const handleSubmit = async () => {
     if (!name.trim() || !location.trim()) { toast.error("Please fill in all fields"); return; }
-    if (type === "In-school" && selectedFellowIds.length !== 2) {
-      toast.error("In-school centres must have exactly 2 fellows assigned");
+    if (type === "In-school" && (selectedFellowIds.length < 1 || selectedFellowIds.length > 2)) {
+      toast.error("In-school centres must have 1 or 2 fellows assigned");
       return;
     }
     if (type === "After-school" && selectedFellowIds.length !== 1) {
@@ -370,7 +370,7 @@ const CentresPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Assign Fellows <span className="text-xs text-muted-foreground">({type === "In-school" ? "exactly 2 required" : "exactly 1 required"})</span></Label>
+                <Label>Assign Fellows <span className="text-xs text-muted-foreground">({type === "In-school" ? "1-2 required" : "exactly 1 required"})</span></Label>
                 <div className="border rounded-md p-3 space-y-4 max-h-60 overflow-y-auto">
                   {Array.from(new Set(fellowsList.map(f => f.batch || "Unspecified"))).sort().reverse().map(batchVersion => (
                     <div key={batchVersion} className="space-y-2">
@@ -399,8 +399,8 @@ const CentresPage = () => {
                     </div>
                   ))}
                 </div>
-                {((type === "In-school" && selectedFellowIds.length !== 2) || (type === "After-school" && selectedFellowIds.length !== 1)) && (
-                  <p className="text-xs text-destructive">Please select exactly {type === "In-school" ? 2 : 1} fellow{type === "In-school" ? "s" : ""} ({selectedFellowIds.length} selected)</p>
+                {((type === "In-school" && (selectedFellowIds.length < 1 || selectedFellowIds.length > 2)) || (type === "After-school" && selectedFellowIds.length !== 1)) && (
+                  <p className="text-xs text-destructive">Please select {type === "In-school" ? "1 or 2" : "exactly 1"} fellow{type === "In-school" ? "s" : ""} ({selectedFellowIds.length} selected)</p>
                 )}
               </div>
 
