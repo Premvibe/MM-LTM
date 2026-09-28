@@ -137,9 +137,14 @@ const LoginPage = () => {
           </CardContent>
         </Card>
         
-        <p className="mt-8 text-center text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
-          &copy; 2026 Manzil Mystics Foundation • All Rights Reserved
-        </p>
+        <div className="mt-8 flex flex-col items-center justify-center space-y-2">
+          <button onClick={() => navigate('/terms')} className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
+            Data Protection Policy
+          </button>
+          <p className="text-center text-[10px] text-muted-foreground/60 font-bold uppercase tracking-[0.2em]">
+            &copy; 2026 Manzil Mystics Foundation • All Rights Reserved
+          </p>
+        </div>
       </div>
     </div>
 

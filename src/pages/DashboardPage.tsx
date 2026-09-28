@@ -277,20 +277,32 @@ const DashboardPage = () => {
         </div>
 
         {/* Sessions */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sessions</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sessions Logged</p>
               <p className="text-3xl font-black mt-2 tracking-tight">{stats.totalSessions}</p>
-              {sessionChange && (
-                <div className={`flex items-center gap-1 mt-2 text-[10px] font-bold ${sessionChange.color}`}>
-                  <sessionChange.icon className="h-3 w-3" /> {sessionChange.pct}% <span className="text-muted-foreground font-normal">vs last month</span>
-                </div>
-              )}
             </div>
             <div className="h-11 w-11 rounded-xl bg-emerald-50 flex items-center justify-center"><CalendarDays className="h-5 w-5 text-emerald-500" /></div>
           </div>
-          <Badge className="mt-3 bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px] font-bold uppercase tracking-widest">Logged</Badge>
+          
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[9px] font-bold text-success uppercase tracking-widest">Approved</p>
+                <p className="text-lg font-black">{stats.totalSessionsApproved !== undefined ? stats.totalSessionsApproved : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-warning uppercase tracking-widest">Pending</p>
+                <p className="text-lg font-black">{stats.totalSessionsPending !== undefined ? stats.totalSessionsPending : '-'}</p>
+              </div>
+            </div>
+            {sessionChange && (
+              <div className={`flex items-center gap-1 mt-3 text-[10px] font-bold ${sessionChange.color}`}>
+                <sessionChange.icon className="h-3 w-3" /> {sessionChange.pct}% <span className="text-muted-foreground font-normal">vs last month</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Assessments */}

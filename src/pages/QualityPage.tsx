@@ -34,6 +34,7 @@ type Quality = {
   assessmentPercentage: number;
   videoObservation: number;
   score: number;
+  observationNote?: string;
   files?: Array<{ fileId: string; fileName: string; fileUrl: string; mimeType?: string; thumbnailLink?: string }>;
 };
 
@@ -65,12 +66,15 @@ const QualityPage = () => {
   const [planSel, setPlanSel] = useState("3");
   const [planMusical, setPlanMusical] = useState("3");
   const [planCurriculum, setPlanCurriculum] = useState("3");
+  const [observationNote, setObservationNote] = useState("");
   const [qualityFiles, setQualityFiles] = useState<DriveFile[]>([]);
 
   const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const isAdmin = ['admin', 'program_director', 'program_lead', 'program_manager', 'm_e_manager'].includes(user?.role || '');
 
   useEffect(() => {
     fetchData();
@@ -84,7 +88,8 @@ const QualityPage = () => {
 
   const fetchData = async () => {
     try {
-      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : user?.role === 'program_manager' ? `?role=program_manager&email=${user.email}` : '';
+      // Allow program managers to see all centres on the Quality Page, just like super admins
+      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
       const [qualityRes, sessionsRes, centresRes, fellowsRes, assessmentsRes, studentsRes] = await Promise.all([
         api.get(`/quality${params}`),
         api.get(`/sessions${params}`),
@@ -174,6 +179,7 @@ const QualityPage = () => {
     setPlanSel("3");
     setPlanMusical("3");
     setPlanCurriculum("3");
+    setObservationNote("");
     setQualityFiles([]);
     setEditItem(null);
   };
@@ -188,12 +194,13 @@ const QualityPage = () => {
     setAttendancePercentage(String(q.attendancePercentage));
     setAssessmentPercentage(String(q.assessmentPercentage));
     setVideoObservation(String(q.videoObservation));
-    setPlanFormat(String(q.sessionPlan.format));
-    setPlanDetails(String(q.sessionPlan.details));
-    setPlanInterconnection(String(q.sessionPlan.interconnection));
-    setPlanSel(String(q.sessionPlan.sel));
-    setPlanMusical(String(q.sessionPlan.musical));
-    setPlanCurriculum(String(q.sessionPlan.curriculumAlignment));
+    setPlanFormat(String(q.sessionPlan?.format || 3));
+    setPlanDetails(String(q.sessionPlan?.details || 3));
+    setPlanInterconnection(String(q.sessionPlan?.interconnection || 3));
+    setPlanSel(String(q.sessionPlan?.sel || 3));
+    setPlanMusical(String(q.sessionPlan?.musical || 3));
+    setPlanCurriculum(String(q.sessionPlan?.curriculumAlignment || 3));
+    setObservationNote(q.observationNote || "");
     setQualityFiles(q.files || []);
     setOpen(true);
   };
@@ -243,6 +250,7 @@ const QualityPage = () => {
       centre: centre?.name || "",
       fellow: fellow?.name || "Unassigned",
       date: auditDate,
+      observationNote: observationNote.trim(),
       files: qualityFiles
     };
     
@@ -305,7 +313,7 @@ const QualityPage = () => {
                </SelectContent>
              </Select>
           </div>
-          {user?.role === 'admin' && (
+          {isAdmin && (
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="rounded-2xl h-12 px-6 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
@@ -426,6 +434,16 @@ const QualityPage = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-2 pt-4 border-t border-gray-100">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Monthly Observation Note</Label>
+                    <textarea 
+                      className="w-full min-h-[100px] p-4 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50/50 resize-y"
+                      placeholder="Add detailed observations, qualitative feedback, or specific areas of improvement for this month..."
+                      value={observationNote}
+                      onChange={(e) => setObservationNote(e.target.value)}
+                    />
+                  </div>
                 </div>
               </ScrollArea>
 
@@ -505,12 +523,12 @@ const QualityPage = () => {
                          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 border-b pb-2">Session Plan Quality</h4>
                          <div className="grid grid-cols-2 gap-4">
                             {[
-                              { label: "Format", val: q.sessionPlan.format },
-                              { label: "Details", val: q.sessionPlan.details },
-                              { label: "Linking", val: q.sessionPlan.interconnection },
-                              { label: "SEL", val: q.sessionPlan.sel },
-                              { label: "Music", val: q.sessionPlan.musical },
-                              { label: "Align", val: q.sessionPlan.curriculumAlignment }
+                              { label: "Format", val: q.sessionPlan?.format || 0 },
+                              { label: "Details", val: q.sessionPlan?.details || 0 },
+                              { label: "Linking", val: q.sessionPlan?.interconnection || 0 },
+                              { label: "SEL", val: q.sessionPlan?.sel || 0 },
+                              { label: "Music", val: q.sessionPlan?.musical || 0 },
+                              { label: "Align", val: q.sessionPlan?.curriculumAlignment || 0 }
                             ].map(item => (
                               <div key={item.label} className="p-3 bg-muted/30 rounded-xl flex items-center justify-between">
                                  <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground">{item.label}</span>
@@ -520,6 +538,15 @@ const QualityPage = () => {
                          </div>
                       </div>
                    </div>
+                   
+                   {q.observationNote && (
+                     <div className="mt-6 bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+                         <FileText className="h-3 w-3" /> Monthly Observation Note
+                       </p>
+                       <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{q.observationNote}</p>
+                     </div>
+                   )}
                    
                    {user?.role === 'admin' && (
                      <div className="mt-8 pt-6 border-t flex justify-end">

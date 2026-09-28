@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
 
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; };
+type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; approvalStatus?: 'pending' | 'approved' | 'rejected'; reviewNote?: string; reviewedBy?: string; };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
 
@@ -85,6 +85,12 @@ const SessionsPage = () => {
   const [attendanceSearchQuery, setAttendanceSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCentreFellow, setFilterCentreFellow] = useState("all");
+  
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewSession, setReviewSession] = useState<Session | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected'>('approved');
+  const [reviewNote, setReviewNote] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -259,6 +265,37 @@ const SessionsPage = () => {
     setAttendanceOpen(true);
   };
 
+  const handleReviewSubmit = async () => {
+    if (!reviewSession) return;
+    if (reviewStatus === 'rejected' && !reviewNote.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    
+    setIsSubmittingReview(true);
+    try {
+      await api.put(`/sessions/${reviewSession._id}/review`, {
+        approvalStatus: reviewStatus,
+        reviewNote: reviewNote.trim(),
+        reviewedBy: user?.id || ''
+      });
+      toast.success(`Session ${reviewStatus}`);
+      setReviewOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to submit review");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const openReview = (session: Session) => {
+    setReviewSession(session);
+    setReviewStatus(session.approvalStatus === 'rejected' ? 'rejected' : 'approved');
+    setReviewNote(session.reviewNote || "");
+    setReviewOpen(true);
+  };
+
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
   const centreSessionsList = useMemo(() => selectedCentreId ? sessionsList.filter(s => {
     const matchesCentre = s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId;
@@ -338,6 +375,7 @@ const SessionsPage = () => {
               const sessionsCount = sessionsList.filter(s => {
                 const matchesCentre = ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id);
                 if (!matchesCentre) return false;
+                if (s.approvalStatus !== 'approved') return false; // Only count approved sessions
                 const d = new Date(s.date);
                 return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
               }).length;
@@ -571,7 +609,17 @@ const SessionsPage = () => {
                     <span className="text-xs font-bold text-muted-foreground">{s.duration} mins</span>
                   </div>
                 </div>
-                <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
+                  {s.approvalStatus === 'approved' && <Badge className="bg-success text-white">Approved</Badge>}
+                  {s.approvalStatus === 'rejected' && <Badge className="bg-destructive text-white">Rejected</Badge>}
+                  {(!s.approvalStatus || s.approvalStatus === 'pending') && <Badge className="bg-warning text-white">Pending Review</Badge>}
+                </div>
+                {s.approvalStatus === 'rejected' && s.reviewNote && (
+                  <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-xl">
+                    <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                  </div>
+                )}
                 <div className="flex items-center gap-6">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Attendance</span>
@@ -603,6 +651,11 @@ const SessionsPage = () => {
                 <Button className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={() => openAttendance(s)}>
                   <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
                 </Button>
+                {isAdmin && (
+                  <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
+                    Review Session
+                  </Button>
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                   {isMEManager && (
@@ -666,6 +719,53 @@ const SessionsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Review Session Dialog */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-[400px] rounded-[2rem] p-6 border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black tracking-tight">Review Session</DialogTitle>
+            <DialogDescription className="text-xs font-bold uppercase tracking-widest">
+              {reviewSession?.topic}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</Label>
+              <Select value={reviewStatus} onValueChange={(val: 'approved' | 'rejected') => setReviewStatus(val)}>
+                <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                  <SelectItem value="approved" className="text-success font-bold">Approve</SelectItem>
+                  <SelectItem value="rejected" className="text-destructive font-bold">Reject</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {(reviewStatus === 'rejected' || reviewNote) && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Review Note {reviewStatus === 'rejected' && <span className="text-destructive">*</span>}
+                </Label>
+                <Textarea 
+                  placeholder={reviewStatus === 'rejected' ? "Why is this session rejected?" : "Optional note..."}
+                  value={reviewNote} 
+                  onChange={e => setReviewNote(e.target.value)} 
+                  className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white min-h-[100px] resize-none" 
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="pt-6 flex gap-2">
+            <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold flex-1">Cancel</Button></DialogClose>
+            <Button onClick={handleReviewSubmit} disabled={isSubmittingReview} className={`rounded-xl font-black uppercase tracking-widest text-[10px] flex-1 ${reviewStatus === 'approved' ? 'bg-success hover:bg-success/90 text-white' : 'bg-destructive hover:bg-destructive/90 text-white'}`}>
+              {isSubmittingReview ? "Saving..." : reviewStatus === 'approved' ? "Approve" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* View Session Plan Dialog */}
       <Dialog open={viewPlanText !== null} onOpenChange={(o) => { if (!o) setViewPlanText(null); }}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl max-w-lg">
