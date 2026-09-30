@@ -305,93 +305,98 @@ const CentresPage = () => {
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Centre</Button>
+            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 font-bold px-4"><Plus className="h-4 w-4 mr-2" />Add Centre</Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] flex flex-col overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>{editItem ? "Edit Centre" : "Add New Centre"}</DialogTitle>
+          <DialogContent className="max-w-md p-0 overflow-hidden rounded-[24px] border-none shadow-2xl">
+            <DialogHeader className="px-6 pt-6 pb-4">
+              <DialogTitle className="text-xl font-bold text-slate-800">{editItem ? "Edit Centre" : "Add New Centre"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Centre Name</Label>
-                <Input id="name" placeholder="e.g. Govt. School - Saket" value={name} onChange={e => setName(e.target.value)} />
+            <div className="px-6 py-2 overflow-y-auto max-h-[70vh] flex flex-col gap-5">
+              
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-[13px] font-semibold text-slate-700">Centre Name</Label>
+                <Input id="name" placeholder="e.g. Govt. School - Saket" value={name} onChange={e => setName(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-1 focus-visible:ring-[#ff4000] focus-visible:border-[#ff4000] h-11 text-[13px]" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" placeholder="e.g. Saket, New Delhi" value={location} onChange={e => setLocation(e.target.value)} />
+              
+              <div className="space-y-1.5">
+                <Label htmlFor="location" className="text-[13px] font-semibold text-slate-700">Location</Label>
+                <Input id="location" placeholder="e.g. Saket, New Delhi" value={location} onChange={e => setLocation(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-1 focus-visible:ring-[#ff4000] h-11 text-[13px]" />
               </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
+              
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-semibold text-slate-700">Type</Label>
                 <Select value={type} onValueChange={(v: "In-school" | "After-school") => {
                   setType(v);
-                  if (v === "After-school" && selectedFellowIds.length > 1) {
-                    setSelectedFellowIds(selectedFellowIds.slice(0, 1));
-                  }
+                  if (v === "After-school" && selectedFellowIds.length > 1) setSelectedFellowIds(selectedFellowIds.slice(0, 1));
                 }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="In-school">In-school (2 Fellows)</SelectItem>
+                  <SelectTrigger className="rounded-xl border-slate-200 h-11 text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="In-school">In-school (1-2 Fellows)</SelectItem>
                     <SelectItem value="After-school">After-school (1 Fellow)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Starting Date</Label>
-                  <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="startDate" className="text-[13px] font-semibold text-slate-700">Starting Date</Label>
+                  <Input id="startDate" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="rounded-xl border-slate-200 h-11 text-[13px] text-slate-600" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">Closing Date</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="endDate" className="text-[13px] font-semibold text-slate-700">Closing Date</Label>
+                  <div className="relative">
+                    <Input id="endDate" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="rounded-xl border-slate-200 h-11 text-[13px] text-slate-600 w-full pr-8" />
                     {endDate && (
-                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setEndDate("")} title="Clear closing date">
+                      <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500" onClick={() => setEndDate("")}>
                         <X className="h-4 w-4" />
-                      </Button>
+                      </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 border-t pt-4 mt-2">
-                <div className="space-y-2">
-                  <Label htmlFor="pocName">POC Name</Label>
-                  <Input id="pocName" placeholder="e.g. Rahul Sharma" value={pocName} onChange={e => setPocName(e.target.value)} />
+              <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pocName" className="text-[13px] font-semibold text-slate-700">POC Name</Label>
+                  <Input id="pocName" placeholder="e.g. Rahul Sharma" value={pocName} onChange={e => setPocName(e.target.value)} className="rounded-xl border-slate-200 h-11 text-[12px]" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pocContact">Contact Number</Label>
-                  <Input id="pocContact" placeholder="e.g. 9876543210" value={pocContact} onChange={e => setPocContact(e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="pocContact" className="text-[13px] font-semibold text-slate-700">Contact Number</Label>
+                  <Input id="pocContact" placeholder="e.g. 9876543210" value={pocContact} onChange={e => setPocContact(e.target.value)} className="rounded-xl border-slate-200 h-11 text-[12px]" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pocEmail">Email ID</Label>
-                  <Input id="pocEmail" placeholder="e.g. rahul@school.edu" value={pocEmail} onChange={e => setPocEmail(e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="pocEmail" className="text-[13px] font-semibold text-slate-700">Email ID</Label>
+                  <Input id="pocEmail" placeholder="e.g. rahul@school..." value={pocEmail} onChange={e => setPocEmail(e.target.value)} className="rounded-xl border-slate-200 h-11 text-[12px]" />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Assign Fellows <span className="text-xs text-muted-foreground">({type === "In-school" ? "1-2 required" : "exactly 1 required"})</span></Label>
-                <div className="border rounded-md p-3 space-y-4 max-h-60 overflow-y-auto">
+              <div className="space-y-3 pt-2">
+                <Label className="text-[13px] font-bold text-slate-800">
+                  Assign Fellows <span className="text-[11px] font-medium text-slate-500 font-normal">({type === "In-school" ? "1-2 required" : "1 required"})</span>
+                </Label>
+                <div className="border border-slate-200 rounded-2xl p-4 space-y-4">
                   {Array.from(new Set(fellowsList.map(f => f.batch || "Unspecified"))).sort().reverse().map(batchVersion => (
-                    <div key={batchVersion} className="space-y-2">
-                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">Batch {batchVersion}</h4>
-                      <div className="grid grid-cols-1 gap-2">
+                    <div key={batchVersion} className="space-y-3">
+                      <h4 className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Batch {batchVersion}</h4>
+                      <div className="flex flex-col space-y-3">
                         {fellowsList
                           .filter(f => (f.batch || "Unspecified") === batchVersion)
                           .map(f => {
                             const isSelected = selectedFellowIds.some(id => id === f._id || id === f.id);
                             return (
-                              <div key={f._id} className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`fellow-${f._id}`}
-                                  checked={isSelected}
-                                  disabled={!isSelected && selectedFellowIds.length >= (type === "In-school" ? 2 : 1)}
-                                  onCheckedChange={() => toggleFellow(f._id)}
-                                />
-                                <label htmlFor={`fellow-${f._id}`} className="text-sm cursor-pointer flex items-center justify-between flex-1 pr-2">
-                                  <span>{f.name}</span>
-                                  <span className="text-[10px] text-muted-foreground">{f.phone || f.email}</span>
-                                </label>
+                              <div key={f._id} className="flex items-center gap-3 cursor-pointer group" onClick={() => {
+                                if (!isSelected && selectedFellowIds.length >= (type === "In-school" ? 2 : 1)) return;
+                                toggleFellow(f._id);
+                              }}>
+                                <div className={`h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? 'border-[#ff4000] bg-[#ff4000]' : 'border-[#ff4000] group-hover:bg-[#ff4000]/10'}`}>
+                                  {isSelected && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                                </div>
+                                <div className="flex-1 flex justify-between items-center">
+                                  <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900 transition-colors">{f.name}</span>
+                                  <span className="text-[11px] font-medium text-slate-400">{f.phone || f.email}</span>
+                                </div>
                               </div>
                             );
                           })}
@@ -400,27 +405,27 @@ const CentresPage = () => {
                   ))}
                 </div>
                 {((type === "In-school" && (selectedFellowIds.length < 1 || selectedFellowIds.length > 2)) || (type === "After-school" && selectedFellowIds.length !== 1)) && (
-                  <p className="text-xs text-destructive">Please select {type === "In-school" ? "1 or 2" : "exactly 1"} fellow{type === "In-school" ? "s" : ""} ({selectedFellowIds.length} selected)</p>
+                  <p className="text-[11px] font-medium text-red-500">Please select {type === "In-school" ? "1 or 2" : "exactly 1"} fellow{type === "In-school" ? "s" : ""} ({selectedFellowIds.length} selected)</p>
                 )}
               </div>
 
               {isSuperAdmin && pmList.length > 0 && (
-                <div className="space-y-2 border-t pt-4">
-                  <Label>Assign Program Manager(s) <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                  <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                <div className="space-y-3 border-t border-slate-100 pt-5">
+                  <Label className="text-[13px] font-bold text-slate-800">
+                    Assign Program Manager(s) <span className="text-[11px] font-medium text-slate-500 font-normal">(Optional)</span>
+                  </Label>
+                  <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
                     {pmList.map(pm => {
                       const isSelected = selectedPmIds.includes(pm._id);
                       return (
-                        <div key={pm._id} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`pm-${pm._id}`}
-                            checked={isSelected}
-                            onCheckedChange={() => togglePM(pm._id)}
-                          />
-                          <label htmlFor={`pm-${pm._id}`} className="text-sm cursor-pointer flex items-center justify-between flex-1 pr-2">
-                            <span className="font-medium">{pm.name}</span>
-                            <span className="text-[10px] text-muted-foreground">{pm.email}</span>
-                          </label>
+                        <div key={pm._id} className="flex items-center gap-3 cursor-pointer group" onClick={() => togglePM(pm._id)}>
+                          <div className={`h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? 'border-[#ff4000] bg-[#ff4000]' : 'border-[#ff4000] group-hover:bg-[#ff4000]/10'}`}>
+                            {isSelected && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                          </div>
+                          <div className="flex-1 flex justify-between items-center">
+                            <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900 transition-colors">{pm.name}</span>
+                            <span className="text-[11px] font-medium text-slate-400">{pm.email}</span>
+                          </div>
                         </div>
                       );
                     })}
@@ -428,10 +433,10 @@ const CentresPage = () => {
                 </div>
               )}
             </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-              <Button onClick={handleSubmit}>{editItem ? "Save Changes" : "Add Centre"}</Button>
-            </DialogFooter>
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-white">
+              <DialogClose asChild><Button variant="outline" className="rounded-full px-6 h-10 text-[13px] font-bold border-slate-200 text-slate-700">Cancel</Button></DialogClose>
+              <Button onClick={handleSubmit} className="rounded-full px-6 h-10 text-[13px] font-bold bg-[#ff3b30] hover:bg-[#ff3b30]/90 text-white shadow-md shadow-red-500/20">{editItem ? "Save Changes" : "Add Centre"}</Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -633,11 +638,11 @@ const CentresPage = () => {
           </Select>
 
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="h-8 rounded-xl border-border/40 bg-white/90 text-xs font-medium w-[115px] shadow-none">
-              <SelectValue placeholder="All Types" />
+            <SelectTrigger className="h-8 rounded-xl border-border/40 bg-white/90 text-xs font-medium w-[130px] shadow-none">
+              <SelectValue placeholder="Program Model" />
             </SelectTrigger>
             <SelectContent className="rounded-xl shadow-xl">
-              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="all">All Models</SelectItem>
               <SelectItem value="In-school">In-school</SelectItem>
               <SelectItem value="After-school">After-school</SelectItem>
             </SelectContent>
