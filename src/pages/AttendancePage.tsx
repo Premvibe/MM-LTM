@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ClipboardCheck, MapPin, Search, Filter, Users, CalendarDays, CheckCircle2, AlertCircle, Info, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSearchParams } from "react-router-dom";
@@ -18,9 +19,11 @@ type Student = {
   _id: string; 
   id: string; 
   name: string; 
-  age: number; 
-  gender: "Male" | "Female"; 
+  age?: number; 
+  gender?: "Male" | "Female"; 
   centreId: any; 
+  grade?: string;
+  section?: string;
   attendancePercent: number; 
   lastAssessmentScore: number;
   status?: "Active" | "Inactive" | "Left";
@@ -28,7 +31,17 @@ type Student = {
   createdAt?: string;
 };
 type Fellow = { _id: string; id: string; name: string; email: string };
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; presentStudentIds: string[] };
+type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; presentStudentIds: string[]; reviewNote?: string };
+
+const getStudentDetails = (s: Student) => {
+  const parts: string[] = [];
+  if (s.age) parts.push(`Age ${s.age}`);
+  if (s.gender) parts.push(s.gender);
+  if (s.grade || s.section) {
+    parts.push(`Class ${s.grade || ''}${s.section ? `-${s.section}` : ''}`.trim());
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Learner";
+};
 
 const AttendancePage = () => {
   const { user, isAdmin, isSuperAdmin } = useAuth();
@@ -39,6 +52,7 @@ const AttendancePage = () => {
     else setSearchParams({});
   };
   const [selected, setSelected] = useState<string[]>([]);
+  const [reviewNote, setReviewNote] = useState("");
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [filterMonth, setFilterMonth] = useState<string>(new Date().getMonth().toString());
   const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
@@ -47,6 +61,7 @@ const AttendancePage = () => {
   const [sessionsList, setSessionsList] = useState<Session[]>([]);
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [loading, setLoading] = useState(true);
+  const isSavingAttendanceRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -195,15 +210,29 @@ const AttendancePage = () => {
   }, [studentsList, selectedCentreId, attendanceDate]);
   const sessionForDate = useMemo(() => sessionsList.find(s => s.date === attendanceDate && (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id)), [sessionsList, attendanceDate, selectedCentreId, selectedCentre]);
 
+  const pendingAttendanceSessions = useMemo(() => {
+    if (!selectedCentreId) return [];
+    return sessionsList
+      .filter(s => 
+        (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id) &&
+        (!s.presentStudentIds || s.presentStudentIds.length === 0)
+      )
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 8);
+  }, [sessionsList, selectedCentreId, selectedCentre]);
+
   useEffect(() => {
     if (sessionForDate) {
       setSelected(sessionForDate.presentStudentIds || []);
+      setReviewNote(sessionForDate.reviewNote || "");
     } else {
       setSelected([]);
+      setReviewNote("");
     }
   }, [sessionForDate]);
 
   const handleSaveAttendance = async () => {
+    if (isSavingAttendanceRef.current || loading) return;
     const dateObj = new Date(attendanceDate);
     const day = dateObj.getDay();
     if (day !== 1 && day !== 3 && day !== 5 && day !== 6) {
@@ -211,17 +240,20 @@ const AttendancePage = () => {
       return;
     }
     
+    isSavingAttendanceRef.current = true;
     try {
       setLoading(true);
-      await api.put(`/sessions/${sessionForDate?._id}`, {
+      await api.post(`/sessions/${sessionForDate?._id}/attendance`, {
         presentStudentIds: selected,
-        studentsPresent: selected.length
+        studentsPresent: selected.length,
+        reviewNote: reviewNote.trim()
       });
       toast.success(`Attendance saved for ${selected.length} students`); 
       fetchData();
     } catch (error) {
       toast.error("Failed to save attendance");
     } finally {
+      isSavingAttendanceRef.current = false;
       setLoading(false);
     }
   };
@@ -464,7 +496,7 @@ const AttendancePage = () => {
                           <Checkbox checked={selected.includes(s._id)} onCheckedChange={() => toggle(s._id)} className="h-5 w-5 rounded-md" />
                           <div>
                             <p className={`font-black text-sm tracking-tight ${selected.includes(s._id) ? 'text-primary' : 'text-foreground'}`}>{s.name}</p>
-                            <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">Age {s.age} · {s.gender}</p>
+                            <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">{getStudentDetails(s)}</p>
                           </div>
                         </div>
                         <Badge variant="secondary" className="rounded-lg text-[9px] font-black uppercase px-2 py-0.5 bg-muted/50 border-none group-hover:bg-primary/10 group-hover:text-primary transition-colors">{s.attendancePercent}% Stability</Badge>
@@ -489,10 +521,23 @@ const AttendancePage = () => {
                     />
                   </div>
                   {sessionForDate && (
-                    <div className="bg-white/10 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
-                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">Active Session</p>
-                       <p className="font-black text-sm tracking-tight">{sessionForDate.topic}</p>
-                    </div>
+                    <>
+                      <div className="bg-white/10 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
+                         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">Active Session</p>
+                         <p className="font-black text-sm tracking-tight">{sessionForDate.topic}</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-white/70">
+                          Review Note (Optional)
+                        </Label>
+                        <Textarea
+                          placeholder="Add session reflections, observations, or attendance remarks..."
+                          value={reviewNote}
+                          onChange={(e) => setReviewNote(e.target.value)}
+                          className="bg-white/10 border-white/20 rounded-2xl text-xs text-white placeholder:text-white/40 focus-visible:ring-white/30 min-h-[85px] resize-y"
+                        />
+                      </div>
+                    </>
                   )}
                   <div className="pt-4 space-y-3">
                     <Button 
@@ -522,6 +567,51 @@ const AttendancePage = () => {
                     <p className="text-sm font-bold text-muted-foreground/40">Out of {centreStudents.length} enrolled</p>
                  </div>
               </Card>
+
+              {pendingAttendanceSessions.length > 0 && (
+                <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
+                  <CardHeader className="px-8 pt-6 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
+                      <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                        Pending Attendance ({pendingAttendanceSessions.length})
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-6 pb-6 space-y-2">
+                    {pendingAttendanceSessions.map(s => {
+                      const sessionDate = new Date(s.date);
+                      const dayName = sessionDate.toLocaleDateString("en-IN", { weekday: "short" });
+                      const dateStr = sessionDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+                      const isSelected = s.date === attendanceDate;
+                      return (
+                        <div
+                          key={s._id}
+                          onClick={() => handleAttendanceDateChange(s.date)}
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all hover:border-primary/30 ${
+                            isSelected 
+                              ? 'border-primary bg-primary/5 shadow-sm' 
+                              : 'border-muted bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-warning/10 text-warning'}`}>
+                              <AlertCircle className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-black tracking-tight truncate">{s.topic}</p>
+                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{dayName} · {dateStr}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-warning/30 text-warning bg-warning/5 shrink-0 ml-2">
+                            No Attendance
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -580,7 +670,7 @@ const AttendancePage = () => {
                       <tr key={s._id} className="hover:bg-primary/5 transition-colors group">
                         <td className="px-8 py-5 sticky left-0 bg-white group-hover:bg-primary/5 transition-colors border-r border-white/50 z-10">
                            <p className="font-black text-sm tracking-tight group-hover:text-primary transition-colors">{s.name}</p>
-                           <p className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">{s.gender}</p>
+                           <p className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">{getStudentDetails(s)}</p>
                         </td>
                         {Array.from({ length: new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0).getDate() }, (_, i) => i + 1).map(d => {
                           const dateStr = `${filterYear}-${String(parseInt(filterMonth) + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;

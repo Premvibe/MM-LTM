@@ -6,15 +6,40 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Users, UserCheck, UserX, UserMinus, ShieldX } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserCheck, UserX, UserMinus, ShieldX, CalendarDays, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; batch?: string; status?: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; programManagers?: string[] };
+type Fellow = { 
+  _id: string; 
+  id: string; 
+  name: string; 
+  email: string; 
+  phone: string; 
+  batch?: string; 
+  status?: string; 
+  centreIds: string[]; 
+  centreAssignedDate?: string;
+  centreEndDate?: string;
+  sessionsCompleted: number; 
+  attendanceRate: number; 
+  programManagers?: string[] 
+};
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+
+const formatDateDMY = (dateStr?: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
 
 const FellowsPage = () => {
   const { user, isMEManager, isSuperAdmin } = useAuth();
@@ -29,6 +54,9 @@ const FellowsPage = () => {
   const [batch, setBatch] = useState("4.0");
   const [status, setStatus] = useState("Active");
   const [password, setPassword] = useState("");
+  const [centreAssignedDate, setCentreAssignedDate] = useState("");
+  const [centreEndDate, setCentreEndDate] = useState("");
+  const [selectedCentreIds, setSelectedCentreIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -78,17 +106,51 @@ const FellowsPage = () => {
     }
   };
 
-  const resetForm = () => { setName(""); setEmail(""); setPhone(""); setBatch("4.0"); setStatus("Active"); setPassword(""); setEditItem(null); };
+  const resetForm = () => { 
+    setName(""); 
+    setEmail(""); 
+    setPhone(""); 
+    setBatch("4.0"); 
+    setStatus("Active"); 
+    setPassword(""); 
+    setCentreAssignedDate(""); 
+    setCentreEndDate(""); 
+    setSelectedCentreIds([]); 
+    setEditItem(null); 
+  };
 
   const openEdit = (f: Fellow) => {
-    setEditItem(f); setName(f.name); setEmail(f.email); setPhone(f.phone); setBatch(f.batch || "4.0"); setStatus(f.status || "Active"); setPassword(""); setOpen(true);
+    setEditItem(f); 
+    setName(f.name); 
+    setEmail(f.email); 
+    setPhone(f.phone); 
+    setBatch(f.batch || "4.0"); 
+    setStatus(f.status || "Active"); 
+    setPassword(""); 
+    setCentreAssignedDate(f.centreAssignedDate ? new Date(f.centreAssignedDate).toISOString().split('T')[0] : "");
+    setCentreEndDate(f.centreEndDate ? new Date(f.centreEndDate).toISOString().split('T')[0] : "");
+
+    const associatedCentres = centresList
+      .filter(c => (c.fellowIds || []).includes(f._id) || (f.id && (c.fellowIds || []).includes(f.id)) || (f.centreIds || []).includes(c._id) || (f.centreIds || []).includes(c.id))
+      .map(c => c._id);
+    setSelectedCentreIds(associatedCentres);
+    setOpen(true);
   };
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) { toast.error("Please fill in name, email, and phone"); return; }
     if (!editItem && !password.trim()) { toast.error("Password is required for new fellows"); return; }
     
-    const fellowData: any = { name: name.trim(), email: email.trim(), phone: phone.trim(), batch, status };
+    const fellowData: any = { 
+      name: name.trim(), 
+      email: email.trim(), 
+      phone: phone.trim(), 
+      batch, 
+      status,
+      centreIds: selectedCentreIds,
+      centreAssignedDate: centreAssignedDate || null,
+      centreEndDate: centreEndDate || null
+    };
     if (password.trim()) {
       fellowData.password = password.trim();
     }
@@ -98,7 +160,7 @@ const FellowsPage = () => {
         await api.put(`/fellows/${editItem._id}`, fellowData);
         toast.success("Fellow updated successfully");
       } else {
-        await api.post("/fellows", { ...fellowData, centreIds: [], sessionsCompleted: 0, attendanceRate: 100 });
+        await api.post("/fellows", { ...fellowData, sessionsCompleted: 0, attendanceRate: 100 });
         toast.success("Fellow added successfully");
       }
       fetchData();
@@ -147,50 +209,144 @@ const FellowsPage = () => {
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Add Fellow</Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editItem ? "Edit Fellow" : "Add New Fellow"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="fellow-name">Full Name</Label>
-                <Input id="fellow-name" placeholder="e.g. Priya Gupta" value={name} onChange={e => setName(e.target.value)} />
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl">
+            <div className="bg-primary p-6 text-white relative overflow-hidden flex-shrink-0">
+              <div className="absolute -right-8 -top-8 h-32 w-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <DialogTitle className="text-xl font-black tracking-tight">{editItem ? "Edit Fellow" : "Add New Fellow"}</DialogTitle>
+              <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Fellow Profile, Centre Assignments & Records</p>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="space-y-1.5">
+                <Label htmlFor="fellow-name" className="text-xs font-bold">Full Name</Label>
+                <Input id="fellow-name" placeholder="e.g. Priya Gupta" value={name} onChange={e => setName(e.target.value)} className="rounded-xl font-medium text-xs" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="fellow-email">Email</Label>
-                <Input id="fellow-email" type="email" placeholder="e.g. priya@manzil.org" value={email} onChange={e => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fellow-phone">Phone</Label>
-                <Input id="fellow-phone" placeholder="e.g. +91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fellow-batch">Batch Version</Label>
-                  <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fellow-email" className="text-xs font-bold">Email</Label>
+                  <Input id="fellow-email" type="email" placeholder="e.g. priya@manzil.org" value={email} onChange={e => setEmail(e.target.value)} className="rounded-xl font-medium text-xs" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fellow-phone" className="text-xs font-bold">Phone</Label>
+                  <Input id="fellow-phone" placeholder="e.g. +91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} className="rounded-xl font-medium text-xs" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fellow-batch" className="text-xs font-bold">Batch Version</Label>
+                  <Input id="fellow-batch" placeholder="e.g. 4.0" value={batch} onChange={e => setBatch(e.target.value)} className="rounded-xl font-medium text-xs" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold">Status</Label>
                   <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                      <SelectItem value="Left">Left</SelectItem>
-                      <SelectItem value="Terminated">Terminated</SelectItem>
+                    <SelectTrigger className="rounded-xl font-medium text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-xl">
+                      <SelectItem value="Active" className="text-xs">Active</SelectItem>
+                      <SelectItem value="Inactive" className="text-xs">Inactive</SelectItem>
+                      <SelectItem value="Left" className="text-xs">Left</SelectItem>
+                      <SelectItem value="Terminated" className="text-xs">Terminated</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="fellow-password">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
-                <Input id="fellow-password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+
+              {/* Centre Assignment */}
+              <div className="space-y-2 border-t border-border/50 pt-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold">Assigned Centre(s)</Label>
+                  <span className="text-[10px] text-muted-foreground font-semibold">{selectedCentreIds.length} selected</span>
+                </div>
+                <div className="max-h-32 overflow-y-auto border border-border/40 rounded-xl p-2 space-y-1 bg-muted/20">
+                  {centresList.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground p-2">No centres available</p>
+                  ) : (
+                    centresList.map(centre => {
+                      const isChecked = selectedCentreIds.includes(centre._id);
+                      return (
+                        <div
+                          key={centre._id}
+                          onClick={() => {
+                            setSelectedCentreIds(prev =>
+                              prev.includes(centre._id)
+                                ? prev.filter(id => id !== centre._id)
+                                : [...prev, centre._id]
+                            );
+                          }}
+                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs ${
+                            isChecked ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/50 text-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              readOnly
+                              className="rounded border-primary text-primary focus:ring-primary pointer-events-none"
+                            />
+                            <span>{centre.name}</span>
+                          </div>
+                          <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="text-[8px] py-0 px-1.5 h-4">
+                            {centre.type}
+                          </Badge>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Centre Dates */}
+              <div className="grid grid-cols-2 gap-3 border-t border-border/50 pt-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="centre-assigned-date" className="text-xs font-bold flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" /> Centre Assigned Date
+                  </Label>
+                  <Input
+                    id="centre-assigned-date"
+                    type="date"
+                    value={centreAssignedDate}
+                    onChange={e => setCentreAssignedDate(e.target.value)}
+                    className="rounded-xl font-medium text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Start date at centre</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="centre-end-date" className="text-xs font-bold flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> Centre End Date
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="centre-end-date"
+                      type="date"
+                      value={centreEndDate}
+                      onChange={e => setCentreEndDate(e.target.value)}
+                      className="rounded-xl font-medium text-xs pr-8"
+                    />
+                    {centreEndDate && (
+                      <button
+                        type="button"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-500"
+                        onClick={() => setCentreEndDate("")}
+                        title="Clear end date"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Leave empty if ongoing</p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 border-t border-border/50 pt-3">
+                <Label htmlFor="fellow-password" className="text-xs font-bold">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
+                <Input id="fellow-password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="rounded-xl font-medium text-xs" />
               </div>
             </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-              <Button onClick={handleSubmit}>{editItem ? "Save Changes" : "Add Fellow"}</Button>
-            </DialogFooter>
+
+            <div className="p-4 bg-muted/20 border-t flex items-center justify-end gap-3 flex-shrink-0">
+              <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold text-xs">Cancel</Button></DialogClose>
+              <Button onClick={handleSubmit} className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10 shadow-lg shadow-primary/20">{editItem ? "Save Changes" : "Add Fellow"}</Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -355,6 +511,30 @@ const FellowsPage = () => {
                     <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
                   ))}
                 </div>
+
+                {(f.centreAssignedDate || f.centreEndDate) && (
+                  <div className="flex items-center flex-wrap gap-2 text-[10px] font-bold text-muted-foreground bg-primary/[0.04] p-2 rounded-xl border border-primary/10">
+                    {f.centreAssignedDate && (
+                      <div className="flex items-center gap-1.5">
+                        <CalendarDays className="h-3 w-3 text-primary" />
+                        <span>Assigned: <strong className="text-foreground">{formatDateDMY(f.centreAssignedDate)}</strong></span>
+                      </div>
+                    )}
+                    {f.centreAssignedDate && f.centreEndDate && <span className="text-muted-foreground/30">·</span>}
+                    {f.centreEndDate ? (
+                      <div className="flex items-center gap-1.5">
+                        <span>End: <strong className="text-foreground">{formatDateDMY(f.centreEndDate)}</strong></span>
+                      </div>
+                    ) : (
+                      f.centreAssignedDate && (
+                        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-wider py-0 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200">
+                          Ongoing
+                        </Badge>
+                      )
+                    )}
+                  </div>
+                )}
+
                 {isSuperAdmin && f.programManagers && f.programManagers.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {f.programManagers.map((pmName, idx) => (

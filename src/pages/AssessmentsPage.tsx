@@ -159,6 +159,7 @@ const AssessmentsPage = () => {
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingAssessmentId, setEditingAssessmentId] = useState<string | null>(null);
+  const [editingAssessmentDate, setEditingAssessmentDate] = useState<string | null>(null);
 
   const getRoleParams = () => {
     return user?.role === 'fellow' 
@@ -188,6 +189,7 @@ const AssessmentsPage = () => {
   }, [user]);
 
   const handleLogAssessment = async () => {
+    if (isSubmitting) return;
     if (!selectedStudent) return;
     setIsSubmitting(true);
     
@@ -206,7 +208,7 @@ const AssessmentsPage = () => {
       finalPhase = "Mid";
     } else if (activeCategory === "InSchool-PrePost") {
       if (activePhase === "Mid") {
-        // Mid phase for In-school: combined musical + SEL
+        // Mid phase: combined musical + SEL
         payloadData = { musical: musicalScores, selMid: selScores };
         finalCategory = "Mid-Evaluation";
       } else {
@@ -217,13 +219,19 @@ const AssessmentsPage = () => {
         payloadData = { musical: musicalScores, selMid: selScores };
         finalCategory = "Mid-Evaluation";
       } else {
-        payloadData = { afterSchool: afterSchoolData };
+        const hasLegacyData = Boolean(afterSchoolData?.background || afterSchoolData?.knowledge);
+        payloadData = hasLegacyData ? { afterSchool: afterSchoolData } : { leading: leadingScores };
+        if (!hasLegacyData) {
+          finalCategory = "InSchool-PrePost";
+        }
       }
     }
 
     const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
     const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear();
-    let dateStr = isCurrentMonth ? new Date().toISOString() : new Date(selectedYear, selectedMonth, 15).toISOString();
+    const dateStr = editingAssessmentDate 
+      ? editingAssessmentDate 
+      : (isCurrentMonth ? new Date().toISOString() : new Date(selectedYear, selectedMonth, 15).toISOString());
 
     try {
       const payload = {
@@ -246,11 +254,31 @@ const AssessmentsPage = () => {
         toast.success("Assessment logged successfully");
       }
       setEditingAssessmentId(null);
+      setEditingAssessmentDate(null);
       setIsLogOpen(false);
       const aRes = await api.get(`/assessments${getRoleParams()}`);
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to log assessment");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAssessment = async () => {
+    if (!editingAssessmentId) return;
+    if (!window.confirm("Are you sure you want to delete this assessment record?")) return;
+    setIsSubmitting(true);
+    try {
+      await api.delete(`/assessments/${editingAssessmentId}`);
+      toast.success("Assessment deleted successfully");
+      setEditingAssessmentId(null);
+      setEditingAssessmentDate(null);
+      setIsLogOpen(false);
+      const aRes = await api.get(`/assessments${getRoleParams()}`);
+      setAssessmentsData(aRes.data);
+    } catch (error) {
+      toast.error("Failed to delete assessment");
     } finally {
       setIsSubmitting(false);
     }
@@ -269,6 +297,7 @@ const AssessmentsPage = () => {
   const activeCentresCount = centres.length;
 
   const handleBulkSubmit = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const acadYear = selectedMonth < 6 ? selectedYear - 1 : selectedYear;
@@ -304,11 +333,17 @@ const AssessmentsPage = () => {
   };
 
   const selectedCentre = centres.find(c => (c._id || c.id) === selectedCentreId);
-  const centreStudents = selectedCentreId ? students.filter(s => (s.centreId?._id || s.centreId) === selectedCentreId) : [];
+  const centreStudents = useMemo(() => {
+    if (!selectedCentreId) return [];
+    return students
+      .filter(s => (s.centreId?._id || s.centreId) === selectedCentreId)
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+  }, [students, selectedCentreId]);
 
   const processedAssessments = useMemo(() =>
     centreStudents
-      .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(s => (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }))
       .map((s) => {
         const studentAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === (s._id || s.id));
         return {
@@ -721,15 +756,32 @@ const AssessmentsPage = () => {
                 
                 const openEditModal = (record: any, phase: string) => {
                   setSelectedStudent(a.raw);
-                  setActiveCategory(record.category);
+                  setActiveCategory(record.data?.afterSchool ? record.category : "InSchool-PrePost");
                   setActivePhase(phase);
                   setEditingAssessmentId(record._id || record.id);
-                  // Pre-fill form with existing data
-                  if (record.data?.leading) {
-                    setLeadingScores(record.data.leading);
-                  }
+                  setEditingAssessmentDate(record.date || null);
+                  
+                  // Pre-fill form with existing data safely
+                  const leading = record.data?.leading || {};
+                  setLeadingScores({
+                    self: Array.isArray(leading.self) && leading.self.length === 7 ? [...leading.self] : new Array(7).fill(1),
+                    other: Array.isArray(leading.other) && leading.other.length === 6 ? [...leading.other] : new Array(6).fill(1),
+                    community: Array.isArray(leading.community) && leading.community.length === 6 ? [...leading.community] : new Array(6).fill(1),
+                  });
                   if (record.data?.afterSchool) {
                     setAfterSchoolData(record.data.afterSchool);
+                  } else {
+                    setAfterSchoolData({});
+                  }
+                  if (record.data?.musical) {
+                    setMusicalScores(record.data.musical);
+                  } else {
+                    setMusicalScores({ sur: 1, laya: 1, word: 1, bhav: 1 });
+                  }
+                  if (record.data?.selMid) {
+                    setSelScores(record.data.selMid);
+                  } else {
+                    setSelScores({ involvement: 1, emotion: 1, creativity: 1, interaction: 1 });
                   }
                   setRemarks(record.remarks || "");
                   setIsLogOpen(true);
@@ -745,23 +797,81 @@ const AssessmentsPage = () => {
                     </div>
                     {/* Pre */}
                     <div className="text-center">
-                      {pre ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3 cursor-pointer hover:bg-success/20 transition-colors" onClick={() => openEditModal(pre, "Pre")}>Done ✎</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
-                        setSelectedStudent(a.raw);
-                        setEditingAssessmentId(null);
-                        setActiveCategory(selectedCentre?.type === "In-school" ? "InSchool-PrePost" : "AfterSchool-PrePost");
-                        setActivePhase("Pre");
-                        setIsLogOpen(true);
-                      }}>Pending</Badge>}
+                      {pre ? (
+                        <div className="inline-flex items-center gap-1.5 justify-center">
+                          <Badge className="bg-success/10 text-success border-none text-[11px] font-bold px-2.5 py-0.5">
+                            {typeof pre.averageScore === 'number' && pre.averageScore > 0 ? `${pre.averageScore} / 5` : "Done"}
+                          </Badge>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 px-2 text-[10px] font-black uppercase text-primary hover:bg-primary/10 rounded-lg cursor-pointer" 
+                            onClick={() => openEditModal(pre, "Pre")}
+                          >
+                            Edit ✎
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5 transition-colors" 
+                          onClick={() => {
+                            setSelectedStudent(a.raw);
+                            setEditingAssessmentId(null);
+                            setEditingAssessmentDate(null);
+                            setLeadingScores({
+                              self: new Array(7).fill(1),
+                              other: new Array(6).fill(1),
+                              community: new Array(6).fill(1),
+                            });
+                            setActiveCategory("InSchool-PrePost");
+                            setActivePhase("Pre");
+                            setIsLogOpen(true);
+                          }}
+                        >
+                          Pending
+                        </Badge>
+                      )}
                     </div>
                     {/* Post */}
                     <div className="text-center">
-                      {post ? <Badge className="bg-success/10 text-success border-none text-xs font-bold px-3 cursor-pointer hover:bg-success/20 transition-colors" onClick={() => openEditModal(post, "Post")}>Done ✎</Badge> : <Badge variant="outline" className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5" onClick={() => {
-                        setSelectedStudent(a.raw);
-                        setEditingAssessmentId(null);
-                        setActiveCategory(selectedCentre?.type === "In-school" ? "InSchool-PrePost" : "AfterSchool-PrePost");
-                        setActivePhase("Post");
-                        setIsLogOpen(true);
-                      }}>Pending</Badge>}
+                      {post ? (
+                        <div className="inline-flex items-center gap-1.5 justify-center">
+                          <Badge className="bg-success/10 text-success border-none text-[11px] font-bold px-2.5 py-0.5">
+                            {typeof post.averageScore === 'number' && post.averageScore > 0 ? `${post.averageScore} / 5` : "Done"}
+                          </Badge>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 px-2 text-[10px] font-black uppercase text-primary hover:bg-primary/10 rounded-lg cursor-pointer" 
+                            onClick={() => openEditModal(post, "Post")}
+                          >
+                            Edit ✎
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5 transition-colors" 
+                          onClick={() => {
+                            setSelectedStudent(a.raw);
+                            setEditingAssessmentId(null);
+                            setEditingAssessmentDate(null);
+                            setLeadingScores({
+                              self: new Array(7).fill(1),
+                              other: new Array(6).fill(1),
+                              community: new Array(6).fill(1),
+                            });
+                            setActiveCategory("InSchool-PrePost");
+                            setActivePhase("Post");
+                            setIsLogOpen(true);
+                          }}
+                        >
+                          Pending
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 );
@@ -775,9 +885,11 @@ const AssessmentsPage = () => {
           <div className="bg-primary p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10"><ClipboardCheck className="h-24 w-24" /></div>
             <DialogHeader>
-              <DialogTitle className="text-2xl font-[950] tracking-tight">Record Performance: {selectedStudent?.name}</DialogTitle>
+              <DialogTitle className="text-2xl font-[950] tracking-tight">
+                {editingAssessmentId ? `Edit ${activePhase}-Assessment: ` : "Record Performance: "}{selectedStudent?.name}
+              </DialogTitle>
               <DialogDescription className="text-primary-foreground/70 font-medium text-sm">
-                Logging {activeCategory === "Monthly-Evaluation" ? `Monthly Assessment (SEL & Musical)` : activeCategory === "SEL-Mid" ? `Monthly SEL Assessment` : activeCategory === "Musical" ? `Quarterly Musical Assessment — ${activeQuarter}` : `${activeCategory} Assessment Phase`}
+                Logging {activeCategory === "Monthly-Evaluation" ? `Monthly Assessment (SEL & Musical)` : activeCategory === "SEL-Mid" ? `Monthly SEL Assessment` : activeCategory === "Musical" ? `Quarterly Musical Assessment — ${activeQuarter}` : (activeCategory === "InSchool-PrePost" || activeCategory === "AfterSchool-PrePost") ? `${activePhase}-Assessment (Leading Self, Other & Community)` : `${activeCategory} Assessment Phase`}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -790,7 +902,7 @@ const AssessmentsPage = () => {
                     <div className="space-y-3">
                       <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</Label>
                       <div className="rounded-2xl h-12 bg-muted/50 px-4 flex items-center text-sm font-bold text-muted-foreground">
-                        {activeCategory === "InSchool-PrePost" ? "In-School Pre/Post" : "After-School Pre/Post"}
+                        Pre/Post Assessment (Leading Survey)
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -812,8 +924,7 @@ const AssessmentsPage = () => {
                         <SelectTrigger className="rounded-2xl h-12 bg-muted border-none font-bold"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-2xl border-none shadow-2xl">
                           <SelectItem value="Monthly-Evaluation">Monthly Progress (SEL & Musical)</SelectItem>
-                          {selectedCentre?.type === "In-school" && <SelectItem value="InSchool-PrePost">In-School Pre/Post</SelectItem>}
-                          {selectedCentre?.type === "After-school" && <SelectItem value="AfterSchool-PrePost">After-School Pre/Post</SelectItem>}
+                          <SelectItem value="InSchool-PrePost">Pre/Post Assessment (Leading Survey)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -928,7 +1039,7 @@ const AssessmentsPage = () => {
                  </div>
               )}
 
-              {(activePhase === "Pre" || activePhase === "Post") && activeCategory !== "Musical" && activeCategory === "InSchool-PrePost" && (
+              {(activePhase === "Pre" || activePhase === "Post") && activeCategory !== "Musical" && (activeCategory === "InSchool-PrePost" || (activeCategory === "AfterSchool-PrePost" && !afterSchoolData?.background && !afterSchoolData?.knowledge)) && (
                 <div className="space-y-8">
                   {Object.entries(LEADING_QUESTIONS).map(([domain, questions]) => (
                     <div key={domain} className="space-y-4">
@@ -938,19 +1049,31 @@ const AssessmentsPage = () => {
                           <div key={i} className="space-y-3 p-4 bg-muted/30 rounded-2xl">
                             <p className="text-xs font-bold leading-relaxed">{q}</p>
                             <div className="flex gap-2">
-                              {[1, 2, 3, 4, 5].map(v => (
-                                <button
-                                  key={v}
-                                  onClick={() => {
-                                    const newScores = { ...leadingScores };
-                                    newScores[domain as keyof typeof leadingScores][i] = v;
-                                    setLeadingScores(newScores);
-                                  }}
-                                  className={`flex-1 h-9 rounded-xl font-black text-[10px] transition-all ${leadingScores[domain as keyof typeof leadingScores][i] === v ? 'bg-primary text-white shadow-lg' : 'bg-white'}`}
-                                >
-                                  {v}
-                                </button>
-                              ))}
+                              {[1, 2, 3, 4, 5].map(v => {
+                                const isSelected = (leadingScores[domain as keyof typeof leadingScores]?.[i] ?? 1) === v;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={v}
+                                    onClick={() => {
+                                      setLeadingScores(prev => {
+                                        const current = Array.isArray(prev[domain as keyof typeof leadingScores])
+                                          ? [...prev[domain as keyof typeof leadingScores]]
+                                          : new Array(questions.length).fill(1);
+                                        while (current.length < questions.length) current.push(1);
+                                        current[i] = v;
+                                        return {
+                                          ...prev,
+                                          [domain]: current
+                                        };
+                                      });
+                                    }}
+                                    className={`flex-1 h-9 rounded-xl font-black text-[10px] transition-all cursor-pointer ${isSelected ? 'bg-primary text-white shadow-lg' : 'bg-white hover:bg-muted text-foreground'}`}
+                                  >
+                                    {v}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         ))}
@@ -960,7 +1083,7 @@ const AssessmentsPage = () => {
                 </div>
               )}
 
-              {(activePhase === "Pre" || activePhase === "Post") && activeCategory !== "Musical" && activeCategory === "AfterSchool-PrePost" && (
+              {(activePhase === "Pre" || activePhase === "Post") && activeCategory !== "Musical" && activeCategory === "AfterSchool-PrePost" && (Boolean(afterSchoolData?.background) || Boolean(afterSchoolData?.knowledge)) && (
                 <div className="space-y-8 animate-in fade-in duration-500">
                   {Object.entries(AFTER_SCHOOL_QUESTIONS).map(([section, questions]) => (
                     <div key={section} className="space-y-4">
@@ -1031,15 +1154,28 @@ const AssessmentsPage = () => {
           </ScrollArea>
           
           <div className="p-8 bg-muted/30 border-t border-muted flex items-center justify-between">
-            <DialogClose asChild>
-              <Button variant="ghost" className="rounded-2xl h-12 px-8 font-bold">Cancel</Button>
-            </DialogClose>
+            <div className="flex items-center gap-2">
+              <DialogClose asChild>
+                <Button variant="ghost" className="rounded-2xl h-12 px-6 font-bold" onClick={() => { setEditingAssessmentId(null); setEditingAssessmentDate(null); }}>Cancel</Button>
+              </DialogClose>
+              {editingAssessmentId && (
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="rounded-2xl h-12 px-5 font-bold text-destructive border-destructive/20 hover:bg-destructive hover:text-white transition-colors"
+                  onClick={handleDeleteAssessment}
+                  disabled={isSubmitting}
+                >
+                  Delete Record
+                </Button>
+              )}
+            </div>
             <Button 
               className="rounded-2xl h-12 px-10 font-[950] uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95" 
               onClick={handleLogAssessment}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Syncing Record..." : "Confirm & Save"}
+              {isSubmitting ? "Syncing Record..." : editingAssessmentId ? "Update & Save" : "Confirm & Save"}
             </Button>
           </div>
         </DialogContent>

@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Building2, MapPin, Users, ArrowLeft, User, Calendar, Clock, BookOpen, Plus, BookHeart } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Building2, MapPin, Users, ArrowLeft, User, Calendar, Clock, BookOpen, Plus, BookHeart, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -16,8 +17,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, ClipboardCheck, Search } from "lucide-react";
 
-type Centre = { _id: string; id?: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+export type PauseRecord = {
+  _id?: string;
+  pausedAt: string;
+  resumedAt?: string;
+  reason?: string;
+  durationDays?: number;
+};
+
+type Centre = { 
+  _id: string; 
+  id?: string; 
+  name: string; 
+  location: string; 
+  type: "In-school" | "After-school"; 
+  fellowIds: string[]; 
+  studentCount: number;
+  status?: "active" | "paused";
+  startDate?: string;
+  endDate?: string;
+  pauseHistory?: PauseRecord[];
+  totalPausedDays?: number;
+  currentPausedDays?: number;
+  currentPauseStartedAt?: string;
+};
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; centreAssignedDate?: string; centreEndDate?: string; sessionsCompleted: number; attendanceRate: number };
 type Student = { 
   _id: string; 
   id: string; 
@@ -33,7 +57,7 @@ type Student = {
   statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
   createdAt?: string;
 };
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; presentStudentIds?: string[] };
+type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; presentStudentIds?: string[]; reviewNote?: string };
 
 const CentreDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,11 +83,63 @@ const CentreDetailPage = () => {
   const [checkedStudentIds, setCheckedStudentIds] = useState<string[]>([]);
   const [attendanceSearch, setAttendanceSearch] = useState("");
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+  const [attendanceReviewNote, setAttendanceReviewNote] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
   const [changeStoriesList, setChangeStoriesList] = useState<any[]>([]);
   const [studentStatusFilter, setStudentStatusFilter] = useState<"all" | "Active" | "Inactive">("all");
+
+  // Pause / Resume duration tracking
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseDate, setPauseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [resumeDate, setResumeDate] = useState(new Date().toISOString().split("T")[0]);
+  const [pauseReason, setPauseReason] = useState("");
+  const [isSubmittingPause, setIsSubmittingPause] = useState(false);
+
+  const handleToggleStatus = async () => {
+    if (!centre) return;
+    setIsSubmittingPause(true);
+    const isCurrentlyPaused = centre.status === "paused";
+    const newStatus = isCurrentlyPaused ? "active" : "paused";
+
+    try {
+      const payload: any = { status: newStatus };
+      if (!isCurrentlyPaused) {
+        payload.pausedAt = pauseDate;
+        payload.pauseReason = pauseReason.trim();
+      } else {
+        payload.resumedAt = resumeDate;
+      }
+
+      const res = await api.put(`/centres/${centre._id}`, payload);
+      setCentre(res.data);
+      if (isCurrentlyPaused) {
+        const lastPause = (res.data.pauseHistory || []).slice(-1)[0];
+        const days = lastPause?.durationDays !== undefined ? lastPause.durationDays : "";
+        toast.success(`Centre resumed successfully${days !== "" ? ` (paused for ${days} days)` : ""}`);
+      } else {
+        toast.success(`Centre paused successfully`);
+      }
+      setPauseModalOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update centre status");
+    } finally {
+      setIsSubmittingPause(false);
+    }
+  };
+
+  const handleDeletePauseHistory = async (historyId: string) => {
+    if (!centre) return;
+    if (!window.confirm("Are you sure you want to delete this pause record?")) return;
+    try {
+      const res = await api.delete(`/centres/${centre._id}/pause-history/${historyId}`);
+      setCentre(res.data);
+      toast.success("Pause record removed");
+    } catch {
+      toast.error("Failed to delete pause record");
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -259,7 +335,10 @@ const CentreDetailPage = () => {
     if (!selectedSessionId) { toast.error("Please select a session"); return; }
     setIsSubmittingAttendance(true);
     try {
-      await api.post(`/sessions/${selectedSessionId}/attendance`, { presentStudentIds: checkedStudentIds });
+      await api.post(`/sessions/${selectedSessionId}/attendance`, { 
+        presentStudentIds: checkedStudentIds,
+        reviewNote: attendanceReviewNote.trim()
+      });
       toast.success("Attendance updated successfully");
       setAttendanceOpen(false);
       fetchData();
@@ -273,6 +352,7 @@ const CentreDetailPage = () => {
   const openAttendance = (session: Session) => {
     setSelectedSessionId(session._id);
     setCheckedStudentIds(session.presentStudentIds || []);
+    setAttendanceReviewNote(session.reviewNote || "");
     setAttendanceOpen(true);
   };
 
@@ -288,32 +368,76 @@ const CentreDetailPage = () => {
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-[950] tracking-tight">{centre.name}</h1>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-[950] tracking-tight">{centre.name}</h1>
+                <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="text-[10px] font-black uppercase tracking-widest h-5 whitespace-nowrap">{centre.type}</Badge>
+                {centre.status === "paused" ? (
+                  <Badge variant="destructive" className="text-[10px] font-bold uppercase tracking-wider h-5 flex items-center gap-1 shadow-xs">
+                    <PauseCircle className="h-3 w-3" />
+                    Paused ({centre.currentPausedDays ?? 0}d)
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider h-5 text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40">
+                    Active
+                  </Badge>
+                )}
+                {centre.totalPausedDays !== undefined && centre.totalPausedDays > 0 && (
+                  <Badge variant="outline" className="text-[10px] font-medium h-5 text-muted-foreground border-dashed bg-muted/40">
+                    {centre.totalPausedDays}d paused total
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium mt-1">
                 <MapPin className="h-3.5 w-3.5" />{centre.location}
-                <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="ml-1 text-[10px] font-black uppercase tracking-widest h-5 whitespace-nowrap">{centre.type}</Badge>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-1.5 rounded-2xl border shadow-sm self-end md:self-center">
-          <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="h-9 w-[120px] rounded-xl border-none font-bold text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-2xl">
-              {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
-                <SelectItem key={m} value={String(i)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-            <SelectTrigger className="h-9 w-[90px] rounded-xl border-none font-bold text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-2xl">
-              {[2025, 2026, 2027, 2028].map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3 self-end md:self-center">
+          <Button
+            size="sm"
+            variant={centre.status === "paused" ? "default" : "outline"}
+            className={centre.status === "paused" ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm" : "border-amber-400 text-amber-700 hover:bg-amber-50 font-bold text-xs rounded-xl"}
+            onClick={() => {
+              const today = new Date().toISOString().split("T")[0];
+              setPauseDate(today);
+              setResumeDate(today);
+              setPauseReason("");
+              setPauseModalOpen(true);
+            }}
+          >
+            {centre.status === "paused" ? (
+              <>
+                <PlayCircle className="h-4 w-4 mr-1.5" />
+                Resume Centre
+              </>
+            ) : (
+              <>
+                <PauseCircle className="h-4 w-4 mr-1.5 text-amber-600" />
+                Pause Centre
+              </>
+            )}
+          </Button>
+
+          <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md p-1.5 rounded-2xl border shadow-sm">
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="h-9 w-[120px] rounded-xl border-none font-bold text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-xl border-none shadow-2xl">
+                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                  <SelectItem key={m} value={String(i)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectTrigger className="h-9 w-[90px] rounded-xl border-none font-bold text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-xl border-none shadow-2xl">
+                {[2025, 2026, 2027, 2028].map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -378,6 +502,15 @@ const CentreDetailPage = () => {
                     <div>
                       <p className="text-sm font-medium">{f.name}</p>
                       <p className="text-xs text-muted-foreground">{f.email}</p>
+                      {(f.centreAssignedDate || f.centreEndDate) && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 font-medium">
+                          <Calendar className="h-3 w-3 text-primary/70 shrink-0" />
+                          <span>
+                            {f.centreAssignedDate ? new Date(f.centreAssignedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Started'}
+                            {f.centreEndDate ? ` - ${new Date(f.centreEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ' (Ongoing)'}
+                          </span>
+                        </p>
+                      )}
                     </div>
                     <div className="ml-auto text-right">
                       <p className="text-sm font-medium">{fellowSessions.length} sessions</p>
@@ -386,6 +519,119 @@ const CentreDetailPage = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Centre Pause & Continuity Timeline */}
+      <Card className="mb-6 overflow-hidden">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-amber-600" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold">Pause & Continuity Records</CardTitle>
+              <p className="text-xs text-muted-foreground">Historical log of periods when this centre was paused and resumed</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {centre.totalPausedDays !== undefined && centre.totalPausedDays > 0 && (
+              <Badge variant="secondary" className="text-xs font-semibold">
+                Total Paused: {centre.totalPausedDays} days
+              </Badge>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8"
+              onClick={() => {
+                const today = new Date().toISOString().split("T")[0];
+                setPauseDate(today);
+                setResumeDate(today);
+                setPauseReason("");
+                setPauseModalOpen(true);
+              }}
+            >
+              {centre.status === "paused" ? (
+                <>
+                  <PlayCircle className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  Resume
+                </>
+              ) : (
+                <>
+                  <PauseCircle className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                  Pause Centre
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {(!centre.pauseHistory || centre.pauseHistory.length === 0) ? (
+            <div className="text-center py-5 text-muted-foreground text-xs bg-muted/20 rounded-xl border border-dashed">
+              <p className="font-medium">No pause periods recorded for this centre.</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">This centre has operated continuously.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow>
+                    <TableHead className="text-xs font-bold">Paused On</TableHead>
+                    <TableHead className="text-xs font-bold">Resumed On</TableHead>
+                    <TableHead className="text-xs font-bold">Duration</TableHead>
+                    <TableHead className="text-xs font-bold">Reason</TableHead>
+                    <TableHead className="text-xs font-bold">Status</TableHead>
+                    <TableHead className="text-xs font-bold text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {centre.pauseHistory.map((p, idx) => (
+                    <TableRow key={p._id || idx}>
+                      <TableCell className="text-xs font-medium">
+                        {p.pausedAt ? format(new Date(p.pausedAt), "dd MMM yyyy") : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {p.resumedAt ? format(new Date(p.resumedAt), "dd MMM yyyy") : (
+                          <span className="text-amber-600 font-bold">Currently Paused</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold">
+                        {p.durationDays !== undefined ? `${p.durationDays} days` : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate" title={p.reason}>
+                        {p.reason || "No reason specified"}
+                      </TableCell>
+                      <TableCell>
+                        {p.resumedAt ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                            Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-[10px] font-bold">
+                            Active Pause
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p._id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeletePauseHistory(p._id!)}
+                            title="Delete this record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -614,8 +860,8 @@ const CentreDetailPage = () => {
                   return (
                     <TableRow key={s._id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-bold text-xs">{s.name}</TableCell>
-                      <TableCell className="text-xs">{s.age}</TableCell>
-                      <TableCell className="text-xs">{s.gender}</TableCell>
+                      <TableCell className="text-xs">{s.age ?? "-"}</TableCell>
+                      <TableCell className="text-xs">{s.gender ?? "-"}</TableCell>
                       {centre.type === "In-school" && (
                         <>
                           <TableCell className="text-xs">{s.grade || "-"}</TableCell>
@@ -717,7 +963,9 @@ const CentreDetailPage = () => {
                       </div>
                       <div>
                         <p className="text-sm font-bold">{student.name}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{student.grade}{student.section}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                          {[student.age ? `Age ${student.age}` : null, student.gender, (student.grade || student.section) ? `Class ${student.grade || ''}${student.section ? `-${student.section}` : ''}`.trim() : null].filter(Boolean).join(" · ")}
+                        </p>
                       </div>
                     </div>
                     <Checkbox 
@@ -731,7 +979,18 @@ const CentreDetailPage = () => {
             </ScrollArea>
           </div>
           
-          <div className="p-8 bg-muted/30 border-t flex items-center justify-between">
+          <div className="px-8 pb-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1.5">
+              Review Note <span className="font-medium text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
+            </label>
+            <Textarea
+              placeholder="Add session reflections, key observations, or attendance remarks..."
+              value={attendanceReviewNote}
+              onChange={(e) => setAttendanceReviewNote(e.target.value)}
+              className="rounded-2xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all text-xs min-h-[70px] resize-none"
+            />
+          </div>
+          <div className="px-8 pb-8 bg-muted/30 border-t pt-4 flex items-center justify-between">
             <div className="text-sm font-bold text-muted-foreground">
               <span className="text-primary">{checkedStudentIds.length}</span> / {activeStudentsForSession.length} present
             </div>
@@ -746,6 +1005,102 @@ const CentreDetailPage = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pause / Resume Duration Tracking Dialog */}
+      <Dialog open={pauseModalOpen} onOpenChange={setPauseModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {centre.status === "paused" ? (
+                <>
+                  <PlayCircle className="h-5 w-5 text-emerald-600" />
+                  <span>Resume Centre</span>
+                </>
+              ) : (
+                <>
+                  <PauseCircle className="h-5 w-5 text-amber-600" />
+                  <span>Pause Centre</span>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {centre.status === "paused" ? (
+                <span>
+                  Resuming <strong>{centre.name}</strong> will mark it as active and calculate the duration it remained paused.
+                </span>
+              ) : (
+                <span>
+                  Pausing <strong>{centre.name}</strong> will temporarily mark it as paused and track the duration until resumed.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {centre.status === "paused" ? (
+              <>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                  <p className="font-semibold text-amber-700 dark:text-amber-400">
+                    Current Pause Status
+                  </p>
+                  <p className="text-muted-foreground">
+                    Paused since: <strong className="text-foreground">{centre.currentPauseStartedAt ? format(new Date(centre.currentPauseStartedAt), "dd/MM/yyyy") : "Recently"}</strong> ({centre.currentPausedDays ?? 0} days paused)
+                  </p>
+                  {centre.pauseHistory && centre.pauseHistory.slice(-1)[0]?.reason && (
+                    <p className="text-muted-foreground">
+                      Reason: <em className="text-foreground">"{centre.pauseHistory.slice(-1)[0].reason}"</em>
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Resume Effective Date</Label>
+                  <Input
+                    type="date"
+                    value={resumeDate}
+                    onChange={(e) => setResumeDate(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-xs font-semibold">Pause Effective Date</Label>
+                  <Input
+                    type="date"
+                    value={pauseDate}
+                    onChange={(e) => setPauseDate(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Reason for Pause (Optional)</Label>
+                  <Input
+                    placeholder="e.g. Summer vacation, School exams, Renovation, Festival break"
+                    value={pauseReason}
+                    onChange={(e) => setPauseReason(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setPauseModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant={centre.status === "paused" ? "default" : "destructive"}
+              onClick={handleToggleStatus}
+              disabled={isSubmittingPause}
+            >
+              {isSubmittingPause ? "Updating..." : centre.status === "paused" ? "Confirm Resume" : "Confirm Pause"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

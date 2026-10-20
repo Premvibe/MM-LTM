@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,12 +79,16 @@ const SessionsPage = () => {
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [checkedStudentIds, setCheckedStudentIds] = useState<string[]>([]);
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+  const [attendanceReviewNote, setAttendanceReviewNote] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewPlanText, setViewPlanText] = useState<string | null>(null);
   const [centreSearchQuery, setCentreSearchQuery] = useState("");
   const [attendanceSearchQuery, setAttendanceSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCentreFellow, setFilterCentreFellow] = useState("all");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const isSubmittingAttendanceRef = useRef(false);
   
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewSession, setReviewSession] = useState<Session | null>(null);
@@ -208,6 +212,7 @@ const SessionsPage = () => {
   };
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
     const finalFellowId = user?.role === 'fellow' ? user.id : fellowId;
     if (!date || !topic.trim() || !finalFellowId || !duration) { toast.error("Please fill in all fields including date"); return; }
     
@@ -223,6 +228,9 @@ const SessionsPage = () => {
     const targetCentreId = selectedCentreId || centreId;
     if (!targetCentreId) { toast.error("Please select a centre"); return; }
 
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     const sessionData = { date, centreId: targetCentreId, fellowId: finalFellowId, topic: topic.trim(), duration: parseInt(duration), sessionPlanLink: sessionPlanLink.trim(), documentationLink: documentationLink.trim(), files: sessionFiles, isMusicBus, observations: isMusicBus ? observations.trim() : "", issues: isMusicBus ? issues.trim() : "" };
 
     try {
@@ -236,24 +244,30 @@ const SessionsPage = () => {
       fetchData();
       resetForm(); 
       setOpen(false);
-    } catch (error) {
-      toast.error("Failed to save session");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to save session");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveAttendance = async () => {
-    if (!activeSession) return;
+    if (!activeSession || isSubmittingAttendanceRef.current) return;
+    isSubmittingAttendanceRef.current = true;
     setIsSubmittingAttendance(true);
     try {
       await api.post(`/sessions/${activeSession._id}/attendance`, {
-        presentStudentIds: checkedStudentIds
+        presentStudentIds: checkedStudentIds,
+        reviewNote: attendanceReviewNote.trim()
       });
       toast.success("Attendance updated successfully");
       setAttendanceOpen(false);
       fetchData();
-    } catch {
-      toast.error("Failed to update attendance");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update attendance");
     } finally {
+      isSubmittingAttendanceRef.current = false;
       setIsSubmittingAttendance(false);
     }
   };
@@ -261,6 +275,7 @@ const SessionsPage = () => {
   const openAttendance = (session: Session) => {
     setActiveSession(session);
     setCheckedStudentIds(session.presentStudentIds || []);
+    setAttendanceReviewNote(session.reviewNote || "");
     setAttendanceSearchQuery("");
     setAttendanceOpen(true);
   };
@@ -531,7 +546,13 @@ const SessionsPage = () => {
         </ScrollArea>
         <div className="p-6 md:p-8 bg-muted/30 border-t flex justify-end gap-3 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
-          <Button onClick={handleSubmit} className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px]">{editItem ? "Save Changes" : "Confirm Log"}</Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting} 
+            className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:pointer-events-none transition-all shadow-lg shadow-primary/20"
+          >
+            {isSubmitting ? "Logging Session..." : (editItem ? "Save Changes" : "Confirm Log")}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -620,6 +641,11 @@ const SessionsPage = () => {
                     <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
                   </div>
                 )}
+                {s.approvalStatus !== 'rejected' && s.reviewNote && (
+                  <div className="bg-info/10 text-info text-sm p-3 rounded-xl">
+                    <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                  </div>
+                )}
                 <div className="flex items-center gap-6">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Attendance</span>
@@ -695,7 +721,7 @@ const SessionsPage = () => {
               <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-black uppercase h-8 px-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-primary" onClick={() => setCheckedStudentIds([])}>Clear All</Button>
             </div>
           </div>
-          <ScrollArea className="h-[400px] p-8">
+          <ScrollArea className="h-[340px] p-8">
             <div className="space-y-3">
               {studentsList
                 .filter(s => s.centreId === selectedCentreId && s.name.toLowerCase().includes(attendanceSearchQuery.toLowerCase()))
@@ -703,18 +729,36 @@ const SessionsPage = () => {
                   <div key={s._id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${checkedStudentIds.includes(s._id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} onClick={() => setCheckedStudentIds(prev => prev.includes(s._id) ? prev.filter(id => id !== s._id) : [...prev, s._id])}>
                     <div className="flex items-center gap-4">
                       <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${checkedStudentIds.includes(s._id) ? 'bg-primary text-white' : 'bg-muted text-transparent'}`}><CheckCircle2 className="h-4 w-4" /></div>
-                      <span className="text-sm font-black tracking-tight">{s.name}</span>
+                      <div>
+                        <span className="text-sm font-black tracking-tight">{s.name}</span>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mt-0.5">
+                          {[s.age ? `Age ${s.age}` : null, s.gender, (s.grade || s.section) ? `Class ${s.grade || ''}${s.section ? `-${s.section}` : ''}`.trim() : null].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
                     </div>
-                    <Badge variant="outline" className="rounded-lg text-[10px] font-bold opacity-50 uppercase">{s.grade}-{s.section}</Badge>
+                    {(s.grade || s.section) && (
+                      <Badge variant="outline" className="rounded-lg text-[10px] font-bold opacity-70 uppercase">{s.grade || ''}{s.section ? `-${s.section}` : ''}</Badge>
+                    )}
                   </div>
                 ))}
             </div>
           </ScrollArea>
-          <div className="p-8 bg-muted/30 border-t flex items-center justify-between">
+          <div className="px-8 pb-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1.5">
+              Review Note <span className="font-medium text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
+            </label>
+            <Textarea
+              placeholder="Add session reflections, key observations, or any attendance remarks..."
+              value={attendanceReviewNote}
+              onChange={(e) => setAttendanceReviewNote(e.target.value)}
+              className="rounded-2xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all text-xs min-h-[70px] resize-none"
+            />
+          </div>
+          <div className="px-8 pb-8 bg-muted/30 border-t pt-4 flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{checkedStudentIds.length} Selected</span>
             <div className="flex gap-3">
               <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
-              <Button className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px]" onClick={handleSaveAttendance} disabled={isSubmittingAttendance}>{isSubmittingAttendance ? "Saving..." : "Save Attendance"}</Button>
+              <Button className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px] disabled:pointer-events-none disabled:opacity-50" onClick={handleSaveAttendance} disabled={isSubmittingAttendance}>{isSubmittingAttendance ? "Saving..." : "Save Attendance"}</Button>
             </div>
           </div>
         </DialogContent>

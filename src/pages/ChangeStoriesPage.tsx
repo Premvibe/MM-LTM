@@ -263,7 +263,13 @@ const ChangeStoriesPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {centres
-            .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.location.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(c => {
+              const q = searchQuery.toLowerCase();
+              const matchesCentre = c.name.toLowerCase().includes(q) || c.location.toLowerCase().includes(q);
+              const centreFellows = fellows.filter(f => c.fellowIds?.includes(f._id || f.id));
+              const matchesFellow = centreFellows.some(f => f.name.toLowerCase().includes(q));
+              return matchesCentre || matchesFellow;
+            })
             .map(centre => {
               const cId = centre._id || centre.id;
               const story = stories.find(s => s.centreId === cId && s.month === parseInt(filterMonth) && s.year === parseInt(filterYear));

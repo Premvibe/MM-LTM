@@ -9,10 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle, X, Trash2, BookOpen, Calendar, ClipboardCheck, Award } from "lucide-react";
+import { Building2, Plus, MapPin, Users, Pencil, Search, Filter, PauseCircle, PlayCircle, X, Trash2, BookOpen, Calendar, ClipboardCheck, Award, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+import { DialogDescription } from "@/components/ui/dialog";
 
+export type PauseRecord = {
+  _id?: string;
+  pausedAt: string;
+  resumedAt?: string;
+  reason?: string;
+  durationDays?: number;
+};
 
 type Centre = { 
   _id: string; 
@@ -35,9 +44,13 @@ type Centre = {
   pocEmail?: string; 
   programManagers?: string[]; 
   programManagerNames?: string[]; 
-  programManagerIds?: string[]; 
+  programManagerIds?: string[];
+  pauseHistory?: PauseRecord[];
+  totalPausedDays?: number;
+  currentPausedDays?: number;
+  currentPauseStartedAt?: string;
 };
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string; centreAssignedDate?: string; centreEndDate?: string };
 type PMUser = { _id: string; name: string; email: string; role: string; assignedCentreIds?: string[] };
 
 const getPMs = (c: Centre): string[] => {
@@ -74,6 +87,14 @@ const CentresPage = () => {
   const [pocName, setPocName] = useState("");
   const [pocContact, setPocContact] = useState("");
   const [pocEmail, setPocEmail] = useState("");
+
+  // Pause & Resume duration tracking state
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [centreToToggle, setCentreToToggle] = useState<Centre | null>(null);
+  const [pauseDate, setPauseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [resumeDate, setResumeDate] = useState(new Date().toISOString().split("T")[0]);
+  const [pauseReason, setPauseReason] = useState("");
+  const [isSubmittingPause, setIsSubmittingPause] = useState(false);
 
   const months = [
     { value: "0", label: "January" },
@@ -284,15 +305,46 @@ const CentresPage = () => {
     }
   };
 
-  const toggleStatus = async (e: React.MouseEvent, centre: Centre) => {
+  const openStatusModal = (e: React.MouseEvent, centre: Centre) => {
     e.stopPropagation();
-    const newStatus = centre.status === "paused" ? "active" : "paused";
+    setCentreToToggle(centre);
+    const today = new Date().toISOString().split("T")[0];
+    setPauseDate(today);
+    setResumeDate(today);
+    setPauseReason("");
+    setPauseModalOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!centreToToggle) return;
+    setIsSubmittingPause(true);
+    const isCurrentlyPaused = centreToToggle.status === "paused";
+    const newStatus = isCurrentlyPaused ? "active" : "paused";
+
     try {
-      await api.put(`/centres/${centre._id}`, { status: newStatus });
-      toast.success(`Centre ${newStatus === "active" ? "resumed" : "paused"} successfully`);
+      const payload: any = { status: newStatus };
+      if (!isCurrentlyPaused) {
+        payload.pausedAt = pauseDate;
+        payload.pauseReason = pauseReason.trim();
+      } else {
+        payload.resumedAt = resumeDate;
+      }
+
+      const res = await api.put(`/centres/${centreToToggle._id}`, payload);
+      const updated = res.data;
+      if (isCurrentlyPaused) {
+        const lastPause = (updated.pauseHistory || []).slice(-1)[0];
+        const days = lastPause?.durationDays !== undefined ? lastPause.durationDays : "";
+        toast.success(`Centre resumed successfully${days !== "" ? ` (paused for ${days} days)` : ""}`);
+      } else {
+        toast.success(`Centre paused successfully`);
+      }
+      setPauseModalOpen(false);
       fetchData();
-    } catch (error) {
-      toast.error("Failed to update status");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update centre status");
+    } finally {
+      setIsSubmittingPause(false);
     }
   };
 
@@ -394,7 +446,15 @@ const CentresPage = () => {
                                   {isSelected && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
                                 </div>
                                 <div className="flex-1 flex justify-between items-center">
-                                  <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900 transition-colors">{f.name}</span>
+                                  <div>
+                                    <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900 transition-colors block">{f.name}</span>
+                                    {(f.centreAssignedDate || f.centreEndDate) && (
+                                      <span className="text-[10px] text-slate-400 font-normal">
+                                        {f.centreAssignedDate ? `Assigned: ${new Date(f.centreAssignedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                                        {f.centreEndDate ? ` - ${new Date(f.centreEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : (f.centreAssignedDate ? ' (Ongoing)' : '')}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[11px] font-medium text-slate-400">{f.phone || f.email}</span>
                                 </div>
                               </div>
@@ -714,7 +774,7 @@ const CentresPage = () => {
                     variant="ghost" 
                     size="icon" 
                     className={`h-7 w-7 rounded-lg ${c.status === "paused" ? "text-success hover:text-success hover:bg-success/10" : "text-warning hover:text-warning hover:bg-warning/10"}`}
-                    onClick={(e) => toggleStatus(e, c)}
+                    onClick={(e) => openStatusModal(e, c)}
                     title={c.status === "paused" ? "Resume Centre" : "Pause Centre"}
                   >
                     {c.status === "paused" ? <PlayCircle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
@@ -742,16 +802,33 @@ const CentresPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-0.5">
+              <div className="flex items-center gap-2 pt-0.5 flex-wrap">
                 <Badge variant={c.type === "In-school" ? "default" : "secondary"} className="text-[10px] font-semibold py-0.5 px-2">
                   {c.type}
                 </Badge>
-                {c.status === "paused" && (
-                  <Badge variant="destructive" className="text-[10px] font-bold uppercase py-0.5 px-2 tracking-wider">
-                    Paused
+                {c.status === "paused" ? (
+                  <Badge variant="destructive" className="text-[10px] font-bold uppercase py-0.5 px-2 tracking-wider flex items-center gap-1 shadow-xs">
+                    <PauseCircle className="h-3 w-3" />
+                    Paused ({c.currentPausedDays !== undefined ? c.currentPausedDays : 0}d)
                   </Badge>
+                ) : (
+                  c.totalPausedDays !== undefined && c.totalPausedDays > 0 ? (
+                    <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 text-muted-foreground border-dashed bg-muted/30">
+                      Paused {c.totalPausedDays}d total
+                    </Badge>
+                  ) : null
                 )}
               </div>
+
+              {c.status === "paused" && (
+                <div className="flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  <span className="truncate">
+                    Paused since {c.currentPauseStartedAt ? format(new Date(c.currentPauseStartedAt), "dd MMM yyyy") : "recently"}
+                    {c.pauseHistory && c.pauseHistory.length > 0 && c.pauseHistory[c.pauseHistory.length - 1].reason ? ` · ${c.pauseHistory[c.pauseHistory.length - 1].reason}` : ""}
+                  </span>
+                </div>
+              )}
             </CardHeader>
 
             <CardContent className="pt-0 flex flex-col justify-between flex-1 space-y-3">
@@ -847,6 +924,102 @@ const CentresPage = () => {
           </Card>
         ))}
       </div>
+
+      {/* Pause / Resume Duration Tracking Dialog */}
+      <Dialog open={pauseModalOpen} onOpenChange={setPauseModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {centreToToggle?.status === "paused" ? (
+                <>
+                  <PlayCircle className="h-5 w-5 text-emerald-600" />
+                  <span>Resume Centre</span>
+                </>
+              ) : (
+                <>
+                  <PauseCircle className="h-5 w-5 text-amber-600" />
+                  <span>Pause Centre</span>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {centreToToggle?.status === "paused" ? (
+                <span>
+                  Resuming <strong>{centreToToggle.name}</strong> will mark it as active and calculate the duration it remained paused.
+                </span>
+              ) : (
+                <span>
+                  Pausing <strong>{centreToToggle?.name}</strong> will mark it as paused and track the duration until resumed.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {centreToToggle?.status === "paused" ? (
+              <>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                  <p className="font-semibold text-amber-700 dark:text-amber-400">
+                    Current Pause Status
+                  </p>
+                  <p className="text-muted-foreground">
+                    Paused since: <strong className="text-foreground">{centreToToggle.currentPauseStartedAt ? format(new Date(centreToToggle.currentPauseStartedAt), "dd/MM/yyyy") : "Recently"}</strong> ({centreToToggle.currentPausedDays ?? 0} days paused)
+                  </p>
+                  {centreToToggle.pauseHistory && centreToToggle.pauseHistory.slice(-1)[0]?.reason && (
+                    <p className="text-muted-foreground">
+                      Reason: <em className="text-foreground">"{centreToToggle.pauseHistory.slice(-1)[0].reason}"</em>
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Resume Effective Date</Label>
+                  <Input
+                    type="date"
+                    value={resumeDate}
+                    onChange={(e) => setResumeDate(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-xs font-semibold">Pause Effective Date</Label>
+                  <Input
+                    type="date"
+                    value={pauseDate}
+                    onChange={(e) => setPauseDate(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Reason for Pause (Optional)</Label>
+                  <Input
+                    placeholder="e.g. Summer vacation, School exams, Renovation, Festival break"
+                    value={pauseReason}
+                    onChange={(e) => setPauseReason(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setPauseModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant={centreToToggle?.status === "paused" ? "default" : "destructive"}
+              onClick={handleConfirmStatusChange}
+              disabled={isSubmittingPause}
+            >
+              {isSubmittingPause ? "Updating..." : centreToToggle?.status === "paused" ? "Confirm Resume" : "Confirm Pause"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

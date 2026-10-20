@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck, Trash2 } from "lucide-react";
+import { Plus, Pencil, ArrowLeft, Users, MapPin, Search, Filter, ClipboardCheck, Trash2, TableProperties } from "lucide-react";
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -84,6 +84,21 @@ const StudentsPage = () => {
   type GridRow = { name: string; age: string; gender: string; classSection: string; phone: string };
   const emptyRow = (): GridRow => ({ name: '', age: '', gender: '', classSection: '', phone: '' });
   const [gridRows, setGridRows] = useState<GridRow[]>(Array.from({ length: 10 }, emptyRow));
+
+  type EditGridRow = {
+    _id: string;
+    name: string;
+    age: string;
+    gender: string;
+    classSection: string;
+    phone: string;
+    status: "Active" | "Inactive" | "Left";
+    isModified?: boolean;
+  };
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [editGridRows, setEditGridRows] = useState<EditGridRow[]>([]);
+  const [bulkEditSearch, setBulkEditSearch] = useState("");
+  const [isBulkEditSubmitting, setIsBulkEditSubmitting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -182,8 +197,8 @@ const StudentsPage = () => {
   const openEdit = (s: Student) => {
     setEditItem(s); 
     setName(s.name); 
-    setAge(String(s.age)); 
-    setGender(s.gender); 
+    setAge(s.age !== undefined && s.age !== null ? String(s.age) : ""); 
+    setGender(s.gender || "Male"); 
     setCentreId(s.centreId); 
     setPhone(s.phone || "");
     setSchoolName(s.schoolName || "");
@@ -453,6 +468,145 @@ const StudentsPage = () => {
       return matchesSearch && matchesGender && matchesStatus;
     });
   }, [centreStudents, selectedMonth, selectedYear, searchQuery, filterGender, filterStatus]);
+
+  const openBulkEdit = (onlySelected: boolean = false) => {
+    let sourceStudents: Student[];
+    if (onlySelected && selectedStudentIds.length > 0) {
+      sourceStudents = centreStudents.filter(s => selectedStudentIds.includes(s._id));
+    } else if (filteredStudents.length > 0) {
+      sourceStudents = filteredStudents;
+    } else {
+      sourceStudents = centreStudents;
+    }
+
+    if (sourceStudents.length === 0) {
+      toast.info("No students available to edit.");
+      return;
+    }
+
+    const rows: EditGridRow[] = sourceStudents.map(s => {
+      const rawClass = (s.grade || '') + (s.section || '');
+      return {
+        _id: s._id,
+        name: s.name || '',
+        age: s.age !== undefined && s.age !== null ? String(s.age) : '',
+        gender: s.gender || '',
+        classSection: rawClass,
+        phone: s.phone || '',
+        status: getStatusForMonth(s, selectedMonth, selectedYear),
+        isModified: false
+      };
+    });
+    setEditGridRows(rows);
+    setBulkEditSearch("");
+    setIsBulkEditOpen(true);
+  };
+
+  const displayedBulkEditRows = useMemo(() => {
+    if (!bulkEditSearch.trim()) return editGridRows;
+    const q = bulkEditSearch.toLowerCase().trim();
+    return editGridRows.filter(r => 
+      r.name.toLowerCase().includes(q) || 
+      r.phone.toLowerCase().includes(q) || 
+      r.classSection.toLowerCase().includes(q)
+    );
+  }, [editGridRows, bulkEditSearch]);
+
+  const handleEditGridCellChange = (id: string, field: keyof EditGridRow, value: string) => {
+    setEditGridRows(prev =>
+      prev.map(r => r._id === id ? { ...r, [field]: value, isModified: true } : r)
+    );
+  };
+
+  const handleEditGridPaste = (e: React.ClipboardEvent, startId: string, startField: keyof EditGridRow, displayedRows: EditGridRow[]) => {
+    const text = e.clipboardData.getData('text');
+    const allLines = text.split('\n').filter(l => l.trim());
+    if (allLines.length <= 1) return;
+    e.preventDefault();
+    const activeFields: (keyof EditGridRow)[] = selectedCentre?.type === 'In-school'
+      ? ['name', 'age', 'gender', 'classSection', 'phone', 'status']
+      : ['name', 'age', 'gender', 'phone', 'status'];
+    const startColIdx = activeFields.indexOf(startField);
+    const startDisplayIdx = displayedRows.findIndex(r => r._id === startId);
+    if (startDisplayIdx === -1 || startColIdx === -1) return;
+
+    const idToUpdates: Record<string, Partial<EditGridRow>> = {};
+    allLines.forEach((line, lineOffset) => {
+      const targetRow = displayedRows[startDisplayIdx + lineOffset];
+      if (targetRow) {
+        const cells = line.split('\t');
+        const rowUpdates: Partial<EditGridRow> = { isModified: true };
+        cells.forEach((cell, cellOffset) => {
+          const colIdx = startColIdx + cellOffset;
+          if (colIdx < activeFields.length) {
+            const field = activeFields[colIdx];
+            (rowUpdates as any)[field] = cell.trim();
+          }
+        });
+        idToUpdates[targetRow._id] = rowUpdates;
+      }
+    });
+
+    setEditGridRows(prev =>
+      prev.map(r => idToUpdates[r._id] ? { ...r, ...idToUpdates[r._id] } : r)
+    );
+  };
+
+  const resetBulkEditRows = () => {
+    openBulkEdit(false);
+    toast.info("Reverted all unsaved changes.");
+  };
+
+  const handleBulkEditSubmit = async () => {
+    const emptyNameRow = editGridRows.find(r => !r.name.trim());
+    if (emptyNameRow) {
+      toast.error("Student names cannot be empty.");
+      return;
+    }
+
+    const modifiedRows = editGridRows.filter(r => r.isModified);
+    if (modifiedRows.length === 0) {
+      toast.info("No changes were made.");
+      setIsBulkEditOpen(false);
+      return;
+    }
+
+    setIsBulkEditSubmitting(true);
+    try {
+      const students = modifiedRows.map(r => {
+        const genderPart = r.gender.trim().toLowerCase();
+        const rawClass = r.classSection.trim();
+        const classMatch = rawClass.match(/^([\d]+(?:st|nd|rd|th)?)?\s*[-]?\s*([A-Za-z])?$/i);
+        const parsedGrade = classMatch?.[1] ?? rawClass;
+        const parsedSection = classMatch?.[2]?.toUpperCase() ?? '';
+
+        return {
+          _id: r._id,
+          name: r.name.trim(),
+          age: r.age.trim() ? parseInt(r.age.trim()) : null,
+          gender: genderPart ? (genderPart.startsWith('f') ? 'Female' : 'Male') : null,
+          grade: selectedCentre?.type === "In-school" ? parsedGrade : undefined,
+          section: selectedCentre?.type === "In-school" ? parsedSection : undefined,
+          phone: r.phone.trim(),
+          status: r.status
+        };
+      });
+
+      await api.put("/students/bulk", {
+        students,
+        month: selectedMonth,
+        year: selectedYear
+      });
+
+      toast.success(`Successfully updated ${students.length} student(s)`);
+      fetchData();
+      setIsBulkEditOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update students");
+    } finally {
+      setIsBulkEditSubmitting(false);
+    }
+  };
 
   // Centre list view
   if (!selectedCentreId) {
@@ -770,6 +924,258 @@ const StudentsPage = () => {
                 </div>
               </DialogContent>
             </Dialog>
+
+            <Button
+              variant="ghost"
+              onClick={() => openBulkEdit(false)}
+              className="rounded-2xl h-11 px-6 font-black uppercase tracking-widest text-[10px] text-primary hover:bg-primary/5"
+            >
+              <TableProperties className="h-4 w-4 mr-2" /> Bulk Edit
+            </Button>
+
+            <Dialog open={isBulkEditOpen} onOpenChange={setIsBulkEditOpen}>
+              <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] flex flex-col rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
+                {/* Header */}
+                <div className="bg-primary p-6 md:p-8 text-white relative overflow-hidden flex-shrink-0">
+                  <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <DialogTitle className="text-2xl font-black tracking-tighter">Bulk Edit Students</DialogTitle>
+                      <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">
+                        Spreadsheet Grid · Edit names, ages, genders, classes, phones & statuses in bulk
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl px-4 py-2 text-center border border-white/10">
+                        <p className="text-xl font-black">{editGridRows.length}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-white/60">Total</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl px-4 py-2 text-center border border-white/10">
+                        <p className="text-xl font-black text-amber-300">{editGridRows.filter(r => r.isModified).length}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-white/60">Modified</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toolbar */}
+                <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Filter rows by name..."
+                      className="pl-9 h-9 rounded-xl border border-border/50 bg-white font-medium text-xs"
+                      value={bulkEditSearch}
+                      onChange={(e) => setBulkEditSearch(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Quick Status:</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const targetIds = new Set(displayedBulkEditRows.map(r => r._id));
+                        setEditGridRows(prev => prev.map(r => targetIds.has(r._id) ? { ...r, status: "Active", isModified: true } : r));
+                      }}
+                      className="h-7 text-[10px] rounded-lg font-bold border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
+                    >
+                      Set Active
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const targetIds = new Set(displayedBulkEditRows.map(r => r._id));
+                        setEditGridRows(prev => prev.map(r => targetIds.has(r._id) ? { ...r, status: "Inactive", isModified: true } : r));
+                      }}
+                      className="h-7 text-[10px] rounded-lg font-bold border-yellow-200 text-yellow-700 bg-yellow-50 hover:bg-yellow-100"
+                    >
+                      Set Inactive
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const targetIds = new Set(displayedBulkEditRows.map(r => r._id));
+                        setEditGridRows(prev => prev.map(r => targetIds.has(r._id) ? { ...r, status: "Left", isModified: true } : r));
+                      }}
+                      className="h-7 text-[10px] rounded-lg font-bold border-red-200 text-red-700 bg-red-50 hover:bg-red-100"
+                    >
+                      Set Left
+                    </Button>
+                    <span className="text-muted-foreground/40">·</span>
+                    <button
+                      type="button"
+                      onClick={resetBulkEditRows}
+                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors ml-1"
+                    >
+                      Revert Changes
+                    </button>
+                  </div>
+                </div>
+
+                {/* Spreadsheet Table */}
+                <div className="overflow-auto flex-1 min-h-[300px] max-h-[55vh]">
+                  <table className="w-full border-collapse text-xs">
+                    <thead className="sticky top-0 z-20">
+                      <tr className="bg-muted/90 backdrop-blur border-b border-border/50">
+                        <th className="w-12 border-r border-border/30 p-2.5 text-center text-[9px] font-black text-muted-foreground uppercase tracking-wider">#</th>
+                        <th className="border-r border-border/30 p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider min-w-[200px]">
+                          Name <span className="text-red-400">*</span>
+                        </th>
+                        <th className="border-r border-border/30 p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider w-20">Age</th>
+                        <th className="border-r border-border/30 p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider w-28">Gender</th>
+                        {selectedCentre?.type === 'In-school' && (
+                          <th className="border-r border-border/30 p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider w-28">Class</th>
+                        )}
+                        <th className="border-r border-border/30 p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider min-w-[140px]">Phone</th>
+                        <th className="p-2.5 text-left text-[9px] font-black text-primary uppercase tracking-wider w-36">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedBulkEditRows.map((row, idx) => (
+                        <tr
+                          key={row._id}
+                          className={`transition-colors border-b border-border/20 ${
+                            row.isModified
+                              ? 'bg-primary/[0.04] hover:bg-primary/[0.08]'
+                              : 'bg-white hover:bg-muted/30'
+                          }`}
+                        >
+                          <td className="border-r border-border/30 p-1 text-center text-[10px] font-bold text-muted-foreground select-none relative">
+                            {idx + 1}
+                            {row.isModified && (
+                              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" title="Modified" />
+                            )}
+                          </td>
+                          
+                          {/* Name */}
+                          <td className="border-r border-border/30 p-0">
+                            <input
+                              type="text"
+                              value={row.name}
+                              onChange={(e) => handleEditGridCellChange(row._id, 'name', e.target.value)}
+                              onPaste={(e) => handleEditGridPaste(e, row._id, 'name', displayedBulkEditRows)}
+                              placeholder="Student name..."
+                              className="w-full h-9 px-3 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors"
+                            />
+                          </td>
+
+                          {/* Age */}
+                          <td className="border-r border-border/30 p-0">
+                            <input
+                              type="number"
+                              value={row.age}
+                              onChange={(e) => handleEditGridCellChange(row._id, 'age', e.target.value)}
+                              onPaste={(e) => handleEditGridPaste(e, row._id, 'age', displayedBulkEditRows)}
+                              placeholder="-"
+                              className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors text-center"
+                            />
+                          </td>
+
+                          {/* Gender */}
+                          <td className="border-r border-border/30 p-0">
+                            <select
+                              value={row.gender}
+                              onChange={(e) => handleEditGridCellChange(row._id, 'gender', e.target.value)}
+                              className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground focus:outline-none focus:bg-primary/5 cursor-pointer"
+                            >
+                              <option value="">-</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                            </select>
+                          </td>
+
+                          {/* Class (In-school only) */}
+                          {selectedCentre?.type === 'In-school' && (
+                            <td className="border-r border-border/30 p-0">
+                              <input
+                                type="text"
+                                value={row.classSection}
+                                onChange={(e) => handleEditGridCellChange(row._id, 'classSection', e.target.value)}
+                                onPaste={(e) => handleEditGridPaste(e, row._id, 'classSection', displayedBulkEditRows)}
+                                placeholder="e.g. 8A"
+                                className="w-full h-9 px-2 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors"
+                              />
+                            </td>
+                          )}
+
+                          {/* Phone */}
+                          <td className="border-r border-border/30 p-0">
+                            <input
+                              type="text"
+                              value={row.phone}
+                              onChange={(e) => handleEditGridCellChange(row._id, 'phone', e.target.value)}
+                              onPaste={(e) => handleEditGridPaste(e, row._id, 'phone', displayedBulkEditRows)}
+                              placeholder="Phone..."
+                              className="w-full h-9 px-3 bg-transparent text-xs font-semibold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:bg-primary/5 transition-colors"
+                            />
+                          </td>
+
+                          {/* Status */}
+                          <td className="p-1">
+                            <select
+                              value={row.status}
+                              onChange={(e) => handleEditGridCellChange(row._id, 'status', e.target.value as any)}
+                              className={`w-full h-7 px-2 text-[10px] font-black uppercase tracking-wider rounded-lg border-none focus:outline-none cursor-pointer ${
+                                row.status === 'Active'
+                                  ? 'bg-green-500/10 text-green-700'
+                                  : row.status === 'Inactive'
+                                  ? 'bg-yellow-500/10 text-yellow-700'
+                                  : 'bg-red-500/10 text-red-700'
+                              }`}
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Inactive">Inactive</option>
+                              <option value="Left">Left</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {displayedBulkEditRows.length === 0 && (
+                    <div className="py-12 text-center text-xs font-bold text-muted-foreground">
+                      No students match the search filter.
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 md:p-6 bg-muted/10 border-t flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+                  <div className="text-xs text-muted-foreground font-semibold">
+                    {editGridRows.filter(r => r.isModified).length > 0 ? (
+                      <span className="text-primary font-bold">
+                        {editGridRows.filter(r => r.isModified).length} unsaved student change(s)
+                      </span>
+                    ) : (
+                      <span>No modifications made</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="rounded-2xl font-black uppercase tracking-widest text-[10px]">
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      onClick={handleBulkEditSubmit}
+                      disabled={isBulkEditSubmitting || editGridRows.filter(r => r.isModified).length === 0}
+                      className="rounded-2xl h-11 px-8 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+                    >
+                      {isBulkEditSubmitting
+                        ? 'Saving...'
+                        : `Save All Changes (${editGridRows.filter(r => r.isModified).length})`}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
       </div>
 
@@ -839,9 +1245,14 @@ const StudentsPage = () => {
               <span className="text-sm font-semibold text-foreground">Select All ({filteredStudents.length})</span>
             </div>
             {selectedStudentIds.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={confirmBulkDelete} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px]">
-                <Trash2 className="h-3 w-3 mr-2" /> Delete {selectedStudentIds.length} Selected
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => openBulkEdit(true)} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px] text-primary border-primary/20 hover:bg-primary/5">
+                  <TableProperties className="h-3 w-3 mr-2" /> Edit {selectedStudentIds.length} Selected
+                </Button>
+                <Button variant="destructive" size="sm" onClick={confirmBulkDelete} className="rounded-xl h-8 font-black uppercase tracking-widest text-[10px]">
+                  <Trash2 className="h-3 w-3 mr-2" /> Delete {selectedStudentIds.length} Selected
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -874,8 +1285,8 @@ const StudentsPage = () => {
                       {getStatusBadge(getStatusForMonth(s, selectedMonth, selectedYear))}
                       {s.gender && <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">{s.gender}</Badge>}
                       {s.age && <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{s.age} Years Old</span>}
-                      {selectedCentre?.type === "In-school" && (
-                        <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-full">{s.grade}-{s.section}</span>
+                      {(s.grade || s.section) && (
+                        <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-full">{s.grade || ''}{s.section ? `-${s.section}` : ''}</span>
                       )}
                     </div>
                   </div>
