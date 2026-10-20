@@ -14,6 +14,192 @@ import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
+export const RUBRIC_POINTERS: Record<string, { title: string; subtitle: string; levels: { score: number; desc: string }[] }> = {
+  involvement: {
+    title: "Involvement",
+    subtitle: "Class engagement & student presence",
+    levels: [
+      { score: 1, desc: "Almost no involvement; just moving through; withdrawn" },
+      { score: 2, desc: "Very little spontaneous involvement" },
+      { score: 3, desc: "Calmly involved" },
+      { score: 4, desc: "Active involvement and engagement" },
+      { score: 5, desc: "Hyperactive" }
+    ]
+  },
+  emotion: {
+    title: "Emotion",
+    subtitle: "Emotional disclosure & affective expression",
+    levels: [
+      { score: 1, desc: "None-both in appearance and active denial" },
+      { score: 2, desc: "Disclosure of a very superficial nature" },
+      { score: 3, desc: "Disclosure of a personal nature but not of an emotional nature" },
+      { score: 4, desc: "Disclosure of an emotional affective nature within an appropriate context" },
+      { score: 5, desc: "Disclosures of an emotional and affective nature- spilling out" }
+    ]
+  },
+  creativity: {
+    title: "Creativity",
+    subtitle: "Originality in play & group activities",
+    levels: [
+      { score: 1, desc: "No contribution to games and activities at all" },
+      { score: 2, desc: "No active contribution, barely responds, but present" },
+      { score: 3, desc: "Contributing actively. Repetitive, follows and imitates others" },
+      { score: 4, desc: "Original in ideas and play. Brings meaning to group work" },
+      { score: 5, desc: "Too erratic. Wants to follow patterns that are out of context" }
+    ]
+  },
+  interaction: {
+    title: "Interaction",
+    subtitle: "Social exchange & attentive listening",
+    levels: [
+      { score: 1, desc: "None. Lost in his/her own world" },
+      { score: 2, desc: "Very little interaction. Responds to others intermittently" },
+      { score: 3, desc: "Responds and interacts, though slightly subdued" },
+      { score: 4, desc: "Listens attentively and responds. Completes a transaction appropriately" },
+      { score: 5, desc: "Very overt and continuous attention seeking. Does not listen attentively" }
+    ]
+  },
+  sur: {
+    title: "Sur / Melody",
+    subtitle: "Pitch, tonal accuracy & vocal melody",
+    levels: [
+      { score: 1, desc: "Poor" },
+      { score: 2, desc: "Basic" },
+      { score: 3, desc: "Good" },
+      { score: 4, desc: "Very Good" },
+      { score: 5, desc: "Excellent" }
+    ]
+  },
+  laya: {
+    title: "Lay / Rythm",
+    subtitle: "Rhythmic pulse, tempo & groove",
+    levels: [
+      { score: 1, desc: "Poor" },
+      { score: 2, desc: "Basic" },
+      { score: 3, desc: "Good" },
+      { score: 4, desc: "Very Good" },
+      { score: 5, desc: "Excellent" }
+    ]
+  },
+  word: {
+    title: "Words / Speech",
+    subtitle: "Pronunciation, diction & lyrical clarity",
+    levels: [
+      { score: 1, desc: "Poor" },
+      { score: 2, desc: "Basic" },
+      { score: 3, desc: "Good" },
+      { score: 4, desc: "Very Good" },
+      { score: 5, desc: "Excellent" }
+    ]
+  },
+  bhav: {
+    title: "Bhav / Emotions",
+    subtitle: "Musical feeling, expressiveness & soul",
+    levels: [
+      { score: 1, desc: "Poor" },
+      { score: 2, desc: "Basic" },
+      { score: 3, desc: "Good" },
+      { score: 4, desc: "Very Good" },
+      { score: 5, desc: "Excellent" }
+    ]
+  }
+};
+
+export const getRubric = (key: string) => {
+  const norm = (key || "").toLowerCase().trim();
+  if (norm.includes("involve")) return RUBRIC_POINTERS.involvement;
+  if (norm.includes("emotion") && !norm.includes("bhav")) return RUBRIC_POINTERS.emotion;
+  if (norm.includes("creativ")) return RUBRIC_POINTERS.creativity;
+  if (norm.includes("interact")) return RUBRIC_POINTERS.interaction;
+  if (norm.includes("sur") || norm.includes("melody")) return RUBRIC_POINTERS.sur;
+  if (norm.includes("lay") || norm.includes("rythm") || norm.includes("rhythm")) return RUBRIC_POINTERS.laya;
+  if (norm.includes("word") || norm.includes("speech")) return RUBRIC_POINTERS.word;
+  if (norm.includes("bhav")) return RUBRIC_POINTERS.bhav;
+  return null;
+};
+
+const RubricHeader = ({
+  categoryKey,
+  label,
+  className = "",
+  badgeColor = "text-foreground"
+}: {
+  categoryKey: string;
+  label?: string;
+  className?: string;
+  badgeColor?: string;
+}) => {
+  const rubric = getRubric(categoryKey);
+  const display = label || (rubric ? rubric.title : categoryKey);
+
+  if (!rubric) {
+    return <span className={className}>{display}</span>;
+  }
+
+  return (
+    <Tooltip delayDuration={120}>
+      <TooltipTrigger asChild>
+        <div className={`inline-flex items-center justify-center gap-1 cursor-help group py-0.5 select-none ${className}`}>
+          <span className={`border-b border-dashed border-muted-foreground/50 group-hover:border-primary group-hover:text-primary transition-colors ${badgeColor}`}>
+            {display}
+          </span>
+          <Info className="h-2.5 w-2.5 text-muted-foreground/60 group-hover:text-primary transition-colors shrink-0" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="bottom"
+        align="center"
+        sideOffset={6}
+        className="p-0 border-none bg-transparent shadow-2xl z-50 overflow-visible"
+      >
+        <div className="w-80 sm:w-88 p-3.5 bg-slate-900/98 text-slate-100 rounded-2xl shadow-2xl border border-slate-700/80 text-xs backdrop-blur-md animate-in fade-in zoom-in-95">
+          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-black text-xs uppercase tracking-wider text-amber-300">
+                  {rubric.title} (1-5)
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">{rubric.subtitle}</p>
+              </div>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              Rubric
+            </span>
+          </div>
+          <div className="space-y-1.5 text-left">
+            {rubric.levels.map((lvl) => (
+              <div key={lvl.score} className="flex items-start gap-2.5 p-1 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span
+                  className={`inline-flex items-center justify-center h-5 w-5 rounded-md text-[10px] font-black shrink-0 ${
+                    lvl.score === 1
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                      : lvl.score === 2
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : lvl.score === 3
+                      ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                      : lvl.score === 4
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  }`}
+                >
+                  {lvl.score}
+                </span>
+                <span className="text-[11px] text-slate-200 leading-snug flex-1 pt-0.5">
+                  {lvl.desc}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const SCORE_LABELS = {
   1: "Basic",
@@ -335,15 +521,27 @@ const AssessmentsPage = () => {
   const selectedCentre = centres.find(c => (c._id || c.id) === selectedCentreId);
   const centreStudents = useMemo(() => {
     if (!selectedCentreId) return [];
+    const statusOrder: Record<string, number> = { Active: 1, Inactive: 2, Left: 3 };
     return students
       .filter(s => (s.centreId?._id || s.centreId) === selectedCentreId)
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+      .sort((a, b) => {
+        const orderA = statusOrder[a.status || "Active"] || 99;
+        const orderB = statusOrder[b.status || "Active"] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+      });
   }, [students, selectedCentreId]);
 
-  const processedAssessments = useMemo(() =>
-    centreStudents
+  const processedAssessments = useMemo(() => {
+    const statusOrder: Record<string, number> = { Active: 1, Inactive: 2, Left: 3 };
+    return centreStudents
       .filter(s => (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }))
+      .sort((a, b) => {
+        const orderA = statusOrder[a.status || "Active"] || 99;
+        const orderB = statusOrder[b.status || "Active"] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+      })
       .map((s) => {
         const studentAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === (s._id || s.id));
         return {
@@ -352,9 +550,8 @@ const AssessmentsPage = () => {
           records: studentAssessments,
           raw: s
         };
-      }),
-    [centreStudents, searchQuery, assessmentsData]
-  );
+      });
+  }, [centreStudents, searchQuery, assessmentsData]);
 
   if (loading) {
     return <div className="h-[200px] w-full flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
@@ -705,6 +902,13 @@ const AssessmentsPage = () => {
                             </div>
                              <p className="text-[8px] sm:text-[9px] font-black text-success uppercase tracking-widest">LOGGED {formatDateDMY(monthlyRecord.date)}</p>
                           </div>
+                        ) : isInactive ? (
+                          <div className="flex items-center gap-2 opacity-50">
+                            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                               <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5" />
+                            </div>
+                             <p className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest">DISABLED ({a.raw.status})</p>
+                          </div>
                         ) : (
                           <Button 
                             className="rounded-2xl h-10 sm:h-11 px-5 sm:px-6 font-black uppercase tracking-widest text-[9px] bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 transition-all whitespace-nowrap"
@@ -787,8 +991,10 @@ const AssessmentsPage = () => {
                   setIsLogOpen(true);
                 };
 
+                const isMilestoneInactive = a.raw.status === "Inactive" || a.raw.status === "Left";
+
                 return (
-                  <div key={a.id} className="grid grid-cols-[1fr_repeat(2,120px)] sm:grid-cols-[1fr_repeat(2,160px)] min-w-[400px] gap-0 items-center px-3 sm:px-5 py-2.5 sm:py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group">
+                  <div key={a.id} className={`grid grid-cols-[1fr_repeat(2,120px)] sm:grid-cols-[1fr_repeat(2,160px)] min-w-[400px] gap-0 items-center px-3 sm:px-5 py-2.5 sm:py-3 border-b border-muted/50 hover:bg-primary/[0.02] transition-colors group ${isMilestoneInactive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-black text-primary">{a.student.charAt(0)}</div>
                       <div>
@@ -815,8 +1021,9 @@ const AssessmentsPage = () => {
                       ) : (
                         <Badge 
                           variant="outline" 
-                          className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5 transition-colors" 
+                          className={`text-xs font-medium px-3 transition-colors ${isMilestoneInactive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/5'}`}
                           onClick={() => {
+                            if (isMilestoneInactive) return;
                             setSelectedStudent(a.raw);
                             setEditingAssessmentId(null);
                             setEditingAssessmentDate(null);
@@ -854,8 +1061,9 @@ const AssessmentsPage = () => {
                       ) : (
                         <Badge 
                           variant="outline" 
-                          className="text-xs font-medium px-3 cursor-pointer hover:bg-primary/5 transition-colors" 
+                          className={`text-xs font-medium px-3 transition-colors ${isMilestoneInactive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/5'}`}
                           onClick={() => {
+                            if (isMilestoneInactive) return;
                             setSelectedStudent(a.raw);
                             setEditingAssessmentId(null);
                             setEditingAssessmentDate(null);
@@ -968,11 +1176,15 @@ const AssessmentsPage = () => {
                    <div className="grid grid-cols-2 gap-6">
                       {['sur', 'laya', 'word', 'bhav'].map(k => (
                         <div key={k} className="space-y-3">
-                          <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{k}</Label>
+                          <div className="flex items-center justify-between">
+                            <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{k}</Label>
+                            <RubricHeader categoryKey={k} label="Rubric Guide" className="text-[9px] font-bold text-primary/80" />
+                          </div>
                           <div className="flex gap-1.5">
                             {[1, 2, 3, 4, 5].map(v => (
                               <button
                                 key={v}
+                                title={`${v}: ${getRubric(k)?.levels[v - 1]?.desc || SCORE_LABELS[v as keyof typeof SCORE_LABELS]}`}
                                 onClick={() => setMusicalScores({ ...musicalScores, [k as keyof typeof musicalScores]: v })}
                                 className={`flex-1 h-12 rounded-xl flex flex-col items-center justify-center transition-all ${musicalScores[k as keyof typeof musicalScores] === v ? 'bg-primary text-white shadow-lg scale-105' : 'bg-white hover:bg-muted shadow-sm'}`}
                               >
@@ -994,11 +1206,15 @@ const AssessmentsPage = () => {
                        <div className="space-y-6">
                           {SEL_CATEGORIES.map((key) => (
                             <div key={key} className="space-y-3">
-                              <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{key}</Label>
+                              <div className="flex items-center justify-between">
+                                <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{key}</Label>
+                                <RubricHeader categoryKey={key} label="Rubric Guide" className="text-[9px] font-bold text-accent/80" badgeColor="text-accent" />
+                              </div>
                               <div className="flex gap-2">
                                 {[1, 2, 3, 4, 5].map(v => (
                                   <button
                                     key={v}
+                                    title={`${v}: ${getRubric(key)?.levels[v - 1]?.desc || SCORE_LABELS[v as keyof typeof SCORE_LABELS]}`}
                                     onClick={() => setSelScores({ ...selScores, [key.toLowerCase() as keyof typeof selScores]: v })}
                                     className={`flex-1 h-12 rounded-xl flex flex-col items-center justify-center transition-all border-2 ${selScores[key.toLowerCase() as keyof typeof selScores] === v ? 'border-accent bg-accent text-white shadow-lg' : 'border-transparent bg-white hover:bg-muted'}`}
                                   >
@@ -1018,11 +1234,15 @@ const AssessmentsPage = () => {
                        <div className="grid grid-cols-2 gap-4">
                           {['sur', 'laya', 'word', 'bhav'].map(k => (
                             <div key={k} className="space-y-2">
-                              <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{k}</Label>
+                              <div className="flex items-center justify-between">
+                                <Label className="capitalize font-black text-[10px] tracking-widest text-muted-foreground">{k}</Label>
+                                <RubricHeader categoryKey={k} label="Rubric Guide" className="text-[9px] font-bold text-primary/80" />
+                              </div>
                               <div className="flex gap-1">
                                 {[1, 2, 3, 4, 5].map(v => (
                                   <button
                                     key={v}
+                                    title={`${v}: ${getRubric(k)?.levels[v - 1]?.desc || SCORE_LABELS[v as keyof typeof SCORE_LABELS]}`}
                                     onClick={() => setMusicalScores({ ...musicalScores, [k as keyof typeof musicalScores]: v })}
                                     className={`flex-1 h-12 rounded-xl flex flex-col items-center justify-center transition-all ${musicalScores[k as keyof typeof musicalScores] === v ? 'bg-primary text-white shadow-lg' : 'bg-white hover:bg-muted'}`}
                                   >
@@ -1218,11 +1438,25 @@ const AssessmentsPage = () => {
                 <TableHeader className="bg-white sticky top-0 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                   <TableRow>
                     <TableHead className="w-[150px] sm:w-[180px] min-w-[150px] sm:min-w-[180px] font-black text-[9px] sm:text-[10px] uppercase tracking-widest pl-3 sm:pl-4 sticky left-0 bg-white z-30">Student Name</TableHead>
-                    {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Sur", "Laya", "Word", "Bhav"].map(k => (
-                      <TableHead key={k} className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest">{k}</TableHead>
+                    {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && [
+                      { key: "sur", label: "Sur" },
+                      { key: "laya", label: "Laya" },
+                      { key: "word", label: "Word" },
+                      { key: "bhav", label: "Bhav" }
+                    ].map(col => (
+                      <TableHead key={col.key} className="text-center p-1 font-black text-[9px] sm:text-[10px] uppercase tracking-widest">
+                        <RubricHeader categoryKey={col.key} label={col.label} />
+                      </TableHead>
                     ))}
-                    {(activeCategory === "SEL-Mid" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ["Involvement", "Emotion", "Creativity", "Interaction"].map(k => (
-                      <TableHead key={k} className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest text-accent">{k}</TableHead>
+                    {(activeCategory === "SEL-Mid" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && [
+                      { key: "involvement", label: "Involvement" },
+                      { key: "emotion", label: "Emotion" },
+                      { key: "creativity", label: "Creativity" },
+                      { key: "interaction", label: "Interaction" }
+                    ].map(col => (
+                      <TableHead key={col.key} className="text-center p-1 font-black text-[9px] sm:text-[10px] uppercase tracking-widest text-accent">
+                        <RubricHeader categoryKey={col.key} label={col.label} />
+                      </TableHead>
                     ))}
                     <TableHead className="text-center font-black text-[9px] sm:text-[10px] uppercase tracking-widest">Avg</TableHead>
                     <TableHead className="font-black text-[9px] sm:text-[10px] uppercase tracking-widest pr-4 sm:pr-8">Status</TableHead>
@@ -1305,66 +1539,84 @@ const AssessmentsPage = () => {
                             </div>
                           </div>
                         </TableCell>
-                        {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => (
-                          <TableCell key={k} className="text-center p-0.5 sm:p-1">
-                            <div className="flex items-center justify-center gap-px">
-                              {[1, 2, 3, 4, 5].map(v => (
-                                <button
-                                  key={v}
-                                  onClick={() => {
-                                    const next = { ...bulkScores };
-                                    if (!next[sId]) next[sId] = { musical: { sur: 0, laya: 0, word: 0, bhav: 0 }, selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
-                                    next[sId].musical[k] = v;
-                                    setBulkScores(next);
-                                  }}
-                                  className={`${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "h-5 w-5 sm:h-6 sm:w-6 text-[8px] sm:text-[9px]" : "h-6 w-6 sm:h-7 sm:w-7 text-[9px] sm:text-[10px]"} rounded-lg font-black transition-all ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
-                                >
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          </TableCell>
-                        ))}
-                        {(activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
-                          <TableCell key={k} className="text-center p-0.5 sm:p-1">
-                            <div className="flex items-center justify-center gap-px">
-                              {[1, 2, 3, 4, 5].map(v => (
-                                <button
-                                  key={v}
-                                  onClick={() => {
-                                    const next = { ...bulkScores };
-                                    if (!next[sId]) next[sId] = { musical: { sur: 0, laya: 0, word: 0, bhav: 0 }, selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
-                                    next[sId].selMid[k] = v;
-                                    setBulkScores(next);
-                                  }}
-                                  className={`h-5 w-5 sm:h-6 sm:w-6 rounded text-[8px] sm:text-[9px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
-                                >
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          </TableCell>
-                        ))}
-                        {activeCategory === "SEL-Mid" && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => (
-                          <TableCell key={k} className="text-center p-1 sm:p-2">
-                            <div className="flex items-center justify-center gap-0.5 sm:gap-1">
-                              {[1, 2, 3, 4, 5].map(v => (
-                                <button
-                                  key={v}
-                                  onClick={() => {
-                                    const newScores = { ...bulkScores };
-                                    if (!newScores[sId]) newScores[sId] = { selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
-                                    newScores[sId].selMid[k] = v;
-                                    setBulkScores(newScores);
-                                  }}
-                                  className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg text-[9px] sm:text-[10px] font-black transition-all ${sData.selMid[k] === v ? 'bg-accent text-white shadow-md' : 'bg-muted hover:bg-muted/80'}`}
-                                >
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          </TableCell>
-                        ))}
+                        {(activeCategory === "Musical" || activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['sur', 'laya', 'word', 'bhav'].map(k => {
+                          const r = getRubric(k);
+                          return (
+                            <TableCell key={k} className="text-center p-0.5 sm:p-1">
+                              <div className="flex items-center justify-center gap-px">
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <button
+                                    key={v}
+                                    title={`${v}: ${r?.levels[v - 1]?.desc || ''}`}
+                                    disabled={isInactive}
+                                    onClick={() => {
+                                      if (isInactive) return;
+                                      const next = { ...bulkScores };
+                                      if (!next[sId]) next[sId] = { musical: { sur: 0, laya: 0, word: 0, bhav: 0 }, selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
+                                      next[sId].musical[k] = v;
+                                      setBulkScores(next);
+                                    }}
+                                    className={`${activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation" ? "h-5 w-5 sm:h-6 sm:w-6 text-[8px] sm:text-[9px]" : "h-6 w-6 sm:h-7 sm:w-7 text-[9px] sm:text-[10px]"} rounded-lg font-black transition-all ${isInactive ? 'opacity-30 cursor-not-allowed' : ''} ${sData.musical[k] === v ? 'bg-primary text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                        {(activeCategory === "Mid-Evaluation" || activeCategory === "Monthly-Evaluation") && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => {
+                          const r = getRubric(k);
+                          return (
+                            <TableCell key={k} className="text-center p-0.5 sm:p-1">
+                              <div className="flex items-center justify-center gap-px">
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <button
+                                    key={v}
+                                    title={`${v}: ${r?.levels[v - 1]?.desc || ''}`}
+                                    disabled={isInactive}
+                                    onClick={() => {
+                                      if (isInactive) return;
+                                      const next = { ...bulkScores };
+                                      if (!next[sId]) next[sId] = { musical: { sur: 0, laya: 0, word: 0, bhav: 0 }, selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
+                                      next[sId].selMid[k] = v;
+                                      setBulkScores(next);
+                                    }}
+                                    className={`h-5 w-5 sm:h-6 sm:w-6 rounded text-[8px] sm:text-[9px] font-black transition-all ${isInactive ? 'opacity-30 cursor-not-allowed' : ''} ${sData.selMid[k] === v ? 'bg-accent text-white shadow-sm' : 'bg-muted hover:bg-muted/80'}`}
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                        {activeCategory === "SEL-Mid" && ['involvement', 'emotion', 'creativity', 'interaction'].map(k => {
+                          const r = getRubric(k);
+                          return (
+                            <TableCell key={k} className="text-center p-1 sm:p-2">
+                              <div className="flex items-center justify-center gap-0.5 sm:gap-1">
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <button
+                                    key={v}
+                                    title={`${v}: ${r?.levels[v - 1]?.desc || ''}`}
+                                    disabled={isInactive}
+                                    onClick={() => {
+                                      if (isInactive) return;
+                                      const newScores = { ...bulkScores };
+                                      if (!newScores[sId]) newScores[sId] = { selMid: { involvement: 0, emotion: 0, creativity: 0, interaction: 0 } };
+                                      newScores[sId].selMid[k] = v;
+                                      setBulkScores(newScores);
+                                    }}
+                                    className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg text-[9px] sm:text-[10px] font-black transition-all ${isInactive ? 'opacity-30 cursor-not-allowed' : ''} ${sData.selMid[k] === v ? 'bg-accent text-white shadow-md' : 'bg-muted hover:bg-muted/80'}`}
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
                         <TableCell className="text-center">
                           <Badge variant="outline" className={`rounded-xl font-black tabular-nums border-none text-[10px] sm:text-xs ${avg > 0 ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground/30'}`}>
                             {avg > 0 ? avg.toFixed(1) : "-"}

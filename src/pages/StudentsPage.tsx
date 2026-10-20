@@ -459,14 +459,24 @@ const StudentsPage = () => {
   }, [centreStudents, sessionsList, assessmentsList, selectedMonth, selectedYear, selectedCentreId]);
 
   const filteredStudents = useMemo(() => {
-    return centreStudents.filter(s => {
-      if (!isEnrolledInMonth(s, selectedMonth, selectedYear)) return false;
-      const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesGender = filterGender === "all" || s.gender === filterGender;
-      const monthlyStatus = getStatusForMonth(s, selectedMonth, selectedYear);
-      const matchesStatus = filterStatus === "all" || monthlyStatus === filterStatus;
-      return matchesSearch && matchesGender && matchesStatus;
-    });
+    const statusOrder: Record<string, number> = { Active: 1, Inactive: 2, Left: 3 };
+    return centreStudents
+      .filter(s => {
+        if (!isEnrolledInMonth(s, selectedMonth, selectedYear)) return false;
+        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesGender = filterGender === "all" || s.gender === filterGender;
+        const monthlyStatus = getStatusForMonth(s, selectedMonth, selectedYear);
+        const matchesStatus = filterStatus === "all" || monthlyStatus === filterStatus;
+        return matchesSearch && matchesGender && matchesStatus;
+      })
+      .sort((a, b) => {
+        const statusA = getStatusForMonth(a, selectedMonth, selectedYear);
+        const statusB = getStatusForMonth(b, selectedMonth, selectedYear);
+        const orderA = statusOrder[statusA] || 99;
+        const orderB = statusOrder[statusB] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+      });
   }, [centreStudents, selectedMonth, selectedYear, searchQuery, filterGender, filterStatus]);
 
   const openBulkEdit = (onlySelected: boolean = false) => {
