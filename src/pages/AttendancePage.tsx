@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { compareStudentsByClassAndName } from "@/lib/utils";
 
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+type Fellow = { _id: string; id?: string; name: string; email?: string; phone?: string; centreIds?: string[]; sessionsCompleted?: number; attendanceRate?: number };
 type Student = { 
   _id: string; 
   id: string; 
@@ -30,8 +32,18 @@ type Student = {
   statusHistory?: Array<{ month: number; year: number; status: "Active" | "Inactive" | "Left" }>;
   createdAt?: string;
 };
-type Fellow = { _id: string; id: string; name: string; email: string };
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; presentStudentIds: string[]; reviewNote?: string };
+type Session = { 
+  _id: string; 
+  id: string; 
+  date: string; 
+  centreId: string; 
+  fellowId: string; 
+  topic: string; 
+  duration?: number;
+  presentStudentIds: string[]; 
+  reviewNote?: string;
+  approvalStatus?: string;
+};
 
 const getStudentDetails = (s: Student) => {
   const parts: string[] = [];
@@ -138,7 +150,7 @@ const AttendancePage = () => {
       ]);
       setStudentsList(studentsRes.data);
       setCentresList(centresRes.data);
-      setSessionsList(sessionsRes.data);
+      setSessionsList((sessionsRes.data || []).filter((s: Session) => s.approvalStatus !== 'rejected'));
       setFellowsList(fellowsRes.data);
     } catch (error) {
       toast.error("Failed to load data");
@@ -206,15 +218,20 @@ const AttendancePage = () => {
       ((s.centreId?._id || s.centreId) === selectedCentreId) &&
       isEnrolledInMonth(s, m, y) &&
       getStatusForMonth(s, m, y) === "Active"
-    );
+    ).sort(compareStudentsByClassAndName);
   }, [studentsList, selectedCentreId, attendanceDate]);
-  const sessionForDate = useMemo(() => sessionsList.find(s => s.date === attendanceDate && (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id)), [sessionsList, attendanceDate, selectedCentreId, selectedCentre]);
+  const sessionForDate = useMemo(() => sessionsList.find(s => 
+    s.date === attendanceDate && 
+    (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id) &&
+    s.approvalStatus !== 'rejected'
+  ), [sessionsList, attendanceDate, selectedCentreId, selectedCentre]);
 
   const pendingAttendanceSessions = useMemo(() => {
     if (!selectedCentreId) return [];
     return sessionsList
       .filter(s => 
         (s.centreId === selectedCentreId || s.centreId === selectedCentre?.id) &&
+        s.approvalStatus !== 'rejected' &&
         (!s.presentStudentIds || s.presentStudentIds.length === 0)
       )
       .sort((a, b) => b.date.localeCompare(a.date))
@@ -424,161 +441,261 @@ const AttendancePage = () => {
 
   return (
     <div className="animate-fade-in space-y-6 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 mb-6 md:mb-10">
-        <div className="flex items-center gap-3 md:gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedCentreId(null)} className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-white shadow-sm hover:bg-primary hover:text-white transition-all shrink-0">
-            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+      {/* Header bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setSelectedCentreId(null)} 
+            className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-white shadow-sm hover:bg-primary hover:text-white transition-all shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <div>
-            <h1 className="text-xl md:text-3xl font-[950] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
-            <p className="text-muted-foreground font-medium flex items-center gap-2 mt-1 uppercase tracking-widest text-[10px]">
-              <CalendarDays className="h-3 w-3" />
-              Roster: {new Date(attendanceDate).toLocaleDateString("en-IN", { dateStyle: "long" })}
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-[950] tracking-tight text-foreground">{selectedCentre?.name}</h1>
+              <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full text-[9px] uppercase tracking-widest font-black">
+                {selectedCentre?.type}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground font-semibold flex items-center gap-2 mt-0.5 text-xs">
+              <MapPin className="h-3 w-3 text-primary/60" />
+              {selectedCentre?.location || "Learning Centre"} · {centreStudents.length} Active Students
             </p>
           </div>
         </div>
-        <Button
-          className="w-full sm:w-auto rounded-2xl h-12 md:h-14 px-8 md:px-10 font-[950] uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-          disabled={selected.length === 0 || !sessionForDate || loading}
-          onClick={handleSaveAttendance}
-        >
-          {loading ? "Syncing..." : `Sync Attendance (${selected.length})`}
-        </Button>
+        
+        <div className="flex items-center gap-2.5">
+          <Button
+            className="w-full sm:w-auto rounded-xl h-11 px-6 font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+            disabled={selected.length === 0 || !sessionForDate || loading}
+            onClick={handleSaveAttendance}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            {loading ? "Saving..." : `Save Attendance (${selected.length})`}
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="mark" className="w-full">
-        <TabsList className="mb-8 p-1.5 bg-white/50 backdrop-blur-xl rounded-[1.5rem] border border-white/20 shadow-xl h-14">
-          <TabsTrigger value="mark" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Mark Attendance</TabsTrigger>
-          <TabsTrigger value="sheet" className="rounded-xl h-10 px-8 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Day-wise Sheet</TabsTrigger>
+        <TabsList className="mb-6 p-1.5 bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-100 shadow-sm h-12">
+          <TabsTrigger value="mark" className="rounded-xl h-9 px-6 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Mark Attendance</TabsTrigger>
+          <TabsTrigger value="sheet" className="rounded-xl h-9 px-6 font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Day-wise Sheet</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mark" className="mt-0 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
+        <TabsContent value="mark" className="mt-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* LEFT 2 COLUMNS: Student Roster Card */}
+            <Card className="lg:col-span-2 border border-gray-100 shadow-sm rounded-3xl overflow-hidden bg-white">
+              <CardHeader className="p-5 sm:p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xl font-black uppercase tracking-tight">Student Roster</CardTitle>
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">Found {centreStudents.length} students</p>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base sm:text-lg font-black uppercase tracking-tight">Student Roster</CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-black border-primary/20 text-primary bg-primary/5">
+                      {selected.length} / {centreStudents.length} Present
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] font-bold text-muted-foreground mt-0.5">Click any student to toggle attendance</p>
                 </div>
-                <div className="relative w-48">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search name..." 
-                    className="pl-9 h-9 rounded-xl bg-white border-none text-[10px] font-bold"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative w-full sm:w-48">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search student..." 
+                      className="pl-9 h-9 rounded-xl bg-white border border-gray-200 text-xs font-semibold focus-visible:ring-primary/20"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  {sessionForDate && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button 
+                        size="sm"
+                        variant="outline" 
+                        className="rounded-xl h-9 text-[10px] font-black uppercase tracking-wider px-3 border-primary/20 text-primary hover:bg-primary/5"
+                        onClick={() => setSelected(centreStudents.map(s => s._id))}
+                      >
+                        All Present
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="ghost" 
+                        className="rounded-xl h-9 text-[10px] font-black uppercase tracking-wider px-3 text-muted-foreground hover:bg-gray-100"
+                        onClick={() => setSelected([])}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent className="p-4">
+              
+              <CardContent className="p-4 sm:p-6">
                 {!sessionForDate ? (
-                  <div className="py-20 text-center space-y-6">
-                    <div className="h-20 w-20 rounded-full bg-warning/10 flex items-center justify-center mx-auto animate-pulse">
-                      <AlertCircle className="h-10 w-10 text-warning" />
+                  <div className="py-16 text-center space-y-5">
+                    <div className="h-16 w-16 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center mx-auto">
+                      <AlertCircle className="h-8 w-8 text-amber-600" />
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-black tracking-tight">Session Required</p>
-                      <p className="text-sm text-muted-foreground max-w-[300px] mx-auto font-medium">Please log a program session for this date before marking student attendance.</p>
+                    <div className="space-y-1.5 max-w-sm mx-auto">
+                      <p className="text-base font-black tracking-tight text-foreground">No Session on this Date</p>
+                      <p className="text-xs text-muted-foreground font-medium">Please select a pending session from the sidebar or pick another date with a logged session.</p>
                     </div>
-                    <Button variant="outline" className="rounded-xl font-black uppercase tracking-widest text-[10px] px-8 h-10 border-primary/20 text-primary" onClick={() => window.location.href = '/sessions'}>Go to Sessions Hub</Button>
+                    <Button 
+                      variant="outline" 
+                      className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10 border-primary/20 text-primary hover:bg-primary/5" 
+                      onClick={() => window.location.href = '/sessions'}
+                    >
+                      Go to Sessions Hub
+                    </Button>
+                  </div>
+                ) : centreStudents.length === 0 ? (
+                  <div className="py-16 text-center space-y-2">
+                    <p className="text-sm font-bold text-muted-foreground">No active students enrolled in this centre for this month.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2 p-2 max-h-[60vh] overflow-y-auto pr-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {centreStudents
                       .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map(s => (
-                      <div 
-                        key={s._id} 
-                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all cursor-pointer group ${selected.includes(s._id) ? 'border-primary bg-primary/5 shadow-md shadow-primary/5' : 'border-muted bg-white hover:border-primary/30'}`} 
-                        onClick={() => toggle(s._id)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <Checkbox checked={selected.includes(s._id)} onCheckedChange={() => toggle(s._id)} className="h-5 w-5 rounded-md" />
-                          <div>
-                            <p className={`font-black text-sm tracking-tight ${selected.includes(s._id) ? 'text-primary' : 'text-foreground'}`}>{s.name}</p>
-                            <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">{getStudentDetails(s)}</p>
+                      .map(s => {
+                        const isPresent = selected.includes(s._id);
+                        return (
+                          <div 
+                            key={s._id} 
+                            className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer select-none group ${
+                              isPresent 
+                                ? 'border-primary/50 bg-primary/5 shadow-sm shadow-primary/5 ring-1 ring-primary/20' 
+                                : 'border-gray-200/80 bg-white hover:border-primary/30 hover:bg-gray-50/50'
+                            }`} 
+                            onClick={() => toggle(s._id)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Checkbox 
+                                checked={isPresent} 
+                                onCheckedChange={() => toggle(s._id)} 
+                                className="h-4 w-4 rounded-md border-gray-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary" 
+                              />
+                              <div className="min-w-0">
+                                <p className={`font-black text-xs sm:text-sm tracking-tight truncate ${isPresent ? 'text-primary' : 'text-foreground'}`}>
+                                  {s.name}
+                                </p>
+                                <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider truncate mt-0.5">
+                                  {getStudentDetails(s)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <Badge 
+                                variant="secondary" 
+                                className={`rounded-lg text-[9px] font-black uppercase px-2 py-0.5 border-none transition-colors ${
+                                  isPresent 
+                                    ? 'bg-emerald-100 text-emerald-800' 
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isPresent ? "Present" : "Absent"}
+                              </Badge>
+                              <span className="text-[10px] font-bold text-muted-foreground/60 hidden sm:inline">
+                                {s.attendancePercent}%
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <Badge variant="secondary" className="rounded-lg text-[9px] font-black uppercase px-2 py-0.5 bg-muted/50 border-none group-hover:bg-primary/10 group-hover:text-primary transition-colors">{s.attendancePercent}% Stability</Badge>
-                      </div>
-                    ))}
+                        );
+                      })}
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <div className="space-y-6">
-              <Card className="border-none shadow-xl rounded-[2.5rem] bg-primary text-white overflow-hidden p-8 relative">
-                <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12"><CalendarDays className="h-32 w-32" /></div>
-                <div className="relative z-10 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-white/60">Selected Date</label>
-                    <Input
-                      type="date"
-                      value={attendanceDate}
-                      onChange={(e) => handleAttendanceDateChange(e.target.value)}
-                      className="bg-white/10 border-none h-14 rounded-2xl text-xl font-black text-white focus-visible:ring-white/20 transition-all cursor-pointer"
+            {/* RIGHT COLUMN: Session Details & Pending Sessions */}
+            <div className="space-y-5 sticky top-24">
+              {/* Date & Active Session Card */}
+              <Card className="border border-gray-100 shadow-sm rounded-3xl overflow-hidden bg-white p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" /> Session Date
+                  </span>
+                  {sessionForDate ? (
+                    <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] font-bold uppercase tracking-wider">
+                      Session Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-[9px] font-bold uppercase tracking-wider">
+                      No Session
+                    </Badge>
+                  )}
+                </div>
+
+                <Input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => handleAttendanceDateChange(e.target.value)}
+                  className="h-11 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-foreground focus-visible:ring-primary/20 cursor-pointer"
+                />
+
+                {sessionForDate ? (
+                  <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-primary/70">Topic</span>
+                    <p className="font-black text-sm tracking-tight text-foreground">{sessionForDate.topic}</p>
+                    {sessionForDate.duration && (
+                      <p className="text-[10px] font-bold text-muted-foreground">{sessionForDate.duration} mins session</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200/50 text-[11px] font-bold text-amber-800">
+                    No session logged on this date. Select a pending session below or change the date.
+                  </div>
+                )}
+
+                {/* Attendance live counter bar */}
+                <div className="bg-gray-50/70 p-3.5 rounded-2xl border border-gray-100 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-muted-foreground">Attendance Rate</span>
+                    <span className="font-black text-primary">
+                      {centreStudents.length > 0 ? Math.round((selected.length / centreStudents.length) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${centreStudents.length > 0 ? Math.round((selected.length / centreStudents.length) * 100) : 0}%` }}
                     />
                   </div>
-                  {sessionForDate && (
-                    <>
-                      <div className="bg-white/10 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
-                         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">Active Session</p>
-                         <p className="font-black text-sm tracking-tight">{sessionForDate.topic}</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-white/70">
-                          Review Note (Optional)
-                        </Label>
-                        <Textarea
-                          placeholder="Add session reflections, observations, or attendance remarks..."
-                          value={reviewNote}
-                          onChange={(e) => setReviewNote(e.target.value)}
-                          className="bg-white/10 border-white/20 rounded-2xl text-xs text-white placeholder:text-white/40 focus-visible:ring-white/30 min-h-[85px] resize-y"
-                        />
-                      </div>
-                    </>
-                  )}
-                  <div className="pt-4 space-y-3">
-                    <Button 
-                      variant="secondary" 
-                      className="w-full rounded-xl h-12 font-black uppercase tracking-widest text-[10px] bg-white text-primary hover:bg-white/90"
-                      onClick={() => setSelected(centreStudents.map(s => s._id))}
-                    >
-                      Mark All Present
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full rounded-xl h-12 font-black uppercase tracking-widest text-[10px] text-white/70 hover:text-white hover:bg-white/10"
-                      onClick={() => setSelected([])}
-                    >
-                      Clear Selection
-                    </Button>
-                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground text-center">
+                    {selected.length} of {centreStudents.length} students marked present
+                  </p>
                 </div>
+
+                {sessionForDate && (
+                  <div className="space-y-1.5 pt-1">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      Review Note (Optional)
+                    </Label>
+                    <Textarea
+                      placeholder="Add session reflections, observations, or remarks..."
+                      value={reviewNote}
+                      onChange={(e) => setReviewNote(e.target.value)}
+                      className="rounded-xl border border-gray-200 text-xs placeholder:text-muted-foreground/50 focus-visible:ring-primary/20 min-h-[70px] resize-none"
+                    />
+                  </div>
+                )}
               </Card>
 
-              <Card className="border-none shadow-xl rounded-[2.5rem] p-8 flex flex-col items-center text-center justify-center space-y-4">
-                 <div className="h-20 w-20 rounded-full border-4 border-primary/10 flex items-center justify-center">
-                    <p className="text-3xl font-[950] tracking-tighter text-primary">{selected.length}</p>
-                 </div>
-                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Students Present</p>
-                    <p className="text-sm font-bold text-muted-foreground/40">Out of {centreStudents.length} enrolled</p>
-                 </div>
-              </Card>
-
+              {/* Pending Attendance Sessions Card */}
               {pendingAttendanceSessions.length > 0 && (
-                <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
-                  <CardHeader className="px-8 pt-6 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
-                      <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                <Card className="border border-gray-100 shadow-sm rounded-3xl overflow-hidden bg-white">
+                  <CardHeader className="p-4 pb-2 border-b border-gray-50">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
                         Pending Attendance ({pendingAttendanceSessions.length})
                       </CardTitle>
+                      <span className="text-[10px] font-bold text-muted-foreground/60">Click to switch</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="px-6 pb-6 space-y-2">
+                  <CardContent className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto">
                     {pendingAttendanceSessions.map(s => {
                       const sessionDate = new Date(s.date);
                       const dayName = sessionDate.toLocaleDateString("en-IN", { weekday: "short" });
@@ -588,22 +705,17 @@ const AttendancePage = () => {
                         <div
                           key={s._id}
                           onClick={() => handleAttendanceDateChange(s.date)}
-                          className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all hover:border-primary/30 ${
+                          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                             isSelected 
-                              ? 'border-primary bg-primary/5 shadow-sm' 
-                              : 'border-muted bg-white'
+                              ? 'border-primary bg-primary/5 shadow-xs font-bold' 
+                              : 'border-gray-100 bg-gray-50/50 hover:bg-gray-100/60 hover:border-gray-200'
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-warning/10 text-warning'}`}>
-                              <AlertCircle className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-black tracking-tight truncate">{s.topic}</p>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{dayName} · {dateStr}</p>
-                            </div>
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-black tracking-tight truncate text-foreground">{s.topic}</p>
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{dayName} · {dateStr}</p>
                           </div>
-                          <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-warning/30 text-warning bg-warning/5 shrink-0 ml-2">
+                          <Badge variant="outline" className="text-[8px] font-black uppercase tracking-wider border-amber-300 text-amber-700 bg-amber-50 shrink-0">
                             No Attendance
                           </Badge>
                         </div>
@@ -706,4 +818,4 @@ const AttendancePage = () => {
   );
 };
 
-export default AttendancePage;;
+export default AttendancePage;

@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
+import { compareStudentsByClassAndName } from "@/lib/utils";
 
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; approvalStatus?: 'pending' | 'approved' | 'rejected'; reviewNote?: string; reviewedBy?: string; };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
@@ -725,6 +726,7 @@ const SessionsPage = () => {
             <div className="space-y-3">
               {studentsList
                 .filter(s => s.centreId === selectedCentreId && s.name.toLowerCase().includes(attendanceSearchQuery.toLowerCase()))
+                .sort(compareStudentsByClassAndName)
                 .map(s => (
                   <div key={s._id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${checkedStudentIds.includes(s._id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} onClick={() => setCheckedStudentIds(prev => prev.includes(s._id) ? prev.filter(id => id !== s._id) : [...prev, s._id])}>
                     <div className="flex items-center gap-4">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { compareStudentsByClassAndName } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -242,7 +243,7 @@ const CentreDetailPage = () => {
     (s.centreId === centreId || s.centreId === centreIdAlt) &&
     isEnrolledInMonth(s, selectedMonth, selectedYear) &&
     getStatusForMonth(s, selectedMonth, selectedYear) !== "Left"
-  );
+  ).sort(compareStudentsByClassAndName);
 
   const activeStudentCount = centreStudents.filter(s => getStatusForMonth(s, selectedMonth, selectedYear) === "Active").length;
   const inactiveStudentCount = centreStudents.filter(s => getStatusForMonth(s, selectedMonth, selectedYear) === "Inactive").length;
@@ -262,7 +263,7 @@ const CentreDetailPage = () => {
       (s.centreId === centreId || s.centreId === centreIdAlt) &&
       isEnrolledInMonth(s, m, y) &&
       getStatusForMonth(s, m, y) === "Active"
-    );
+    ).sort(compareStudentsByClassAndName);
   })();
   const monthlySessions = allSessions
     .filter(s => (s.centreId === centreId || s.centreId === centreIdAlt))

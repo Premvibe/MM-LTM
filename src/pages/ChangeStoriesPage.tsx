@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye, User } from "lucide-react";
+import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye, User, X, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams } from "react-router-dom";
@@ -15,8 +15,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
 
-type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+type Centre = { 
+  _id: string; 
+  id: string; 
+  name: string; 
+  location: string; 
+  type: "In-school" | "After-school"; 
+  fellowIds: string[]; 
+  studentCount: number;
+  programManagers?: string[];
+  programManagerNames?: string[];
+  programManagerIds?: string[];
+};
 type Fellow = { _id: string; id: string; name: string; email: string };
+type PMUser = { _id: string; name: string; email: string; role: string; assignedCentreIds?: string[] };
 type ChangeStory = {
   _id: string;
   centreId: string;
@@ -57,6 +69,12 @@ const statusConfig = {
   revision_needed: { label: "Revision Needed", color: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertTriangle },
 };
 
+const getPMs = (c: Centre): string[] => {
+  if (c.programManagers && c.programManagers.length > 0) return c.programManagers;
+  if (c.programManagerNames && c.programManagerNames.length > 0) return c.programManagerNames;
+  return [];
+};
+
 const ChangeStoriesPage = () => {
   const { user, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,9 +86,12 @@ const ChangeStoriesPage = () => {
 
   const [centres, setCentres] = useState<Centre[]>([]);
   const [fellows, setFellows] = useState<Fellow[]>([]);
+  const [pmList, setPmList] = useState<PMUser[]>([]);
   const [stories, setStories] = useState<ChangeStory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterFellow, setFilterFellow] = useState<string>("all");
+  const [filterPM, setFilterPM] = useState<string>("all");
   const [filterMonth, setFilterMonth] = useState<string>(new Date().getMonth().toString());
   const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
 
@@ -106,14 +127,18 @@ const ChangeStoriesPage = () => {
         : user?.role === "program_manager"
           ? `?role=program_manager&email=${user.email}`
           : "";
-      const [storiesRes, centresRes, fellowsRes] = await Promise.all([
+      const [storiesRes, centresRes, fellowsRes, adminsRes] = await Promise.all([
         api.get(`/change-stories${params}`),
         api.get(`/centres${paramsQuery}`),
         api.get(`/fellows${paramsQuery}`),
+        api.get('/admins').catch(() => ({ data: [] })),
       ]);
       setStories(storiesRes.data);
       setCentres(centresRes.data);
       setFellows(fellowsRes.data);
+      if (adminsRes?.data && Array.isArray(adminsRes.data)) {
+        setPmList(adminsRes.data.filter((a: any) => a.role === 'program_manager'));
+      }
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -122,6 +147,42 @@ const ChangeStoriesPage = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const pmOptions = useMemo(() => {
+    const fromCentres = centres.flatMap(c => getPMs(c));
+    const fromAdmins = pmList.map(p => p.name);
+    return Array.from(new Set([...fromCentres, ...fromAdmins])).filter(Boolean).sort();
+  }, [centres, pmList]);
+
+  const filteredCentres = useMemo(() => {
+    return centres.filter(c => {
+      // 1. Fellow filter
+      if (filterFellow !== "all") {
+        const hasFellow = (c.fellowIds || []).includes(filterFellow) ||
+          fellows.some(f => (f._id === filterFellow || f.id === filterFellow) && (c.fellowIds || []).includes(f._id || f.id));
+        if (!hasFellow) return false;
+      }
+
+      // 2. Program Manager filter
+      if (filterPM !== "all") {
+        const centrePMs = getPMs(c);
+        if (!centrePMs.includes(filterPM)) return false;
+      }
+
+      // 3. Search query (matches Centre name, location, fellow names, or PM names)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesCentre = c.name.toLowerCase().includes(q) || c.location.toLowerCase().includes(q);
+        const centreFellows = fellows.filter(f => (c.fellowIds || []).includes(f._id || f.id));
+        const matchesFellow = centreFellows.some(f => f.name.toLowerCase().includes(q));
+        const centrePMs = getPMs(c);
+        const matchesPM = centrePMs.some(pm => pm.toLowerCase().includes(q));
+        if (!matchesCentre && !matchesFellow && !matchesPM) return false;
+      }
+
+      return true;
+    });
+  }, [centres, fellows, filterFellow, filterPM, searchQuery]);
 
   const selectedCentre = useMemo(() => centres.find(c => (c._id || c.id) === selectedCentreId), [centres, selectedCentreId]);
 
@@ -251,70 +312,125 @@ const ChangeStoriesPage = () => {
           </div>
         </div>
 
-        <div className="relative max-w-lg">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
-          <Input
-            placeholder="Search centres..."
-            className="pl-10 h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Filters Toolbar */}
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
+            <Input
+              placeholder="Search centre, fellow, or PM..."
+              className="pl-9 h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter by Fellow */}
+            <Select value={filterFellow} onValueChange={setFilterFellow}>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/70 font-bold text-xs w-[145px]">
+                <SelectValue placeholder="All Fellows" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl max-h-[280px]">
+                <SelectItem value="all" className="font-bold text-xs">All Fellows</SelectItem>
+                {fellows
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(f => (
+                    <SelectItem key={f._id || f.id} value={f._id || f.id} className="text-xs">
+                      {f.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            {/* Filter by Program Manager */}
+            <Select value={filterPM} onValueChange={setFilterPM}>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/70 font-bold text-xs w-[160px]">
+                <SelectValue placeholder="All PMs" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectItem value="all" className="font-bold text-xs">All Program Managers</SelectItem>
+                {pmOptions.map(pm => (
+                  <SelectItem key={pm} value={pm} className="text-xs">
+                    {pm}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Clear filters button */}
+            {(filterFellow !== "all" || filterPM !== "all" || searchQuery) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilterFellow("all");
+                  setFilterPM("all");
+                  setSearchQuery("");
+                }}
+                className="h-10 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground px-3 hover:bg-white/50"
+              >
+                <X className="h-3.5 w-3.5 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {centres
-            .filter(c => {
-              const q = searchQuery.toLowerCase();
-              const matchesCentre = c.name.toLowerCase().includes(q) || c.location.toLowerCase().includes(q);
-              const centreFellows = fellows.filter(f => c.fellowIds?.includes(f._id || f.id));
-              const matchesFellow = centreFellows.some(f => f.name.toLowerCase().includes(q));
-              return matchesCentre || matchesFellow;
-            })
-            .map(centre => {
-              const cId = centre._id || centre.id;
-              const story = stories.find(s => s.centreId === cId && s.month === parseInt(filterMonth) && s.year === parseInt(filterYear));
-              const sc = story ? statusConfig[story.status] : null;
+        {/* Results counter when filtered */}
+        {(filterFellow !== "all" || filterPM !== "all" || searchQuery) && (
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+            Showing {filteredCentres.length} of {centres.length} centres
+          </p>
+        )}
 
-              return (
-                <Card
-                  key={cId}
-                  className="glass-card-premium border-none hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden"
-                  onClick={() => setSelectedCentreId(cId)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:rotate-6 transition-transform">
-                          <Building2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-sm font-black tracking-tight">{centre.name}</CardTitle>
-                          <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                            <MapPin className="h-3 w-3" />{centre.location}
-                          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCentres.map(centre => {
+            const cId = centre._id || centre.id;
+            const story = stories.find(s => s.centreId === cId && s.month === parseInt(filterMonth) && s.year === parseInt(filterYear));
+            const sc = story ? statusConfig[story.status] : null;
+            const centrePMs = getPMs(centre);
+
+            return (
+              <Card
+                key={cId}
+                className="glass-card-premium border-none hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden"
+                onClick={() => setSelectedCentreId(cId)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:rotate-6 transition-transform">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-sm font-black tracking-tight">{centre.name}</CardTitle>
+                        <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                          <MapPin className="h-3 w-3" />{centre.location}
                         </div>
                       </div>
-                      <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest h-fit">{centre.type}</Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-end justify-between border-t border-primary/5 pt-4">
-                      <div className="flex-1 min-w-0 pr-2">
-                        {story ? (
-                          <div className="flex items-center gap-2">
-                            {sc && <sc.icon className="h-4 w-4 flex-shrink-0" />}
-                            <Badge className={`${sc?.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest flex-shrink-0`}>{sc?.label}</Badge>
-                            <span className="text-[10px] font-bold text-muted-foreground truncate">{story.title}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-muted-foreground/60">
-                            <BookHeart className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-[10px] font-black uppercase tracking-widest truncate">No story this month</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-1 justify-end max-w-[40%] flex-shrink-0">
+                    <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest h-fit">{centre.type}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end justify-between border-t border-primary/5 pt-4">
+                    <div className="flex-1 min-w-0 pr-2">
+                      {story ? (
+                        <div className="flex items-center gap-2">
+                          {sc && <sc.icon className="h-4 w-4 flex-shrink-0" />}
+                          <Badge className={`${sc?.color} border rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest flex-shrink-0`}>{sc?.label}</Badge>
+                          <span className="text-[10px] font-bold text-muted-foreground truncate">{story.title}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground/60">
+                          <BookHeart className="h-4 w-4 flex-shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-widest truncate">No story this month</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col items-end gap-1 max-w-[45%] flex-shrink-0">
+                      <div className="flex flex-wrap gap-1 justify-end">
                         {centre.fellowIds?.map(fid => {
                           const fellow = fellows.find(f => (f._id === fid || f.id === fid));
                           return fellow ? (
@@ -324,11 +440,18 @@ const ChangeStoriesPage = () => {
                           ) : null;
                         })}
                       </div>
+                      {centrePMs.length > 0 && (
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/80 mt-0.5">
+                          <Briefcase className="h-2.5 w-2.5 text-primary/70 shrink-0" />
+                          <span className="truncate">{centrePMs.join(", ")}</span>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     );

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart, Legend } from "recharts";
 import api from "@/lib/api";
 import { useEffect, useState, useMemo } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -212,9 +212,18 @@ const DashboardPage = () => {
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all" className="text-xs font-semibold">All Fellows</SelectItem>
-                  {fellows.map(f => (
-                    <SelectItem key={f._id || f.id} value={f._id || f.id} className="text-xs">{f.name}</SelectItem>
-                  ))}
+                  {(() => {
+                    const activeFellows = fellows.filter(f => f.status === 'Active');
+                    const batches = [...new Set(activeFellows.map(f => f.batch || 'Unknown'))].sort();
+                    return batches.map(batch => (
+                      <SelectGroup key={batch}>
+                        <SelectLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 pt-2 pb-1">Batch {batch}</SelectLabel>
+                        {activeFellows.filter(f => (f.batch || 'Unknown') === batch).map(f => (
+                          <SelectItem key={f._id || f.id} value={f._id || f.id} className="text-xs">{f.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </>

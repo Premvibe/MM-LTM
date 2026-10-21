@@ -209,6 +209,15 @@ const SCORE_LABELS = {
   5: "Outstanding"
 };
 
+const LEADING_POINTERS = [
+  { value: 1, label: "Very difficult" },
+  { value: 2, label: "Difficult" },
+  { value: 3, label: "Okay okay" },
+  { value: 4, label: "Easy" },
+  { value: 5, label: "Very easy" },
+  { value: 6, label: "I don't know" }
+];
+
 const SEL_CATEGORIES = ["Involvement", "Emotion", "Creativity", "Interaction"];
 
 const LEADING_QUESTIONS = {
@@ -1006,7 +1015,7 @@ const AssessmentsPage = () => {
                       {pre ? (
                         <div className="inline-flex items-center gap-1.5 justify-center">
                           <Badge className="bg-success/10 text-success border-none text-[11px] font-bold px-2.5 py-0.5">
-                            {typeof pre.averageScore === 'number' && pre.averageScore > 0 ? `${pre.averageScore} / 5` : "Done"}
+                            {typeof pre.averageScore === 'number' && pre.averageScore > 0 ? `${pre.averageScore} / 6` : "Done"}
                           </Badge>
                           <Button 
                             type="button"
@@ -1046,7 +1055,7 @@ const AssessmentsPage = () => {
                       {post ? (
                         <div className="inline-flex items-center gap-1.5 justify-center">
                           <Badge className="bg-success/10 text-success border-none text-[11px] font-bold px-2.5 py-0.5">
-                            {typeof post.averageScore === 'number' && post.averageScore > 0 ? `${post.averageScore} / 5` : "Done"}
+                            {typeof post.averageScore === 'number' && post.averageScore > 0 ? `${post.averageScore} / 6` : "Done"}
                           </Badge>
                           <Button 
                             type="button"
@@ -1089,7 +1098,7 @@ const AssessmentsPage = () => {
       </Tabs>
 
       <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
-        <DialogContent className="sm:max-w-2xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="sm:max-w-3xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10"><ClipboardCheck className="h-24 w-24" /></div>
             <DialogHeader>
@@ -1268,29 +1277,34 @@ const AssessmentsPage = () => {
                         {questions.map((q, i) => (
                           <div key={i} className="space-y-3 p-4 bg-muted/30 rounded-2xl">
                             <p className="text-xs font-bold leading-relaxed">{q}</p>
-                            <div className="flex gap-2">
-                              {[1, 2, 3, 4, 5].map(v => {
-                                const isSelected = (leadingScores[domain as keyof typeof leadingScores]?.[i] ?? 1) === v;
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                              {LEADING_POINTERS.map(p => {
+                                const isSelected = (leadingScores[domain as keyof typeof leadingScores]?.[i] ?? 1) === p.value;
                                 return (
                                   <button
                                     type="button"
-                                    key={v}
+                                    key={p.value}
                                     onClick={() => {
                                       setLeadingScores(prev => {
                                         const current = Array.isArray(prev[domain as keyof typeof leadingScores])
                                           ? [...prev[domain as keyof typeof leadingScores]]
                                           : new Array(questions.length).fill(1);
                                         while (current.length < questions.length) current.push(1);
-                                        current[i] = v;
+                                        current[i] = p.value;
                                         return {
                                           ...prev,
                                           [domain]: current
                                         };
                                       });
                                     }}
-                                    className={`flex-1 h-9 rounded-xl font-black text-[10px] transition-all cursor-pointer ${isSelected ? 'bg-primary text-white shadow-lg' : 'bg-white hover:bg-muted text-foreground'}`}
+                                    className={`py-2 px-1.5 rounded-xl text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 border ${
+                                      isSelected 
+                                        ? 'bg-primary text-white border-primary shadow-sm ring-2 ring-primary/20' 
+                                        : 'bg-white hover:bg-muted/80 text-foreground border-gray-200'
+                                    }`}
                                   >
-                                    {v}
+                                    <span className={`text-[10px] font-black ${isSelected ? 'text-white/80' : 'text-muted-foreground/60'}`}>{p.value}</span>
+                                    <span className="text-[10px] sm:text-[11px] font-bold leading-tight line-clamp-2">{p.label}</span>
                                   </button>
                                 );
                               })}
