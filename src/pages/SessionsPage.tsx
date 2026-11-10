@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck } from "lucide-react";
+import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -19,7 +19,7 @@ import { compareStudentsByClassAndName } from "@/lib/utils";
 
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; approvalStatus?: 'pending' | 'approved' | 'rejected'; reviewNote?: string; reviewedBy?: string; };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
-type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number };
+type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
 
 const formatDateDMY = (dateStr?: string) => {
   if (!dateStr) return "";
@@ -47,15 +47,20 @@ const SessionsPage = () => {
 
   const [filterMonth, setFilterMonth] = useState<string>(searchParams.get("month") || new Date().getMonth().toString());
   const [filterYear, setFilterYear] = useState<string>(searchParams.get("year") || new Date().getFullYear().toString());
+  const [filterDate, setFilterDate] = useState<string>("");
+  const [filterBatch, setFilterBatch] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all"); // "all" | "approved" | "pending" | "rejected"
+  const [viewMode, setViewMode] = useState<"centres" | "sessions">("centres");
 
   const months = [
+    { value: "all", label: "All Months" },
     { value: "0", label: "January" }, { value: "1", label: "February" }, { value: "2", label: "March" },
     { value: "3", label: "April" }, { value: "4", label: "May" }, { value: "5", label: "June" },
     { value: "6", label: "July" }, { value: "7", label: "August" }, { value: "8", label: "September" },
     { value: "9", label: "October" }, { value: "10", label: "November" }, { value: "11", label: "December" },
   ];
 
-  const years = ["2023", "2024", "2025", "2026"];
+  const years = ["all", "2023", "2024", "2025", "2026"];
 
   const selectedCentreId = searchParams.get("centre");
   const setSelectedCentreId = (id: string | null) => {
@@ -107,7 +112,7 @@ const SessionsPage = () => {
       const isCurrentPeriod = today.getMonth().toString() === filterMonth && today.getFullYear().toString() === filterYear;
       if (isCurrentPeriod) {
         setDate(today.toISOString().split("T")[0]);
-      } else {
+      } else if (filterMonth !== "all" && filterYear !== "all") {
         const monthNum = parseInt(filterMonth);
         const yearNum = parseInt(filterYear);
         const formattedMonth = String(monthNum + 1).padStart(2, "0");
@@ -156,11 +161,13 @@ const SessionsPage = () => {
     const isCurrentPeriod = today.getMonth().toString() === filterMonth && today.getFullYear().toString() === filterYear;
     if (isCurrentPeriod) {
       setDate(today.toISOString().split("T")[0]);
-    } else {
+    } else if (filterMonth !== "all" && filterYear !== "all") {
       const monthNum = parseInt(filterMonth);
       const yearNum = parseInt(filterYear);
       const formattedMonth = String(monthNum + 1).padStart(2, "0");
       setDate(`${yearNum}-${formattedMonth}-01`);
+    } else {
+      setDate(today.toISOString().split("T")[0]);
     }
 
     setSessionPlanLink(""); 
@@ -217,14 +224,6 @@ const SessionsPage = () => {
     const finalFellowId = user?.role === 'fellow' ? user.id : fellowId;
     if (!date || !topic.trim() || !finalFellowId || !duration) { toast.error("Please fill in all fields including date"); return; }
     
-    const sessionDate = new Date(date);
-    if (sessionDate) {
-      const day = sessionDate.getDay();
-      if (day !== 1 && day !== 3 && day !== 5 && day !== 6) {
-        toast.error("Sessions can only be scheduled on Monday, Wednesday, Friday, or Saturday");
-        return;
-      }
-    }
 
     const targetCentreId = selectedCentreId || centreId;
     if (!targetCentreId) { toast.error("Please select a centre"); return; }
@@ -312,143 +311,215 @@ const SessionsPage = () => {
     setReviewOpen(true);
   };
 
+  const availableBatches = useMemo(() => {
+    const batches = new Set<string>();
+    fellowsList.forEach(f => {
+      if (f.batch) batches.add(f.batch);
+    });
+    return Array.from(batches).sort();
+  }, [fellowsList]);
+
+  const isDateMatch = (dateStr?: string) => {
+    if (!dateStr) return false;
+    if (filterDate) {
+      return dateStr.slice(0, 10) === filterDate;
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const matchMonth = filterMonth === "all" || d.getMonth() === parseInt(filterMonth);
+    const matchYear = filterYear === "all" || d.getFullYear() === parseInt(filterYear);
+    return matchMonth && matchYear;
+  };
+
+  const isStatusMatch = (s: Session, status: string) => {
+    if (status === "all") return true;
+    if (status === "approved") return s.approvalStatus === "approved";
+    if (status === "pending") return !s.approvalStatus || s.approvalStatus === "pending";
+    if (status === "rejected") return s.approvalStatus === "rejected";
+    return true;
+  };
+
+  const isFellowBatchMatch = (fellowIdVal?: string) => {
+    if (filterBatch === "all") return true;
+    if (!fellowIdVal) return false;
+    const f = fellowsList.find(fellow => (fellow._id || fellow.id) === fellowIdVal);
+    return f?.batch === filterBatch;
+  };
+
+  const baseFilteredSessions = useMemo(() => {
+    return sessionsList.filter(s => {
+      if (!isDateMatch(s.date)) return false;
+      if (!isFellowBatchMatch(s.fellowId)) return false;
+      if (filterCentreFellow !== "all" && s.fellowId !== filterCentreFellow) return false;
+      return true;
+    });
+  }, [sessionsList, filterDate, filterMonth, filterYear, filterBatch, filterCentreFellow, fellowsList]);
+
+  // Overall counts for summary cards
+  const overallTotal = baseFilteredSessions.length;
+  const overallApproved = baseFilteredSessions.filter(s => s.approvalStatus === 'approved').length;
+  const overallPending = baseFilteredSessions.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length;
+  const overallRejected = baseFilteredSessions.filter(s => s.approvalStatus === 'rejected').length;
+
+  const getCentreSessionStats = (centre: Centre) => {
+    const cId = centre._id || centre.id;
+    const centreSessions = baseFilteredSessions.filter(s => {
+      const matchesCentre = ((s.centreId as any)?._id || s.centreId) === cId;
+      return matchesCentre;
+    });
+    const approved = centreSessions.filter(s => s.approvalStatus === 'approved').length;
+    const pending = centreSessions.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length;
+    const rejected = centreSessions.filter(s => s.approvalStatus === 'rejected').length;
+    return {
+      total: centreSessions.length,
+      approved,
+      pending,
+      rejected,
+      sessions: centreSessions
+    };
+  };
+
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
+
   const centreSessionsList = useMemo(() => selectedCentreId ? sessionsList.filter(s => {
     const matchesCentre = s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId;
     if (!matchesCentre) return false;
-    const d = new Date(s.date);
-    return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
-  }) : [], [sessionsList, selectedCentreId, filterMonth, filterYear]);
+    if (!isDateMatch(s.date)) return false;
+    if (!isFellowBatchMatch(s.fellowId)) return false;
+    if (!isStatusMatch(s, filterStatus)) return false;
+    return true;
+  }) : [], [sessionsList, selectedCentreId, filterDate, filterMonth, filterYear, filterBatch, filterStatus, fellowsList]);
 
-  if (!selectedCentreId) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
+  const allFilteredSessionsList = useMemo(() => {
+    return baseFilteredSessions.filter(s => {
+      if (!isStatusMatch(s, filterStatus)) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const centre = centresList.find(c => (c._id || c.id) === s.centreId || (s.centreId as any)?._id === (c._id || c.id));
+      const fellow = fellowsList.find(f => (f._id || f.id) === s.fellowId);
+      return (s.topic || "").toLowerCase().includes(q) ||
+             (centre?.name || "").toLowerCase().includes(q) ||
+             (fellow?.name || "").toLowerCase().includes(q);
+    });
+  }, [baseFilteredSessions, filterStatus, searchQuery, centresList, fellowsList]);
+
+  const filteredCentres = useMemo(() => {
+    return centresList.filter(c => {
+      const assignedFellows = c.fellowIds.map(fid => fellowsList.find(f => f._id === fid || f.id === fid)?.name || "").join(" ").toLowerCase();
+      const matchesSearch = c.name.toLowerCase().includes(centreSearchQuery.toLowerCase()) || 
+                           c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
+                           assignedFellows.includes(centreSearchQuery.toLowerCase());
+      const matchesType = filterType === "all" || c.type === filterType;
+      
+      const matchesBatch = filterBatch === "all" || c.fellowIds.some(fid => {
+        const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
+        return fellow?.batch === filterBatch;
+      });
+
+      const matchesFellow = filterCentreFellow === "all" || c.fellowIds.includes(filterCentreFellow);
+
+      const stats = getCentreSessionStats(c);
+      let matchesStatus = true;
+      if (filterStatus === "approved") {
+        matchesStatus = stats.approved > 0;
+      } else if (filterStatus === "pending") {
+        matchesStatus = stats.pending > 0;
+      } else if (filterStatus === "rejected") {
+        matchesStatus = stats.rejected > 0;
+      }
+
+      return matchesSearch && matchesType && matchesBatch && matchesFellow && matchesStatus;
+    });
+  }, [centresList, fellowsList, centreSearchQuery, filterType, filterBatch, filterCentreFellow, filterStatus, baseFilteredSessions]);
+
+  const renderStatsCards = () => (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <Card 
+        onClick={() => setFilterStatus("all")}
+        className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "all" ? "border-primary/50 bg-primary/5 shadow-sm ring-2 ring-primary/20" : "border-border/40 hover:border-border"}`}
+      >
+        <CardContent className="p-4 sm:p-5 flex items-center justify-between">
           <div>
-            <h1 className="page-title">Sessions Log</h1>
-            <p className="page-description uppercase tracking-[0.2em] text-[10px]">LTM Program Quality & Student Attendance Tracker</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Sessions</p>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mt-1">{overallTotal}</h3>
+            <p className="text-[10px] font-bold text-muted-foreground/80 mt-0.5">
+              {filterDate ? formatDateDMY(filterDate) : filterMonth === "all" ? "All Time" : `${months.find(m => m.value === filterMonth)?.label || ""} ${filterYear}`}
+            </p>
           </div>
+          <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6" />
+          </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex flex-wrap items-center gap-2 bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-xl border border-primary/5 text-primary">
-              <Filter className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Period</span>
+      <Card 
+        onClick={() => setFilterStatus(filterStatus === "approved" ? "all" : "approved")}
+        className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "approved" ? "border-emerald-500 bg-emerald-50/50 shadow-sm ring-2 ring-emerald-500/20" : "border-border/40 hover:border-emerald-200"}`}
+      >
+        <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Approved</p>
+              {filterStatus === "approved" && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8px] font-black bg-emerald-600 text-white uppercase">Active</span>
+              )}
             </div>
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger className="w-[120px] h-9 rounded-xl bg-white/60 border-none shadow-sm text-xs font-bold">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-                {months.map(m => <SelectItem key={m.value} value={m.value} className="rounded-lg text-xs font-medium">{m.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger className="w-[85px] h-9 rounded-xl bg-white/60 border-none shadow-sm text-xs font-bold">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-                {years.map(y => <SelectItem key={y} value={y} className="rounded-lg text-xs font-medium">{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-700 mt-1">{overallApproved}</h3>
+            <p className="text-[10px] font-bold text-emerald-600/80 mt-0.5">
+              {overallTotal > 0 ? `${Math.round((overallApproved / overallTotal) * 100)}% of total` : "0% approved"}
+            </p>
           </div>
-        </div>
+          <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md p-1.5 rounded-[1.5rem] border border-white/20 shadow-lg">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
-            <Input 
-              placeholder="Find centre by name or fellow..." 
-              className="pl-10 h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs" 
-              value={centreSearchQuery} 
-              onChange={(e) => setCentreSearchQuery(e.target.value)} 
-            />
-          </div>
-          {isAdmin && (
-            <div className="flex flex-wrap items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[150px]">
-              <Select value={filterCentreFellow} onValueChange={setFilterCentreFellow}>
-                <SelectTrigger className="h-11 rounded-2xl border-none shadow-sm bg-white"><SelectValue placeholder="Fellow" /></SelectTrigger>
-                <SelectContent className="rounded-2xl border-none shadow-2xl">
-                  <SelectItem value="all">All Fellows</SelectItem>
-                  {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+      <Card 
+        onClick={() => setFilterStatus(filterStatus === "pending" ? "all" : "pending")}
+        className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "pending" ? "border-amber-500 bg-amber-50/50 shadow-sm ring-2 ring-amber-500/20" : overallPending > 0 ? "border-amber-300/80 hover:border-amber-400" : "border-border/40"}`}
+      >
+        <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Pending Review</p>
+              {overallPending > 0 && <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />}
             </div>
-          )}
-        </div>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-amber-700 mt-1">{overallPending}</h3>
+            <p className="text-[10px] font-bold text-amber-600/80 mt-0.5">
+              {overallPending > 0 ? "Needs PM review" : "All reviewed"}
+            </p>
+          </div>
+          <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {centresList
-            .filter(c => {
-              const assignedFellows = c.fellowIds.map(fid => fellowsList.find(f => f._id === fid || f.id === fid)?.name || "").join(" ").toLowerCase();
-              const matchesSearch = c.name.toLowerCase().includes(centreSearchQuery.toLowerCase()) || 
-                                   c.location.toLowerCase().includes(centreSearchQuery.toLowerCase()) ||
-                                   assignedFellows.includes(centreSearchQuery.toLowerCase());
-              const matchesType = filterType === "all" || c.type === filterType;
-              const matchesFellow = filterCentreFellow === "all" || c.fellowIds.includes(filterCentreFellow);
-              return matchesSearch && matchesType && matchesFellow;
-            })
-            .map(centre => {
-              const sessionsCount = sessionsList.filter(s => {
-                const matchesCentre = ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id);
-                if (!matchesCentre) return false;
-                if (s.approvalStatus !== 'approved') return false; // Only count approved sessions
-                const d = new Date(s.date);
-                return d.getMonth() === parseInt(filterMonth) && d.getFullYear() === parseInt(filterYear);
-              }).length;
-              const studentCount = studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id)).length;
-              const cId = centre._id || centre.id;
-              
-              return (
-                <Card 
-                  key={cId} 
-                  className="glass-card-premium border-none hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden"
-                  onClick={() => setSelectedCentreId(cId)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:rotate-6 transition-transform">
-                          <Building2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-sm font-black tracking-tight">{centre.name}</CardTitle>
-                          <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                            <MapPin className="h-3 w-3" />{centre.location}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest h-fit">{centre.type}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-end justify-between border-t border-primary/5 pt-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                          <Users className="h-3 w-3" />
-                          <span>{studentCount} Students</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-primary">
-                          <CalendarDays className="h-3 w-3" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{sessionsCount} Sessions this month</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1 justify-end max-w-[120px]">
-                        {centre.fellowIds?.map(fid => {
-                          const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
-                          return fellow ? (
-                            <Badge key={fid} variant="outline" className="text-[8px] font-black uppercase py-0 h-4 border-primary/10 bg-primary/5 text-primary/60">{fellow.name}</Badge>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-        </div>
-      </div>
-    );
-  }
+      <Card 
+        onClick={() => setFilterStatus(filterStatus === "rejected" ? "all" : "rejected")}
+        className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "rejected" ? "border-rose-500 bg-rose-50/50 shadow-sm ring-2 ring-rose-500/20" : "border-border/40 hover:border-rose-200"}`}
+      >
+        <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">Rejected</p>
+              {filterStatus === "rejected" && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8px] font-black bg-rose-600 text-white uppercase">Active</span>
+              )}
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-rose-700 mt-1">{overallRejected}</h3>
+            <p className="text-[10px] font-bold text-rose-600/80 mt-0.5">
+              {overallRejected > 0 ? "Requires correction" : "0 rejected"}
+            </p>
+          </div>
+          <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+            <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const dialogForm = (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
@@ -460,10 +531,27 @@ const SessionsPage = () => {
       <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-primary p-6 md:p-8 text-white shrink-0">
           <DialogTitle className="text-2xl font-black tracking-tight">{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
-          <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">Operation LTM · {selectedCentre?.name}</p>
+          <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
+            Operation LTM · {selectedCentre?.name || "All Centres"}
+          </p>
         </div>
         <ScrollArea className="flex-1 overflow-y-auto max-h-[60vh] md:max-h-full">
           <div className="p-6 md:p-8 space-y-6">
+            {!selectedCentreId && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Centre</Label>
+                <Select value={centreId} onValueChange={setCentreId}>
+                  <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
+                    <SelectValue placeholder="Select Centre..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-2xl">
+                    {centresList.map(c => (
+                      <SelectItem key={c._id || c.id} value={c._id || c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
@@ -483,7 +571,9 @@ const SessionsPage = () => {
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-none shadow-2xl">
                     {fellowsList.map(f => (
-                      <SelectItem key={f._id} value={f._id || f.id}>{f.name}</SelectItem>
+                      <SelectItem key={f._id} value={f._id || f.id}>
+                        {f.name} {f.batch ? `(${f.batch})` : ''}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -539,7 +629,7 @@ const SessionsPage = () => {
               centreId={selectedCentreId || centreId || undefined}
               centreName={selectedCentre?.name}
               context="Sessions"
-              monthYear={`${months.find(m => m.value === filterMonth)?.label} ${filterYear}`}
+              monthYear={`${months.find(m => m.value === filterMonth)?.label || 'Current'} ${filterYear}`}
               label="Attach Session Plans / Photos / Videos"
               maxFiles={5}
             />
@@ -559,6 +649,429 @@ const SessionsPage = () => {
     </Dialog>
   );
 
+  const isAnyFilterActive = filterDate !== "" || filterMonth !== new Date().getMonth().toString() || filterYear !== new Date().getFullYear().toString() || filterBatch !== "all" || filterStatus !== "all" || filterCentreFellow !== "all" || centreSearchQuery !== "" || searchQuery !== "";
+
+  const resetAllFilters = () => {
+    setFilterDate("");
+    setFilterMonth(new Date().getMonth().toString());
+    setFilterYear(new Date().getFullYear().toString());
+    setFilterBatch("all");
+    setFilterStatus("all");
+    setFilterCentreFellow("all");
+    setCentreSearchQuery("");
+    setSearchQuery("");
+  };
+
+  if (!selectedCentreId) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="page-title">Sessions Log</h1>
+            <p className="page-description uppercase tracking-[0.2em] text-[10px]">LTM Program Quality & Student Attendance Tracker</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {dialogForm}
+          </div>
+        </div>
+
+        {/* 2) Overall count of pending and approved session */}
+        {renderStatsCards()}
+
+        {/* Filters Bar */}
+        <div className="bg-white/60 backdrop-blur-md p-3.5 rounded-[1.5rem] border border-white/40 shadow-lg space-y-3">
+          {/* Top Row: Full-width Search Input + View Mode Switcher */}
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
+              <Input 
+                placeholder={viewMode === "centres" ? "Search centre by name, location, or fellow..." : "Search sessions by topic, centre, or fellow..."}
+                className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white font-bold text-xs w-full focus-visible:ring-primary/20" 
+                value={viewMode === "centres" ? centreSearchQuery : searchQuery} 
+                onChange={(e) => viewMode === "centres" ? setCentreSearchQuery(e.target.value) : setSearchQuery(e.target.value)} 
+              />
+            </div>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center bg-white border border-border/40 p-1 rounded-xl shadow-sm shrink-0 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setViewMode("centres")}
+                className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-colors flex items-center gap-1.5 ${viewMode === "centres" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                <span>Centres</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("sessions")}
+                className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-colors flex items-center gap-1.5 ${viewMode === "sessions" ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                <span>All Sessions</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Row: Filter dropdowns */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/20">
+            {/* 3) Date vise filter */}
+            <div className="flex items-center gap-1.5 bg-white border border-border/40 rounded-xl px-2.5 h-10 shadow-sm">
+              <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">Date</span>
+              <Input 
+                type="date" 
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)} 
+                className="h-8 w-[125px] border-none bg-transparent p-0 text-xs font-bold focus-visible:ring-0 cursor-pointer" 
+              />
+              {filterDate && (
+                <Button variant="ghost" size="icon" className="h-5 w-5 p-0 hover:bg-muted rounded-md text-muted-foreground" onClick={() => setFilterDate("")}>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+
+            {/* Period Selects (Month / Year) */}
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="w-[120px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {months.map(m => <SelectItem key={m.value} value={m.value} className="rounded-lg text-xs font-medium">{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger className="w-[90px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                {years.map(y => <SelectItem key={y} value={y} className="rounded-lg text-xs font-medium">{y === "all" ? "All Years" : y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* 4) Fellow batch vise filter */}
+            <Select value={filterBatch} onValueChange={(val) => {
+              setFilterBatch(val);
+              if (filterCentreFellow !== "all") {
+                const f = fellowsList.find(fellow => (fellow._id || fellow.id) === filterCentreFellow);
+                if (f && f.batch && f.batch !== val && val !== "all") {
+                  setFilterCentreFellow("all");
+                }
+              }
+            }}>
+              <SelectTrigger className="w-[120px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Batch" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                <SelectItem value="all">All Batches</SelectItem>
+                {availableBatches.map(b => (
+                  <SelectItem key={b} value={b}>Batch {b}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* 1) Show Pending & Approved Session filter */}
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[130px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="approved">Approved Only</SelectItem>
+                <SelectItem value="pending">Pending Only</SelectItem>
+                <SelectItem value="rejected">Rejected Only</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Fellow Filter (Admin/PM) */}
+            {isAdmin && (
+              <Select value={filterCentreFellow} onValueChange={setFilterCentreFellow}>
+                <SelectTrigger className="w-[140px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                  <SelectValue placeholder="Fellow" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                  <SelectItem value="all">All Fellows</SelectItem>
+                  {fellowsList
+                    .filter(f => filterBatch === "all" || f.batch === filterBatch)
+                    .map(f => (
+                      <SelectItem key={f._id || f.id} value={f._id || f.id}>
+                        {f.name} {f.batch ? `(${f.batch})` : ''}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {isAnyFilterActive && (
+              <Button variant="ghost" size="sm" onClick={resetAllFilters} className="h-10 px-3 text-xs font-bold text-muted-foreground hover:text-destructive ml-auto">
+                Reset Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Active filter pills & Reset button */}
+          {isAnyFilterActive && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/20">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Active Filters:</span>
+              {filterDate && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Date: {formatDateDMY(filterDate)}
+                  <button onClick={() => setFilterDate("")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterBatch !== "all" && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Batch: {filterBatch}
+                  <button onClick={() => setFilterBatch("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterStatus !== "all" && (
+                <Badge variant="outline" className={`text-[10px] font-bold gap-1 pr-1 ${filterStatus === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : filterStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-rose-50 text-rose-700 border-rose-300'}`}>
+                  Status: {filterStatus === 'approved' ? 'Approved' : filterStatus === 'pending' ? 'Pending' : 'Rejected'}
+                  <button onClick={() => setFilterStatus("all")} className="hover:bg-black/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterCentreFellow !== "all" && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Fellow: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
+                  <button onClick={() => setFilterCentreFellow("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              <Button variant="ghost" size="sm" onClick={resetAllFilters} className="h-6 px-2 text-[10px] font-black uppercase text-muted-foreground hover:text-destructive">
+                Reset All Filters
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* View Mode: Centres View */}
+        {viewMode === "centres" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCentres.map(centre => {
+              const cStats = getCentreSessionStats(centre);
+              const studentCount = studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id)).length;
+              const cId = centre._id || centre.id;
+              
+              return (
+                <Card 
+                  key={cId} 
+                  className="glass-card-premium border-none hover:scale-[1.02] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
+                  onClick={() => setSelectedCentreId(cId)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:rotate-6 transition-transform">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-sm font-black tracking-tight">{centre.name}</CardTitle>
+                          <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                            <MapPin className="h-3 w-3" />{centre.location}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={centre.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest h-fit">{centre.type}</Badge>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="border-t border-primary/5 pt-3 space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                        <div className="flex items-center gap-1.5">
+                          <Users className="h-3 w-3" />
+                          <span>{studentCount} Students</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-primary">
+                          <CalendarDays className="h-3 w-3" />
+                          <span>{cStats.total} Sessions Logged</span>
+                        </div>
+                      </div>
+
+                      {/* 1) Show Pending & Approved Session counts on Centre card */}
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-200/80 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                            <span>{cStats.approved} Approved</span>
+                          </Badge>
+                          {cStats.pending > 0 ? (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-amber-50 text-amber-700 border-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm">
+                              <Clock className="h-3 w-3 text-amber-600 animate-pulse" />
+                              <span>{cStats.pending} Pending</span>
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] font-medium bg-gray-50/80 text-gray-400 border-gray-200/60 px-1.5 py-0.5 rounded-lg">
+                              0 Pending
+                            </Badge>
+                          )}
+                          {cStats.rejected > 0 && (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-rose-50 text-rose-700 border-rose-200 px-1.5 py-0.5 rounded-lg flex items-center gap-1">
+                              <XCircle className="h-3 w-3 text-rose-600" />
+                              <span>{cStats.rejected}</span>
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Fellow badges with batch version */}
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[130px]">
+                          {centre.fellowIds?.map(fid => {
+                            const fellow = fellowsList.find(f => f._id === fid || f.id === fid);
+                            return fellow ? (
+                              <Badge key={fid} variant="outline" className="text-[8px] font-black uppercase py-0 h-4 border-primary/10 bg-primary/5 text-primary/70">
+                                {fellow.name} {fellow.batch ? `(${fellow.batch})` : ''}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {filteredCentres.length === 0 && (
+              <div className="col-span-full text-center py-20 bg-muted/10 rounded-[3rem] border-2 border-dashed">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto opacity-20" />
+                <p className="text-sm font-bold text-muted-foreground mt-4">No centres match the current filters</p>
+                <Button variant="outline" size="sm" onClick={resetAllFilters} className="mt-3 rounded-xl text-xs font-bold">
+                  Reset Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* View Mode: All Sessions List across all centres */}
+        {viewMode === "sessions" && (
+          <div className="grid grid-cols-1 gap-4">
+            {allFilteredSessionsList.map(s => {
+              const centre = centresList.find(c => (c._id || c.id) === s.centreId || (s.centreId as any)?._id === (c._id || c.id));
+              const fellow = fellowsList.find(f => (f._id || f.id) === s.fellowId);
+
+              return (
+                <Card key={s._id} className="border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] overflow-hidden group bg-white">
+                  <CardContent className="p-0 flex flex-col sm:flex-row">
+                    <div className="p-6 sm:p-8 flex-1 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
+                            {formatDateDMY(s.date)}
+                          </Badge>
+                          {centre && (
+                            <Badge variant="outline" className="bg-muted/50 text-foreground border-border/40 rounded-lg px-2.5 py-1 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                              <Building2 className="h-3 w-3 text-primary" /> {centre.name}
+                            </Badge>
+                          )}
+                          {fellow && (
+                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 rounded-lg px-2 py-1 font-bold text-[10px]">
+                              {fellow.name} {fellow.batch ? `(${fellow.batch})` : ''}
+                            </Badge>
+                          )}
+                          {s.isMusicBus && (
+                            <Badge className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-500/20 rounded-lg px-2 py-1 font-black text-[10px] uppercase tracking-widest flex items-center gap-1">
+                              <Truck className="h-3 w-3" /> Music Bus
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span className="text-xs font-bold">{s.duration} mins</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
+                        {s.approvalStatus === 'approved' && <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>}
+                        {s.approvalStatus === 'rejected' && <Badge className="bg-rose-600 text-white font-bold">Rejected</Badge>}
+                        {(!s.approvalStatus || s.approvalStatus === 'pending') && (
+                          <Badge className="bg-amber-500 text-white font-bold flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> Pending Review
+                          </Badge>
+                        )}
+                      </div>
+
+                      {s.approvalStatus === 'rejected' && s.reviewNote && (
+                        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-xl">
+                          <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                        </div>
+                      )}
+                      {s.approvalStatus !== 'rejected' && s.reviewNote && (
+                        <div className="bg-info/10 text-info text-sm p-3 rounded-xl">
+                          <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-6">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Attendance</span>
+                          <span className="text-sm font-black flex items-center gap-1.5 mt-0.5"><Users className="h-4 w-4 text-info" />{s.studentsPresent} students</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Session Plan</span>
+                          {s.sessionPlanLink ? (
+                            <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success mt-0.5 flex items-center gap-1 hover:underline cursor-pointer">
+                              <CheckCircle2 className="h-3 w-3" /> View Plan
+                            </button>
+                          ) : (
+                            <span className="text-xs font-bold text-destructive mt-0.5">Missing Plan</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
+                          {s.documentationLink ? (
+                            <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">
+                              View Media <CheckCircle2 className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {s.files && s.files.length > 0 && (
+                        <FileGallery files={s.files} title="Drive Media & Attachments" />
+                      )}
+                    </div>
+
+                    <div className="bg-muted/30 sm:w-64 p-6 sm:p-8 flex flex-col justify-center gap-2.5 border-t sm:border-t-0 sm:border-l">
+                      <Button className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={() => openAttendance(s)}>
+                        <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
+                      </Button>
+                      {isAdmin && (
+                        <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
+                          Review Session
+                        </Button>
+                      )}
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                        {isMEManager && (
+                          <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDelete(s._id)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {allFilteredSessionsList.length === 0 && (
+              <div className="text-center py-20 bg-muted/10 rounded-[3rem] border-2 border-dashed">
+                <CalendarDays className="h-12 w-12 text-muted-foreground mx-auto opacity-20" />
+                <p className="text-sm font-bold text-muted-foreground mt-4">No sessions found matching the active filters</p>
+                <Button variant="outline" size="sm" onClick={resetAllFilters} className="mt-3 rounded-xl text-xs font-bold">
+                  Reset Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -568,11 +1081,25 @@ const SessionsPage = () => {
           </Button>
           <div>
             <h1 className="text-xl md:text-3xl font-[950] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
-            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] flex items-center gap-2 mt-1">
-               {months.find(m => m.value === filterMonth)?.label} {filterYear} 
-               <span className="opacity-20">|</span> 
-               {centreSessionsList.length} Sessions Logged
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                <span>{centreSessionsList.filter(s => s.approvalStatus === 'approved').length} Approved</span>
+              </Badge>
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold flex items-center gap-1">
+                <Clock className="h-3 w-3 text-amber-600" />
+                <span>{centreSessionsList.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length} Pending</span>
+              </Badge>
+              {centreSessionsList.filter(s => s.approvalStatus === 'rejected').length > 0 && (
+                <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold flex items-center gap-1">
+                  <XCircle className="h-3 w-3 text-rose-600" />
+                  <span>{centreSessionsList.filter(s => s.approvalStatus === 'rejected').length} Rejected</span>
+                </Badge>
+              )}
+              <span className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">
+                | {centreSessionsList.length} Sessions Total
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -580,27 +1107,58 @@ const SessionsPage = () => {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 min-w-0 sm:max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+      <div className="bg-white/60 backdrop-blur-md p-3.5 rounded-[1.5rem] border border-white/40 shadow-lg space-y-3">
+        {/* Top: Full width Search */}
+        <div className="relative w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
           <Input 
-            placeholder="Filter sessions by topic or theme..." 
-            className="pl-12 h-12 rounded-xl border-none shadow-lg bg-white font-bold tracking-tight focus:ring-primary/20" 
+            placeholder="Search sessions by topic or theme..." 
+            className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white font-bold text-xs w-full focus-visible:ring-primary/20" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
           />
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Bottom: Filter controls */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/20">
+          <div className="flex items-center gap-1.5 bg-white border border-border/40 rounded-xl px-2.5 h-10 shadow-sm">
+            <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">Date</span>
+            <Input 
+              type="date" 
+              value={filterDate} 
+              onChange={(e) => setFilterDate(e.target.value)} 
+              className="h-8 w-[125px] border-none bg-transparent p-0 text-xs font-bold focus-visible:ring-0 cursor-pointer" 
+            />
+            {filterDate && (
+              <Button variant="ghost" size="icon" className="h-5 w-5 p-0 hover:bg-muted rounded-md text-muted-foreground" onClick={() => setFilterDate("")}>
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+
           <Select value={filterMonth} onValueChange={setFilterMonth}>
-            <SelectTrigger className="h-12 rounded-xl border-none shadow-lg bg-white font-bold text-xs w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[120px] shadow-sm"><SelectValue /></SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl">
               {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
             </SelectContent>
           </Select>
+
           <Select value={filterYear} onValueChange={setFilterYear}>
-            <SelectTrigger className="h-12 rounded-xl border-none shadow-lg bg-white font-bold text-xs w-[90px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[85px] shadow-sm"><SelectValue /></SelectTrigger>
             <SelectContent className="rounded-2xl border-none shadow-2xl">
-              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              {years.map(y => <SelectItem key={y} value={y}>{y === "all" ? "All Years" : y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* Status Filter */}
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[130px] shadow-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent className="rounded-2xl border-none shadow-2xl">
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="approved">Approved Only</SelectItem>
+              <SelectItem value="pending">Pending Only</SelectItem>
+              <SelectItem value="rejected">Rejected Only</SelectItem>
             </SelectContent>
           </Select>
         </div>

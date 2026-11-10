@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { compareStudentsByClassAndName } from "@/lib/utils";
 
 export const RUBRIC_POINTERS: Record<string, { title: string; subtitle: string; levels: { score: number; desc: string }[] }> = {
   involvement: {
@@ -537,19 +538,27 @@ const AssessmentsPage = () => {
         const orderA = statusOrder[a.status || "Active"] || 99;
         const orderB = statusOrder[b.status || "Active"] || 99;
         if (orderA !== orderB) return orderA - orderB;
-        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+        return compareStudentsByClassAndName(a, b);
       });
   }, [students, selectedCentreId]);
 
   const processedAssessments = useMemo(() => {
     const statusOrder: Record<string, number> = { Active: 1, Inactive: 2, Left: 3 };
+    const q = searchQuery.toLowerCase().trim();
     return centreStudents
-      .filter(s => (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(s => {
+        if (!q) return true;
+        const nameMatch = (s.name || "").toLowerCase().includes(q);
+        const sectionMatch = (s.section || "").toLowerCase().includes(q);
+        const gradeMatch = (s.grade || "").toLowerCase().includes(q);
+        const classSecMatch = `${s.grade || ""}${s.section || ""}`.toLowerCase().includes(q);
+        return nameMatch || sectionMatch || gradeMatch || classSecMatch;
+      })
       .sort((a, b) => {
         const orderA = statusOrder[a.status || "Active"] || 99;
         const orderB = statusOrder[b.status || "Active"] || 99;
         if (orderA !== orderB) return orderA - orderB;
-        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+        return compareStudentsByClassAndName(a, b);
       })
       .map((s) => {
         const studentAssessments = assessmentsData.filter(a => (a.studentId?._id || a.studentId) === (s._id || s.id));
@@ -864,7 +873,14 @@ const AssessmentsPage = () => {
                       {/* Student Info Header */}
                       <div className="p-4 sm:p-6 bg-primary/5 group-hover:bg-primary/10 transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-black text-sm sm:text-base tracking-tight group-hover:text-primary transition-colors truncate">{a.student}</h4>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-black text-sm sm:text-base tracking-tight group-hover:text-primary transition-colors truncate">{a.student}</h4>
+                            {(a.raw.grade || a.raw.section) && (
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                                {[a.raw.grade ? `Class ${a.raw.grade}` : null, a.raw.section ? `Sec ${a.raw.section}` : null].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </div>
                           <Select value={a.raw.status || "Active"} onValueChange={(val) => handleStatusChange(a.id, val)}>
                             <SelectTrigger className="h-6 px-1.5 sm:px-2 w-[70px] sm:w-[80px] shrink-0 text-[8px] sm:text-[9px] font-black uppercase tracking-widest bg-white/50 border-primary/20">
                               <SelectValue />
@@ -877,6 +893,11 @@ const AssessmentsPage = () => {
                           </Select>
                         </div>
                         <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+                           {(a.raw.grade || a.raw.section) && (
+                             <Badge variant="outline" className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest border-primary/30 bg-primary/5 text-primary">
+                               {[a.raw.grade ? `Class ${a.raw.grade}` : null, a.raw.section ? `Sec ${a.raw.section}` : null].filter(Boolean).join(" - ")}
+                             </Badge>
+                           )}
                            <Badge variant="outline" className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary/60">{monthlyAttendancePercent}% ATT</Badge>
                            {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[7px] sm:text-[8px] font-black uppercase tracking-widest">SYNCED</Badge>}
                            {isPreviousRecord && <Badge className="bg-orange-500/10 text-orange-600 border-none text-[7px] sm:text-[8px] font-black uppercase tracking-widest">PREV: {previousMonthName}</Badge>}
@@ -1008,6 +1029,11 @@ const AssessmentsPage = () => {
                       <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-black text-primary">{a.student.charAt(0)}</div>
                       <div>
                         <span className="text-sm font-bold block leading-tight">{a.student}</span>
+                        {(a.raw.grade || a.raw.section) && (
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mt-0.5">
+                            {[a.raw.grade ? `Class ${a.raw.grade}` : null, a.raw.section ? `Sec ${a.raw.section}` : null].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {/* Pre */}
@@ -1104,6 +1130,11 @@ const AssessmentsPage = () => {
             <DialogHeader>
               <DialogTitle className="text-2xl font-[950] tracking-tight">
                 {editingAssessmentId ? `Edit ${activePhase}-Assessment: ` : "Record Performance: "}{selectedStudent?.name}
+                {(selectedStudent?.grade || selectedStudent?.section) && (
+                  <span className="text-xs font-bold text-white/80 block mt-1 uppercase tracking-wider">
+                    {[selectedStudent.grade ? `Class ${selectedStudent.grade}` : null, selectedStudent.section ? `Section ${selectedStudent.section}` : null].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </DialogTitle>
               <DialogDescription className="text-primary-foreground/70 font-medium text-sm">
                 Logging {activeCategory === "Monthly-Evaluation" ? `Monthly Assessment (SEL & Musical)` : activeCategory === "SEL-Mid" ? `Monthly SEL Assessment` : activeCategory === "Musical" ? `Quarterly Musical Assessment — ${activeQuarter}` : (activeCategory === "InSchool-PrePost" || activeCategory === "AfterSchool-PrePost") ? `${activePhase}-Assessment (Leading Self, Other & Community)` : `${activeCategory} Assessment Phase`}
@@ -1546,6 +1577,11 @@ const AssessmentsPage = () => {
                                 </SelectContent>
                               </Select>
                             </div>
+                            {(s.grade || s.section) && (
+                              <span className="text-[8px] font-bold text-primary/80 uppercase tracking-wider bg-primary/5 px-1.5 py-0.5 rounded">
+                                {[s.grade ? `Class ${s.grade}` : null, s.section ? `Sec ${s.section}` : null].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
                             <div className="flex items-center flex-wrap gap-0.5 sm:gap-1">
                                <Badge variant="outline" className={`text-[6px] sm:text-[7px] font-black uppercase tracking-widest border-primary/20 px-1 py-0 h-3.5 sm:h-4 ${monthlyAttendancePercent < 50 ? 'text-destructive' : 'text-primary/60'}`}>{monthlyAttendancePercent}% ATT</Badge>
                                {isAssessedThisMonth && <Badge className="bg-success/10 text-success border-none text-[6px] sm:text-[7px] font-black uppercase tracking-widest px-1 py-0 h-3.5 sm:h-4">SYNCED</Badge>}
