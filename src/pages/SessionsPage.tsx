@@ -17,9 +17,64 @@ import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
 import { compareStudentsByClassAndName } from "@/lib/utils";
 
-type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; sessionPlanLink?: string; documentationLink?: string; files?: DriveFile[]; presentStudentIds?: string[]; isMusicBus?: boolean; observations?: string; issues?: string; createdAt?: string; approvalStatus?: 'pending' | 'approved' | 'rejected'; reviewNote?: string; reviewedBy?: string; };
-type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
+type Session = {
+  _id: string;
+  id: string;
+  date: string;
+  centreId: string;
+  fellowId: string;
+  topic: string;
+  duration: number;
+  activities: string[];
+  studentsPresent: number;
+  sessionPlanLink?: string;
+  documentationLink?: string;
+  files?: DriveFile[];
+  presentStudentIds?: string[];
+  isMusicBus?: boolean;
+  observations?: string;
+  issues?: string;
+  createdAt?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewerName?: string;
+  reviewerRole?: string;
+  reviewerEmail?: string;
+};
+type Centre = {
+  _id: string;
+  id: string;
+  name: string;
+  location: string;
+  type: "In-school" | "After-school";
+  fellowIds: string[];
+  studentCount: number;
+  programManagers?: string[];
+  programManagerNames?: string[];
+  programManagerIds?: string[];
+};
 type Fellow = { _id: string; id: string; name: string; email: string; phone: string; centreIds: string[]; sessionsCompleted: number; attendanceRate: number; batch?: string };
+type AdminUser = { _id: string; id?: string; name: string; email: string; role: string; assignedFellowIds?: string[]; assignedCentreIds?: string[] };
+
+const getPMs = (c: Centre): string[] => {
+  if (c.programManagers && c.programManagers.length > 0) return c.programManagers;
+  if ((c as any).programManagerNames && (c as any).programManagerNames.length > 0) return (c as any).programManagerNames;
+  return [];
+};
+
+const formatRole = (role?: string) => {
+  if (!role) return "Program Manager";
+  const map: Record<string, string> = {
+    program_manager: "Program Manager",
+    program_lead: "Program Lead",
+    program_director: "Program Director",
+    m_e_manager: "M&E Manager",
+    admin: "Admin"
+  };
+  return map[role] || role;
+};
 
 const formatDateDMY = (dateStr?: string) => {
   if (!dateStr) return "";
@@ -43,6 +98,7 @@ const SessionsPage = () => {
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [adminsList, setAdminsList] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [filterMonth, setFilterMonth] = useState<string>(searchParams.get("month") || new Date().getMonth().toString());
@@ -134,16 +190,18 @@ const SessionsPage = () => {
           ? `?role=program_manager&email=${user.email}` 
           : '';
       const dateParams = `?month=${filterMonth}&year=${filterYear}`;
-      const [sessionsRes, centresRes, fellowsRes, studentsRes] = await Promise.all([
+      const [sessionsRes, centresRes, fellowsRes, studentsRes, adminsRes] = await Promise.all([
         api.get(`/sessions${dateParams}${params}`),
         api.get(`/centres${paramsQuery}`),
         api.get(`/fellows${paramsQuery}`),
-        api.get(`/students${paramsQuery}`)
+        api.get(`/students${paramsQuery}`),
+        isSuperAdmin ? api.get('/admins').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
       ]);
       setSessionsList(sessionsRes.data);
       setCentresList(centresRes.data);
       setFellowsList(fellowsRes.data);
       setStudentsList(studentsRes.data);
+      if (adminsRes?.data) setAdminsList(adminsRes.data);
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -346,14 +404,60 @@ const SessionsPage = () => {
     return f?.batch === filterBatch;
   };
 
+  const isCentreTypeMatch = (centreIdVal?: string) => {
+    if (filterType === "all") return true;
+    if (!centreIdVal) return false;
+    const c = centresList.find(centre => (centre._id || centre.id) === centreIdVal || (centreIdVal as any)?._id === (centre._id || centre.id));
+    return c?.type === filterType;
+  };
+
+  const getReviewerInfo = (s: Session) => {
+    if (s.reviewerName) {
+      return {
+        name: s.reviewerName,
+        role: formatRole(s.reviewerRole)
+      };
+    }
+
+    if (s.reviewedBy) {
+      const admin = adminsList.find(a => 
+        (a._id || a.id) === s.reviewedBy || 
+        a._id?.toString() === s.reviewedBy?.toString() ||
+        a.email === s.reviewedBy || 
+        a.name === s.reviewedBy
+      );
+      if (admin) {
+        return {
+          name: admin.name,
+          role: formatRole(admin.role)
+        };
+      }
+    }
+
+    // Fallback: Check if the centre has assigned Program Managers
+    const centre = centresList.find(c => (c._id || c.id) === s.centreId || (s.centreId as any)?._id === (c._id || c.id));
+    if (centre) {
+      const pms = getPMs(centre);
+      if (pms && pms.length > 0) {
+        return {
+          name: pms.join(", "),
+          role: "Program Manager"
+        };
+      }
+    }
+
+    return null;
+  };
+
   const baseFilteredSessions = useMemo(() => {
     return sessionsList.filter(s => {
       if (!isDateMatch(s.date)) return false;
       if (!isFellowBatchMatch(s.fellowId)) return false;
       if (filterCentreFellow !== "all" && s.fellowId !== filterCentreFellow) return false;
+      if (!isCentreTypeMatch(s.centreId)) return false;
       return true;
     });
-  }, [sessionsList, filterDate, filterMonth, filterYear, filterBatch, filterCentreFellow, fellowsList]);
+  }, [sessionsList, filterDate, filterMonth, filterYear, filterBatch, filterCentreFellow, filterType, fellowsList, centresList]);
 
   // Overall counts for summary cards
   const overallTotal = baseFilteredSessions.length;
@@ -649,12 +753,13 @@ const SessionsPage = () => {
     </Dialog>
   );
 
-  const isAnyFilterActive = filterDate !== "" || filterMonth !== new Date().getMonth().toString() || filterYear !== new Date().getFullYear().toString() || filterBatch !== "all" || filterStatus !== "all" || filterCentreFellow !== "all" || centreSearchQuery !== "" || searchQuery !== "";
+  const isAnyFilterActive = filterDate !== "" || filterMonth !== new Date().getMonth().toString() || filterYear !== new Date().getFullYear().toString() || filterType !== "all" || filterBatch !== "all" || filterStatus !== "all" || filterCentreFellow !== "all" || centreSearchQuery !== "" || searchQuery !== "";
 
   const resetAllFilters = () => {
     setFilterDate("");
     setFilterMonth(new Date().getMonth().toString());
     setFilterYear(new Date().getFullYear().toString());
+    setFilterType("all");
     setFilterBatch("all");
     setFilterStatus("all");
     setFilterCentreFellow("all");
@@ -752,6 +857,18 @@ const SessionsPage = () => {
               </SelectContent>
             </Select>
 
+            {/* Programme Type (In-school vs After-school) */}
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[130px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="In-school">In-school</SelectItem>
+                <SelectItem value="After-school">After-school</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* 4) Fellow batch vise filter */}
             <Select value={filterBatch} onValueChange={(val) => {
               setFilterBatch(val);
@@ -826,6 +943,12 @@ const SessionsPage = () => {
                 <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
                   Batch: {filterBatch}
                   <button onClick={() => setFilterBatch("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterType !== "all" && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Type: {filterType}
+                  <button onClick={() => setFilterType("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
                 </Badge>
               )}
               {filterStatus !== "all" && (
@@ -986,7 +1109,16 @@ const SessionsPage = () => {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
                         {s.approvalStatus === 'approved' && <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>}
-                        {s.approvalStatus === 'rejected' && <Badge className="bg-rose-600 text-white font-bold">Rejected</Badge>}
+                        {s.approvalStatus === 'rejected' && (
+                          <div className="flex items-center gap-1.5">
+                            <Badge className="bg-rose-600 text-white font-bold">Rejected</Badge>
+                            {isSuperAdmin && getReviewerInfo(s) && (
+                              <Badge variant="outline" className="text-[10px] font-bold text-rose-700 bg-rose-50 border-rose-200">
+                                by {getReviewerInfo(s)?.name}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                         {(!s.approvalStatus || s.approvalStatus === 'pending') && (
                           <Badge className="bg-amber-500 text-white font-bold flex items-center gap-1">
                             <Clock className="h-3 w-3" /> Pending Review
@@ -994,14 +1126,60 @@ const SessionsPage = () => {
                         )}
                       </div>
 
-                      {s.approvalStatus === 'rejected' && s.reviewNote && (
-                        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-xl">
-                          <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                      {s.approvalStatus === 'rejected' && (s.reviewNote || (isSuperAdmin && getReviewerInfo(s))) && (
+                        <div className="bg-destructive/10 text-destructive text-sm p-3.5 rounded-xl space-y-1.5 border border-destructive/20">
+                          {s.reviewNote && (
+                            <div>
+                              <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                            </div>
+                          )}
+                          {isSuperAdmin && getReviewerInfo(s) && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-destructive/90 pt-1.5 border-t border-destructive/15">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-destructive/15 text-destructive font-black text-[11px] uppercase tracking-wider">
+                                Rejected by:
+                              </span>
+                              <span className="font-black text-destructive text-sm">
+                                {getReviewerInfo(s)?.name}
+                              </span>
+                              {getReviewerInfo(s)?.role && (
+                                <span className="text-muted-foreground font-medium text-xs">
+                                  ({getReviewerInfo(s)?.role})
+                                </span>
+                              )}
+                              {s.reviewedAt && (
+                                <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                                  on {formatDateDMY(s.reviewedAt)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                       {s.approvalStatus !== 'rejected' && s.reviewNote && (
-                        <div className="bg-info/10 text-info text-sm p-3 rounded-xl">
-                          <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                        <div className="bg-info/10 text-info text-sm p-3.5 rounded-xl space-y-1.5 border border-info/20">
+                          <div>
+                            <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                          </div>
+                          {isSuperAdmin && getReviewerInfo(s) && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-info/90 pt-1.5 border-t border-info/15">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-info/15 text-info font-black text-[11px] uppercase tracking-wider">
+                                Reviewed by:
+                              </span>
+                              <span className="font-black text-info text-sm">
+                                {getReviewerInfo(s)?.name}
+                              </span>
+                              {getReviewerInfo(s)?.role && (
+                                <span className="text-muted-foreground font-medium text-xs">
+                                  ({getReviewerInfo(s)?.role})
+                                </span>
+                              )}
+                              {s.reviewedAt && (
+                                <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                                  on {formatDateDMY(s.reviewedAt)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1192,17 +1370,72 @@ const SessionsPage = () => {
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
                   {s.approvalStatus === 'approved' && <Badge className="bg-success text-white">Approved</Badge>}
-                  {s.approvalStatus === 'rejected' && <Badge className="bg-destructive text-white">Rejected</Badge>}
+                  {s.approvalStatus === 'rejected' && (
+                    <div className="flex items-center gap-1.5">
+                      <Badge className="bg-destructive text-white">Rejected</Badge>
+                      {isSuperAdmin && getReviewerInfo(s) && (
+                        <Badge variant="outline" className="text-[10px] font-bold text-rose-700 bg-rose-50 border-rose-200">
+                          by {getReviewerInfo(s)?.name}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                   {(!s.approvalStatus || s.approvalStatus === 'pending') && <Badge className="bg-warning text-white">Pending Review</Badge>}
                 </div>
-                {s.approvalStatus === 'rejected' && s.reviewNote && (
-                  <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-xl">
-                    <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                {s.approvalStatus === 'rejected' && (s.reviewNote || (isSuperAdmin && getReviewerInfo(s))) && (
+                  <div className="bg-destructive/10 text-destructive text-sm p-3.5 rounded-xl space-y-1.5 border border-destructive/20">
+                    {s.reviewNote && (
+                      <div>
+                        <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
+                      </div>
+                    )}
+                    {isSuperAdmin && getReviewerInfo(s) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-destructive/90 pt-1.5 border-t border-destructive/15">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-destructive/15 text-destructive font-black text-[11px] uppercase tracking-wider">
+                          Rejected by:
+                        </span>
+                        <span className="font-black text-destructive text-sm">
+                          {getReviewerInfo(s)?.name}
+                        </span>
+                        {getReviewerInfo(s)?.role && (
+                          <span className="text-muted-foreground font-medium text-xs">
+                            ({getReviewerInfo(s)?.role})
+                          </span>
+                        )}
+                        {s.reviewedAt && (
+                          <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                            on {formatDateDMY(s.reviewedAt)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {s.approvalStatus !== 'rejected' && s.reviewNote && (
-                  <div className="bg-info/10 text-info text-sm p-3 rounded-xl">
-                    <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                  <div className="bg-info/10 text-info text-sm p-3.5 rounded-xl space-y-1.5 border border-info/20">
+                    <div>
+                      <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                    </div>
+                    {isSuperAdmin && getReviewerInfo(s) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-info/90 pt-1.5 border-t border-info/15">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-info/15 text-info font-black text-[11px] uppercase tracking-wider">
+                          Reviewed by:
+                        </span>
+                        <span className="font-black text-info text-sm">
+                          {getReviewerInfo(s)?.name}
+                        </span>
+                        {getReviewerInfo(s)?.role && (
+                          <span className="text-muted-foreground font-medium text-xs">
+                            ({getReviewerInfo(s)?.role})
+                          </span>
+                        )}
+                        {s.reviewedAt && (
+                          <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                            on {formatDateDMY(s.reviewedAt)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center gap-6">
