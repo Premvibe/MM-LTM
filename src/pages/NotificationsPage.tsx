@@ -54,7 +54,7 @@ const NotificationsPage = () => {
   const fetchNotifications = async () => {
     try {
       const roleParam = user?.role === 'fellow' 
-        ? `?role=fellow` 
+        ? `?role=fellow&email=${encodeURIComponent(user.email || '')}&userId=${user.id || ''}` 
         : user?.role === 'program_manager' 
           ? `?role=program_manager&email=${user.email}` 
           : `?role=${user?.role}`;
@@ -76,7 +76,7 @@ const NotificationsPage = () => {
   const markAllAsRead = async () => {
     try {
       const roleParam = user?.role === 'fellow' 
-        ? `?role=fellow` 
+        ? `?role=fellow&email=${encodeURIComponent(user.email || '')}&userId=${user.id || ''}` 
         : user?.role === 'program_manager' 
           ? `?role=program_manager&email=${user.email}` 
           : `?role=${user?.role}`;

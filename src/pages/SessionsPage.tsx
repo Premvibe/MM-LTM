@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check } from "lucide-react";
+import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -35,7 +35,7 @@ type Session = {
   observations?: string;
   issues?: string;
   createdAt?: string;
-  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvalStatus?: 'pending' | 'approved' | 'rejected' | 'revision_requested' | 'revision_needed';
   reviewNote?: string;
   reviewedBy?: string;
   reviewedAt?: string;
@@ -120,8 +120,14 @@ const SessionsPage = () => {
 
   const selectedCentreId = searchParams.get("centre");
   const setSelectedCentreId = (id: string | null) => {
-    if (id) setSearchParams({ centre: id });
-    else setSearchParams({});
+    const nextParams = new URLSearchParams(searchParams);
+    if (id) {
+      nextParams.set("centre", id);
+    } else {
+      nextParams.delete("centre");
+      nextParams.delete("session");
+    }
+    setSearchParams(nextParams);
   };
 
   const [open, setOpen] = useState(false);
@@ -154,7 +160,7 @@ const SessionsPage = () => {
   
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewSession, setReviewSession] = useState<Session | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected'>('approved');
+  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected' | 'revision_requested'>('approved');
   const [reviewNote, setReviewNote] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
@@ -195,7 +201,7 @@ const SessionsPage = () => {
         api.get(`/centres${paramsQuery}`),
         api.get(`/fellows${paramsQuery}`),
         api.get(`/students${paramsQuery}`),
-        isSuperAdmin ? api.get('/admins').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+        api.get('/admins').catch(() => ({ data: [] }))
       ]);
       setSessionsList(sessionsRes.data);
       setCentresList(centresRes.data);
@@ -344,15 +350,20 @@ const SessionsPage = () => {
       toast.error("Please provide a reason for rejection");
       return;
     }
+    if (reviewStatus === 'revision_requested' && !reviewNote.trim()) {
+      toast.error("Please provide instructions on what needs revision");
+      return;
+    }
     
     setIsSubmittingReview(true);
     try {
       await api.put(`/sessions/${reviewSession._id}/review`, {
         approvalStatus: reviewStatus,
         reviewNote: reviewNote.trim(),
-        reviewedBy: user?.id || ''
+        reviewedBy: user?.id || (user as any)?._id || ''
       });
-      toast.success(`Session ${reviewStatus}`);
+      const statusLabel = reviewStatus === 'approved' ? 'approved' : reviewStatus === 'rejected' ? 'rejected' : 'sent for revision';
+      toast.success(`Session ${statusLabel}`);
       setReviewOpen(false);
       fetchData();
     } catch (error) {
@@ -364,7 +375,13 @@ const SessionsPage = () => {
 
   const openReview = (session: Session) => {
     setReviewSession(session);
-    setReviewStatus(session.approvalStatus === 'rejected' ? 'rejected' : 'approved');
+    setReviewStatus(
+      session.approvalStatus === 'rejected'
+        ? 'rejected'
+        : session.approvalStatus === 'revision_requested' || session.approvalStatus === 'revision_needed'
+          ? 'revision_requested'
+          : 'approved'
+    );
     setReviewNote(session.reviewNote || "");
     setReviewOpen(true);
   };
@@ -394,6 +411,7 @@ const SessionsPage = () => {
     if (status === "approved") return s.approvalStatus === "approved";
     if (status === "pending") return !s.approvalStatus || s.approvalStatus === "pending";
     if (status === "rejected") return s.approvalStatus === "rejected";
+    if (status === "revision_requested") return s.approvalStatus === "revision_requested" || s.approvalStatus === "revision_needed";
     return true;
   };
 
@@ -463,6 +481,7 @@ const SessionsPage = () => {
   const overallTotal = baseFilteredSessions.length;
   const overallApproved = baseFilteredSessions.filter(s => s.approvalStatus === 'approved').length;
   const overallPending = baseFilteredSessions.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length;
+  const overallRevision = baseFilteredSessions.filter(s => s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed').length;
   const overallRejected = baseFilteredSessions.filter(s => s.approvalStatus === 'rejected').length;
 
   const getCentreSessionStats = (centre: Centre) => {
@@ -473,11 +492,13 @@ const SessionsPage = () => {
     });
     const approved = centreSessions.filter(s => s.approvalStatus === 'approved').length;
     const pending = centreSessions.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length;
+    const revision = centreSessions.filter(s => s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed').length;
     const rejected = centreSessions.filter(s => s.approvalStatus === 'rejected').length;
     return {
       total: centreSessions.length,
       approved,
       pending,
+      revision,
       rejected,
       sessions: centreSessions
     };
@@ -485,14 +506,40 @@ const SessionsPage = () => {
 
   const selectedCentre = useMemo(() => centresList.find(c => (c._id || c.id) === selectedCentreId), [centresList, selectedCentreId]);
 
-  const centreSessionsList = useMemo(() => selectedCentreId ? sessionsList.filter(s => {
-    const matchesCentre = s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId;
-    if (!matchesCentre) return false;
-    if (!isDateMatch(s.date)) return false;
-    if (!isFellowBatchMatch(s.fellowId)) return false;
-    if (!isStatusMatch(s, filterStatus)) return false;
-    return true;
-  }) : [], [sessionsList, selectedCentreId, filterDate, filterMonth, filterYear, filterBatch, filterStatus, fellowsList]);
+  const centreBaseSessions = useMemo(() => {
+    if (!selectedCentreId) return [];
+    return sessionsList.filter(s => {
+      const matchesCentre = s.centreId === selectedCentreId || (s.centreId as any)?._id === selectedCentreId;
+      if (!matchesCentre) return false;
+      if (!isDateMatch(s.date)) return false;
+      if (!isFellowBatchMatch(s.fellowId)) return false;
+      if (filterCentreFellow !== "all" && s.fellowId !== filterCentreFellow) return false;
+      return true;
+    });
+  }, [sessionsList, selectedCentreId, filterDate, filterMonth, filterYear, filterBatch, filterCentreFellow, fellowsList]);
+
+  const centreApprovedCount = centreBaseSessions.filter(s => s.approvalStatus === 'approved').length;
+  const centrePendingCount = centreBaseSessions.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length;
+  const centreRevisionCount = centreBaseSessions.filter(s => s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed').length;
+  const centreRejectedCount = centreBaseSessions.filter(s => s.approvalStatus === 'rejected').length;
+  const centreTotalCount = centreBaseSessions.length;
+
+  const centreSessionsList = useMemo(() => {
+    return centreBaseSessions.filter(s => isStatusMatch(s, filterStatus));
+  }, [centreBaseSessions, filterStatus]);
+
+  const attendanceCentreId = selectedCentreId || (activeSession?.centreId ? ((activeSession.centreId as any)?._id || activeSession.centreId) : null);
+
+  const attendanceStudents = useMemo(() => {
+    return studentsList
+      .filter(s => {
+        const sCid = (s.centreId as any)?._id || s.centreId;
+        const matchesCentre = attendanceCentreId ? sCid === attendanceCentreId : true;
+        const matchesSearch = s.name.toLowerCase().includes(attendanceSearchQuery.toLowerCase());
+        return matchesCentre && matchesSearch;
+      })
+      .sort(compareStudentsByClassAndName);
+  }, [studentsList, attendanceCentreId, attendanceSearchQuery]);
 
   const allFilteredSessionsList = useMemo(() => {
     return baseFilteredSessions.filter(s => {
@@ -528,6 +575,8 @@ const SessionsPage = () => {
         matchesStatus = stats.approved > 0;
       } else if (filterStatus === "pending") {
         matchesStatus = stats.pending > 0;
+      } else if (filterStatus === "revision_requested") {
+        matchesStatus = stats.revision > 0;
       } else if (filterStatus === "rejected") {
         matchesStatus = stats.rejected > 0;
       }
@@ -537,7 +586,7 @@ const SessionsPage = () => {
   }, [centresList, fellowsList, centreSearchQuery, filterType, filterBatch, filterCentreFellow, filterStatus, baseFilteredSessions]);
 
   const renderStatsCards = () => (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       <Card 
         onClick={() => setFilterStatus("all")}
         className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "all" ? "border-primary/50 bg-primary/5 shadow-sm ring-2 ring-primary/20" : "border-border/40 hover:border-border"}`}
@@ -601,6 +650,29 @@ const SessionsPage = () => {
       </Card>
 
       <Card 
+        onClick={() => setFilterStatus(filterStatus === "revision_requested" ? "all" : "revision_requested")}
+        className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "revision_requested" ? "border-orange-500 bg-orange-50/50 shadow-sm ring-2 ring-orange-500/20" : overallRevision > 0 ? "border-orange-300/80 hover:border-orange-400" : "border-border/40 hover:border-orange-200"}`}
+      >
+        <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-700">Revision</p>
+              {filterStatus === "revision_requested" && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8px] font-black bg-orange-600 text-white uppercase">Active</span>
+              )}
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-orange-700 mt-1">{overallRevision}</h3>
+            <p className="text-[10px] font-bold text-orange-600/80 mt-0.5">
+              {overallRevision > 0 ? "Awaiting fellow update" : "0 in revision"}
+            </p>
+          </div>
+          <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
+            <RotateCcw className="h-5 w-5 sm:h-6 sm:w-6" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card 
         onClick={() => setFilterStatus(filterStatus === "rejected" ? "all" : "rejected")}
         className={`glass-card-premium border-2 transition-all cursor-pointer hover:shadow-md ${filterStatus === "rejected" ? "border-rose-500 bg-rose-50/50 shadow-sm ring-2 ring-rose-500/20" : "border-border/40 hover:border-rose-200"}`}
       >
@@ -625,13 +697,21 @@ const SessionsPage = () => {
     </div>
   );
 
-  const dialogForm = (
+  const renderLogSessionButton = () => (
+    <Button 
+      onClick={() => {
+        resetForm();
+        if (selectedCentreId) setCentreId(selectedCentreId);
+        setOpen(true);
+      }}
+      className="rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
+    >
+      <Plus className="h-4 w-4 mr-2" /> Log Session
+    </Button>
+  );
+
+  const sessionModal = (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-      <DialogTrigger asChild>
-        <Button className="rounded-xl h-11 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4 mr-2" />Log Session
-        </Button>
-      </DialogTrigger>
       <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-primary p-6 md:p-8 text-white shrink-0">
           <DialogTitle className="text-2xl font-black tracking-tight">{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
@@ -767,19 +847,20 @@ const SessionsPage = () => {
     setSearchQuery("");
   };
 
-  if (!selectedCentreId) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="page-title">Sessions Log</h1>
-            <p className="page-description uppercase tracking-[0.2em] text-[10px]">LTM Program Quality & Student Attendance Tracker</p>
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {!selectedCentreId ? (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="page-title">Sessions Log</h1>
+              <p className="page-description uppercase tracking-[0.2em] text-[10px]">LTM Program Quality & Student Attendance Tracker</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {renderLogSessionButton()}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {dialogForm}
-          </div>
-        </div>
 
         {/* 2) Overall count of pending and approved session */}
         {renderStatsCards()}
@@ -899,6 +980,7 @@ const SessionsPage = () => {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="approved">Approved Only</SelectItem>
                 <SelectItem value="pending">Pending Only</SelectItem>
+                <SelectItem value="revision_requested">Revision Requested</SelectItem>
                 <SelectItem value="rejected">Rejected Only</SelectItem>
               </SelectContent>
             </Select>
@@ -952,8 +1034,8 @@ const SessionsPage = () => {
                 </Badge>
               )}
               {filterStatus !== "all" && (
-                <Badge variant="outline" className={`text-[10px] font-bold gap-1 pr-1 ${filterStatus === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : filterStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-rose-50 text-rose-700 border-rose-300'}`}>
-                  Status: {filterStatus === 'approved' ? 'Approved' : filterStatus === 'pending' ? 'Pending' : 'Rejected'}
+                <Badge variant="outline" className={`text-[10px] font-bold gap-1 pr-1 ${filterStatus === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : filterStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-300' : filterStatus === 'revision_requested' ? 'bg-orange-50 text-orange-700 border-orange-300' : 'bg-rose-50 text-rose-700 border-rose-300'}`}>
+                  Status: {filterStatus === 'approved' ? 'Approved' : filterStatus === 'pending' ? 'Pending' : filterStatus === 'revision_requested' ? 'Revision Requested' : 'Rejected'}
                   <button onClick={() => setFilterStatus("all")} className="hover:bg-black/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
                 </Badge>
               )}
@@ -1029,6 +1111,12 @@ const SessionsPage = () => {
                           ) : (
                             <Badge variant="outline" className="text-[10px] font-medium bg-gray-50/80 text-gray-400 border-gray-200/60 px-1.5 py-0.5 rounded-lg">
                               0 Pending
+                            </Badge>
+                          )}
+                          {cStats.revision > 0 && (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-orange-50 text-orange-700 border-orange-200 px-1.5 py-0.5 rounded-lg flex items-center gap-1">
+                              <RotateCcw className="h-3 w-3 text-orange-600" />
+                              <span>{cStats.revision}</span>
                             </Badge>
                           )}
                           {cStats.rejected > 0 && (
@@ -1108,12 +1196,33 @@ const SessionsPage = () => {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
-                        {s.approvalStatus === 'approved' && <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>}
+                        {s.approvalStatus === 'approved' && (
+                          <div className="flex items-center gap-1.5">
+                            <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>
+                            {getReviewerInfo(s) && (
+                              <Badge variant="outline" className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border-emerald-200">
+                                by {getReviewerInfo(s)?.name}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                         {s.approvalStatus === 'rejected' && (
                           <div className="flex items-center gap-1.5">
                             <Badge className="bg-rose-600 text-white font-bold">Rejected</Badge>
-                            {isSuperAdmin && getReviewerInfo(s) && (
+                            {getReviewerInfo(s) && (
                               <Badge variant="outline" className="text-[10px] font-bold text-rose-700 bg-rose-50 border-rose-200">
+                                by {getReviewerInfo(s)?.name}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        {(s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed') && (
+                          <div className="flex items-center gap-1.5">
+                            <Badge className="bg-orange-600 text-white font-bold flex items-center gap-1">
+                              <RotateCcw className="h-3 w-3" /> Revision Requested
+                            </Badge>
+                            {getReviewerInfo(s) && (
+                              <Badge variant="outline" className="text-[10px] font-bold text-orange-700 bg-orange-50 border-orange-200">
                                 by {getReviewerInfo(s)?.name}
                               </Badge>
                             )}
@@ -1126,14 +1235,44 @@ const SessionsPage = () => {
                         )}
                       </div>
 
-                      {s.approvalStatus === 'rejected' && (s.reviewNote || (isSuperAdmin && getReviewerInfo(s))) && (
+                      {(s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed') && (s.reviewNote || (getReviewerInfo(s))) && (
+                        <div className="bg-orange-50 text-orange-800 text-sm p-3.5 rounded-xl space-y-1.5 border border-orange-200">
+                          {s.reviewNote && (
+                            <div>
+                              <strong className="font-bold">Revision Requested:</strong> {s.reviewNote}
+                            </div>
+                          )}
+                          {getReviewerInfo(s) && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-orange-700 pt-1.5 border-t border-orange-200/60">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 font-black text-[11px] uppercase tracking-wider">
+                                Requested by:
+                              </span>
+                              <span className="font-black text-orange-800 text-sm">
+                                {getReviewerInfo(s)?.name}
+                              </span>
+                              {getReviewerInfo(s)?.role && (
+                                <span className="text-muted-foreground font-medium text-xs">
+                                  ({getReviewerInfo(s)?.role})
+                                </span>
+                              )}
+                              {s.reviewedAt && (
+                                <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                                  on {formatDateDMY(s.reviewedAt)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {s.approvalStatus === 'rejected' && (s.reviewNote || (getReviewerInfo(s))) && (
                         <div className="bg-destructive/10 text-destructive text-sm p-3.5 rounded-xl space-y-1.5 border border-destructive/20">
                           {s.reviewNote && (
                             <div>
                               <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
                             </div>
                           )}
-                          {isSuperAdmin && getReviewerInfo(s) && (
+                          {getReviewerInfo(s) && (
                             <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-destructive/90 pt-1.5 border-t border-destructive/15">
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-destructive/15 text-destructive font-black text-[11px] uppercase tracking-wider">
                                 Rejected by:
@@ -1155,17 +1294,19 @@ const SessionsPage = () => {
                           )}
                         </div>
                       )}
-                      {s.approvalStatus !== 'rejected' && s.reviewNote && (
-                        <div className="bg-info/10 text-info text-sm p-3.5 rounded-xl space-y-1.5 border border-info/20">
-                          <div>
-                            <strong className="font-bold">Review Note:</strong> {s.reviewNote}
-                          </div>
-                          {isSuperAdmin && getReviewerInfo(s) && (
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-info/90 pt-1.5 border-t border-info/15">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-info/15 text-info font-black text-[11px] uppercase tracking-wider">
-                                Reviewed by:
+                      {s.approvalStatus === 'approved' && (s.reviewNote || (getReviewerInfo(s))) && (
+                        <div className="bg-emerald-50 text-emerald-800 text-sm p-3.5 rounded-xl space-y-1.5 border border-emerald-200">
+                          {s.reviewNote && (
+                            <div>
+                              <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                            </div>
+                          )}
+                          {getReviewerInfo(s) && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-700 pt-1.5 border-t border-emerald-200/60">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-black text-[11px] uppercase tracking-wider">
+                                Approved by:
                               </span>
-                              <span className="font-black text-info text-sm">
+                              <span className="font-black text-emerald-800 text-sm">
                                 {getReviewerInfo(s)?.name}
                               </span>
                               {getReviewerInfo(s)?.role && (
@@ -1247,100 +1388,219 @@ const SessionsPage = () => {
           </div>
         )}
       </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3 md:gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedCentreId(null)} className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary/20 hover:text-primary transition-all shrink-0">
-            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl md:text-3xl font-[950] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-1.5">
-              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                <span>{centreSessionsList.filter(s => s.approvalStatus === 'approved').length} Approved</span>
-              </Badge>
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold flex items-center gap-1">
-                <Clock className="h-3 w-3 text-amber-600" />
-                <span>{centreSessionsList.filter(s => !s.approvalStatus || s.approvalStatus === 'pending').length} Pending</span>
-              </Badge>
-              {centreSessionsList.filter(s => s.approvalStatus === 'rejected').length > 0 && (
-                <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold flex items-center gap-1">
-                  <XCircle className="h-3 w-3 text-rose-600" />
-                  <span>{centreSessionsList.filter(s => s.approvalStatus === 'rejected').length} Rejected</span>
+    ) : (
+      <div className="space-y-6">
+        <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setSelectedCentreId(null)} className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary/20 hover:text-primary transition-all shrink-0">
+              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl md:text-3xl font-[950] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <Badge 
+                  variant="outline" 
+                  onClick={() => setFilterStatus(filterStatus === 'approved' ? 'all' : 'approved')}
+                  className={`cursor-pointer transition-all hover:scale-105 active:scale-95 text-[10px] font-bold flex items-center gap-1 ${
+                    filterStatus === 'approved' 
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20' 
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span>{centreApprovedCount} Approved</span>
                 </Badge>
-              )}
-              <span className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">
-                | {centreSessionsList.length} Sessions Total
-              </span>
+                <Badge 
+                  variant="outline" 
+                  onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
+                  className={`cursor-pointer transition-all hover:scale-105 active:scale-95 text-[10px] font-bold flex items-center gap-1 ${
+                    filterStatus === 'pending' 
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-500/20' 
+                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <Clock className="h-3 w-3" />
+                  <span>{centrePendingCount} Pending</span>
+                </Badge>
+                {centreRevisionCount > 0 && (
+                  <Badge 
+                    variant="outline" 
+                    onClick={() => setFilterStatus(filterStatus === 'revision_requested' ? 'all' : 'revision_requested')}
+                    className={`cursor-pointer transition-all hover:scale-105 active:scale-95 text-[10px] font-bold flex items-center gap-1 ${
+                      filterStatus === 'revision_requested' 
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-sm ring-2 ring-orange-500/20' 
+                        : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+                    }`}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>{centreRevisionCount} Revision</span>
+                  </Badge>
+                )}
+                {centreRejectedCount > 0 && (
+                  <Badge 
+                    variant="outline" 
+                    onClick={() => setFilterStatus(filterStatus === 'rejected' ? 'all' : 'rejected')}
+                    className={`cursor-pointer transition-all hover:scale-105 active:scale-95 text-[10px] font-bold flex items-center gap-1 ${
+                      filterStatus === 'rejected' 
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm ring-2 ring-rose-500/20' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                    }`}
+                  >
+                    <XCircle className="h-3 w-3" />
+                    <span>{centreRejectedCount} Rejected</span>
+                  </Badge>
+                )}
+                <span 
+                  onClick={() => setFilterStatus('all')}
+                  className={`cursor-pointer hover:underline text-[10px] font-medium uppercase tracking-[0.2em] ${filterStatus === 'all' ? 'text-primary font-black' : 'text-muted-foreground'}`}
+                >
+                  | {centreTotalCount} Sessions Total
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {dialogForm}
-        </div>
-      </div>
-
-      <div className="bg-white/60 backdrop-blur-md p-3.5 rounded-[1.5rem] border border-white/40 shadow-lg space-y-3">
-        {/* Top: Full width Search */}
-        <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
-          <Input 
-            placeholder="Search sessions by topic or theme..." 
-            className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white font-bold text-xs w-full focus-visible:ring-primary/20" 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
-          />
+          <div className="flex items-center gap-3">
+            {renderLogSessionButton()}
+          </div>
         </div>
 
-        {/* Bottom: Filter controls */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/20">
-          <div className="flex items-center gap-1.5 bg-white border border-border/40 rounded-xl px-2.5 h-10 shadow-sm">
-            <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">Date</span>
+        <div className="bg-white/60 backdrop-blur-md p-3.5 rounded-[1.5rem] border border-white/40 shadow-lg space-y-3">
+          {/* Top: Full width Search */}
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
             <Input 
-              type="date" 
-              value={filterDate} 
-              onChange={(e) => setFilterDate(e.target.value)} 
-              className="h-8 w-[125px] border-none bg-transparent p-0 text-xs font-bold focus-visible:ring-0 cursor-pointer" 
+              placeholder="Search sessions by topic or theme..." 
+              className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white font-bold text-xs w-full focus-visible:ring-primary/20" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
             />
-            {filterDate && (
-              <Button variant="ghost" size="icon" className="h-5 w-5 p-0 hover:bg-muted rounded-md text-muted-foreground" onClick={() => setFilterDate("")}>
-                <X className="h-3 w-3" />
+          </div>
+
+          {/* Bottom: Filter controls */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/20">
+            <div className="flex items-center gap-1.5 bg-white border border-border/40 rounded-xl px-2.5 h-10 shadow-sm">
+              <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">Date</span>
+              <Input 
+                type="date" 
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)} 
+                className="h-8 w-[125px] border-none bg-transparent p-0 text-xs font-bold focus-visible:ring-0 cursor-pointer" 
+              />
+              {filterDate && (
+                <Button variant="ghost" size="icon" className="h-5 w-5 p-0 hover:bg-muted rounded-md text-muted-foreground" onClick={() => setFilterDate("")}>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[120px] shadow-sm"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[85px] shadow-sm"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                {years.map(y => <SelectItem key={y} value={y}>{y === "all" ? "All Years" : y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* Fellow Batch filter */}
+            <Select value={filterBatch} onValueChange={(val) => {
+              setFilterBatch(val);
+              if (filterCentreFellow !== "all") {
+                const f = fellowsList.find(fellow => (fellow._id || fellow.id) === filterCentreFellow);
+                if (f && f.batch && f.batch !== val && val !== "all") {
+                  setFilterCentreFellow("all");
+                }
+              }
+            }}>
+              <SelectTrigger className="w-[120px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                <SelectValue placeholder="Batch" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                <SelectItem value="all">All Batches</SelectItem>
+                {availableBatches.map(b => (
+                  <SelectItem key={b} value={b}>Batch {b}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Status Filter */}
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[130px] shadow-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="approved">Approved Only</SelectItem>
+                <SelectItem value="pending">Pending Only</SelectItem>
+                <SelectItem value="revision_requested">Revision Requested</SelectItem>
+                <SelectItem value="rejected">Rejected Only</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Fellow Filter (Admin/PM) */}
+            {isAdmin && (
+              <Select value={filterCentreFellow} onValueChange={setFilterCentreFellow}>
+                <SelectTrigger className="w-[140px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
+                  <SelectValue placeholder="Fellow" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl p-1 max-h-[300px]">
+                  <SelectItem value="all">All Fellows</SelectItem>
+                  {fellowsList
+                    .filter(f => selectedCentre?.fellowIds?.includes(f._id || f.id) || !selectedCentre)
+                    .map(f => (
+                      <SelectItem key={f._id || f.id} value={f._id || f.id}>
+                        {f.name} {f.batch ? `(${f.batch})` : ''}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {isAnyFilterActive && (
+              <Button variant="ghost" size="sm" onClick={resetAllFilters} className="h-10 px-3 text-xs font-bold text-muted-foreground hover:text-destructive ml-auto">
+                Reset Filters
               </Button>
             )}
           </div>
 
-          <Select value={filterMonth} onValueChange={setFilterMonth}>
-            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[120px] shadow-sm"><SelectValue /></SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl">
-              {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Select value={filterYear} onValueChange={setFilterYear}>
-            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[85px] shadow-sm"><SelectValue /></SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl">
-              {years.map(y => <SelectItem key={y} value={y}>{y === "all" ? "All Years" : y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {/* Status Filter */}
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="h-10 rounded-xl border-border/40 bg-white font-bold text-xs w-[130px] shadow-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent className="rounded-2xl border-none shadow-2xl">
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="approved">Approved Only</SelectItem>
-              <SelectItem value="pending">Pending Only</SelectItem>
-              <SelectItem value="rejected">Rejected Only</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Active filter pills */}
+          {isAnyFilterActive && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/20">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Active Filters:</span>
+              {filterDate && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Date: {formatDateDMY(filterDate)}
+                  <button onClick={() => setFilterDate("")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterBatch !== "all" && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Batch: {filterBatch}
+                  <button onClick={() => setFilterBatch("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterStatus !== "all" && (
+                <Badge variant="outline" className={`text-[10px] font-bold gap-1 pr-1 ${filterStatus === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : filterStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-300' : filterStatus === 'revision_requested' ? 'bg-orange-50 text-orange-700 border-orange-300' : 'bg-rose-50 text-rose-700 border-rose-300'}`}>
+                  Status: {filterStatus === 'approved' ? 'Approved' : filterStatus === 'pending' ? 'Pending' : filterStatus === 'revision_requested' ? 'Revision Requested' : 'Rejected'}
+                  <button onClick={() => setFilterStatus("all")} className="hover:bg-black/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              {filterCentreFellow !== "all" && (
+                <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
+                  Fellow: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
+                  <button onClick={() => setFilterCentreFellow("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
+                </Badge>
+              )}
+              <Button variant="ghost" size="sm" onClick={resetAllFilters} className="h-6 px-2 text-[10px] font-black uppercase text-muted-foreground hover:text-destructive">
+                Reset All Filters
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
 
       <div className="grid grid-cols-1 gap-4">
         {centreSessionsList
@@ -1369,12 +1629,33 @@ const SessionsPage = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
-                  {s.approvalStatus === 'approved' && <Badge className="bg-success text-white">Approved</Badge>}
+                  {s.approvalStatus === 'approved' && (
+                    <div className="flex items-center gap-1.5">
+                      <Badge className="bg-success text-white">Approved</Badge>
+                      {getReviewerInfo(s) && (
+                        <Badge variant="outline" className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border-emerald-200">
+                          by {getReviewerInfo(s)?.name}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                   {s.approvalStatus === 'rejected' && (
                     <div className="flex items-center gap-1.5">
                       <Badge className="bg-destructive text-white">Rejected</Badge>
-                      {isSuperAdmin && getReviewerInfo(s) && (
+                      {getReviewerInfo(s) && (
                         <Badge variant="outline" className="text-[10px] font-bold text-rose-700 bg-rose-50 border-rose-200">
+                          by {getReviewerInfo(s)?.name}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  {(s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed') && (
+                    <div className="flex items-center gap-1.5">
+                      <Badge className="bg-orange-600 text-white font-bold flex items-center gap-1">
+                        <RotateCcw className="h-3 w-3" /> Revision Requested
+                      </Badge>
+                      {getReviewerInfo(s) && (
+                        <Badge variant="outline" className="text-[10px] font-bold text-orange-700 bg-orange-50 border-orange-200">
                           by {getReviewerInfo(s)?.name}
                         </Badge>
                       )}
@@ -1382,14 +1663,43 @@ const SessionsPage = () => {
                   )}
                   {(!s.approvalStatus || s.approvalStatus === 'pending') && <Badge className="bg-warning text-white">Pending Review</Badge>}
                 </div>
-                {s.approvalStatus === 'rejected' && (s.reviewNote || (isSuperAdmin && getReviewerInfo(s))) && (
+                {(s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed') && (s.reviewNote || (getReviewerInfo(s))) && (
+                  <div className="bg-orange-50 text-orange-800 text-sm p-3.5 rounded-xl space-y-1.5 border border-orange-200">
+                    {s.reviewNote && (
+                      <div>
+                        <strong className="font-bold">Revision Requested:</strong> {s.reviewNote}
+                      </div>
+                    )}
+                    {getReviewerInfo(s) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-orange-700 pt-1.5 border-t border-orange-200/60">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 font-black text-[11px] uppercase tracking-wider">
+                          Requested by:
+                        </span>
+                        <span className="font-black text-orange-800 text-sm">
+                          {getReviewerInfo(s)?.name}
+                        </span>
+                        {getReviewerInfo(s)?.role && (
+                          <span className="text-muted-foreground font-medium text-xs">
+                            ({getReviewerInfo(s)?.role})
+                          </span>
+                        )}
+                        {s.reviewedAt && (
+                          <span className="text-muted-foreground/80 font-normal text-xs ml-auto">
+                            on {formatDateDMY(s.reviewedAt)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {s.approvalStatus === 'rejected' && (s.reviewNote || (getReviewerInfo(s))) && (
                   <div className="bg-destructive/10 text-destructive text-sm p-3.5 rounded-xl space-y-1.5 border border-destructive/20">
                     {s.reviewNote && (
                       <div>
                         <strong className="font-bold">Rejection Note:</strong> {s.reviewNote}
                       </div>
                     )}
-                    {isSuperAdmin && getReviewerInfo(s) && (
+                    {getReviewerInfo(s) && (
                       <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-destructive/90 pt-1.5 border-t border-destructive/15">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-destructive/15 text-destructive font-black text-[11px] uppercase tracking-wider">
                           Rejected by:
@@ -1411,17 +1721,19 @@ const SessionsPage = () => {
                     )}
                   </div>
                 )}
-                {s.approvalStatus !== 'rejected' && s.reviewNote && (
-                  <div className="bg-info/10 text-info text-sm p-3.5 rounded-xl space-y-1.5 border border-info/20">
-                    <div>
-                      <strong className="font-bold">Review Note:</strong> {s.reviewNote}
-                    </div>
-                    {isSuperAdmin && getReviewerInfo(s) && (
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-info/90 pt-1.5 border-t border-info/15">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-info/15 text-info font-black text-[11px] uppercase tracking-wider">
-                          Reviewed by:
+                {s.approvalStatus === 'approved' && (s.reviewNote || (getReviewerInfo(s))) && (
+                  <div className="bg-emerald-50 text-emerald-800 text-sm p-3.5 rounded-xl space-y-1.5 border border-emerald-200">
+                    {s.reviewNote && (
+                      <div>
+                        <strong className="font-bold">Review Note:</strong> {s.reviewNote}
+                      </div>
+                    )}
+                    {getReviewerInfo(s) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-700 pt-1.5 border-t border-emerald-200/60">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-black text-[11px] uppercase tracking-wider">
+                          Approved by:
                         </span>
-                        <span className="font-black text-info text-sm">
+                        <span className="font-black text-emerald-800 text-sm">
                           {getReviewerInfo(s)?.name}
                         </span>
                         {getReviewerInfo(s)?.role && (
@@ -1491,7 +1803,13 @@ const SessionsPage = () => {
           </div>
         )}
       </div>
+    </div>
+    )}
 
+      {/* Shared Session Log / Edit Dialog */}
+      {sessionModal}
+
+      {/* Shared Quick Attendance Dialog */}
       <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
         <DialogContent className="max-w-[500px] rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-primary p-8 text-white">
@@ -1509,19 +1827,47 @@ const SessionsPage = () => {
               />
             </div>
             <div className="flex gap-2 mt-4">
-              <Button variant="secondary" size="sm" className="rounded-lg text-[10px] font-black uppercase h-8 px-4" onClick={() => setCheckedStudentIds(studentsList.filter(s => s.centreId === selectedCentreId).map(s => s._id))}>Select All</Button>
-              <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-black uppercase h-8 px-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-primary" onClick={() => setCheckedStudentIds([])}>Clear All</Button>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="rounded-lg text-[10px] font-black uppercase h-8 px-4" 
+                onClick={() => {
+                  const allIds = studentsList
+                    .filter(s => {
+                      const sCid = (s.centreId as any)?._id || s.centreId;
+                      return attendanceCentreId ? sCid === attendanceCentreId : true;
+                    })
+                    .map(s => s._id || s.id);
+                  setCheckedStudentIds(allIds);
+                }}
+              >
+                Select All
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-lg text-[10px] font-black uppercase h-8 px-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-primary" 
+                onClick={() => setCheckedStudentIds([])}
+              >
+                Clear All
+              </Button>
             </div>
           </div>
           <ScrollArea className="h-[340px] p-8">
             <div className="space-y-3">
-              {studentsList
-                .filter(s => s.centreId === selectedCentreId && s.name.toLowerCase().includes(attendanceSearchQuery.toLowerCase()))
-                .sort(compareStudentsByClassAndName)
-                .map(s => (
-                  <div key={s._id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${checkedStudentIds.includes(s._id) ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} onClick={() => setCheckedStudentIds(prev => prev.includes(s._id) ? prev.filter(id => id !== s._id) : [...prev, s._id])}>
+              {attendanceStudents.map(s => {
+                const sId = s._id || s.id;
+                const isChecked = checkedStudentIds.includes(sId);
+                return (
+                  <div 
+                    key={sId} 
+                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${isChecked ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} 
+                    onClick={() => setCheckedStudentIds(prev => prev.includes(sId) ? prev.filter(id => id !== sId) : [...prev, sId])}
+                  >
                     <div className="flex items-center gap-4">
-                      <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${checkedStudentIds.includes(s._id) ? 'bg-primary text-white' : 'bg-muted text-transparent'}`}><CheckCircle2 className="h-4 w-4" /></div>
+                      <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isChecked ? 'bg-primary text-white' : 'bg-muted text-transparent'}`}>
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
                       <div>
                         <span className="text-sm font-black tracking-tight">{s.name}</span>
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mt-0.5">
@@ -1533,7 +1879,13 @@ const SessionsPage = () => {
                       <Badge variant="outline" className="rounded-lg text-[10px] font-bold opacity-70 uppercase">{s.grade || ''}{s.section ? `-${s.section}` : ''}</Badge>
                     )}
                   </div>
-                ))}
+                );
+              })}
+              {attendanceStudents.length === 0 && (
+                <div className="text-center py-8 text-xs font-bold text-muted-foreground">
+                  No students found for this centre.
+                </div>
+              )}
             </div>
           </ScrollArea>
           <div className="px-8 pb-4">
@@ -1569,35 +1921,57 @@ const SessionsPage = () => {
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</Label>
-              <Select value={reviewStatus} onValueChange={(val: 'approved' | 'rejected') => setReviewStatus(val)}>
-                <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white h-11">
+              <Select value={reviewStatus} onValueChange={(val: 'approved' | 'rejected' | 'revision_requested') => setReviewStatus(val)}>
+                <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white h-11 font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl">
                   <SelectItem value="approved" className="text-success font-bold">Approve</SelectItem>
+                  <SelectItem value="revision_requested" className="text-orange-600 font-bold">Request Revision</SelectItem>
                   <SelectItem value="rejected" className="text-destructive font-bold">Reject</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
-            {(reviewStatus === 'rejected' || reviewNote) && (
+            {(reviewStatus === 'rejected' || reviewStatus === 'revision_requested' || reviewNote) && (
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  Review Note {reviewStatus === 'rejected' && <span className="text-destructive">*</span>}
+                  {reviewStatus === 'revision_requested' ? "Revision Instructions" : "Review Note"} {(reviewStatus === 'rejected' || reviewStatus === 'revision_requested') && <span className="text-destructive">*</span>}
                 </Label>
                 <Textarea 
-                  placeholder={reviewStatus === 'rejected' ? "Why is this session rejected?" : "Optional note..."}
+                  placeholder={
+                    reviewStatus === 'revision_requested' 
+                      ? "Explain what the fellow needs to update (e.g. upload missing media, correct student attendance, or update session plan)..." 
+                      : reviewStatus === 'rejected' 
+                        ? "Why is this session rejected?" 
+                        : "Optional note..."
+                  }
                   value={reviewNote} 
                   onChange={e => setReviewNote(e.target.value)} 
-                  className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white min-h-[100px] resize-none" 
+                  className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white min-h-[100px] resize-none text-xs" 
                 />
+                {reviewStatus === 'revision_requested' && (
+                  <p className="text-[11px] text-muted-foreground">
+                    A notification with your instructions will be sent directly to the fellow.
+                  </p>
+                )}
               </div>
             )}
           </div>
           <DialogFooter className="pt-6 flex gap-2">
             <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold flex-1">Cancel</Button></DialogClose>
-            <Button onClick={handleReviewSubmit} disabled={isSubmittingReview} className={`rounded-xl font-black uppercase tracking-widest text-[10px] flex-1 ${reviewStatus === 'approved' ? 'bg-success hover:bg-success/90 text-white' : 'bg-destructive hover:bg-destructive/90 text-white'}`}>
-              {isSubmittingReview ? "Saving..." : reviewStatus === 'approved' ? "Approve" : "Reject"}
+            <Button 
+              onClick={handleReviewSubmit} 
+              disabled={isSubmittingReview} 
+              className={`rounded-xl font-black uppercase tracking-widest text-[10px] flex-1 ${
+                reviewStatus === 'approved' 
+                  ? 'bg-success hover:bg-success/90 text-white' 
+                  : reviewStatus === 'revision_requested'
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'bg-destructive hover:bg-destructive/90 text-white'
+              }`}
+            >
+              {isSubmittingReview ? "Saving..." : reviewStatus === 'approved' ? "Approve" : reviewStatus === 'revision_requested' ? "Request Revision" : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>

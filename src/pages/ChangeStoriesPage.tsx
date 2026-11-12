@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye, User, X, Briefcase } from "lucide-react";
+import { ArrowLeft, Search, Building2, MapPin, BookHeart, Plus, CheckCircle2, Clock, AlertTriangle, Pencil, Trash2, Eye, User, X, Briefcase, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams } from "react-router-dom";
@@ -38,9 +38,10 @@ type ChangeStory = {
   studentName: string;
   title: string;
   story: string;
-  status: "pending" | "approved" | "revision_needed";
+  status: "pending" | "approved" | "revision_needed" | "revision_requested" | "rejected";
   reviewedBy: string;
   reviewComment: string;
+  reviewedAt?: string;
   files?: Array<{ fileId: string; fileName: string; fileUrl: string; mimeType?: string; thumbnailLink?: string }>;
   createdAt?: string;
 };
@@ -63,10 +64,12 @@ const months = [
 ];
 const years = ["2024", "2025", "2026"];
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pending Review", color: "bg-warning/10 text-warning border-warning/20", icon: Clock },
   approved: { label: "Approved", color: "bg-success/10 text-success border-success/20", icon: CheckCircle2 },
-  revision_needed: { label: "Revision Needed", color: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertTriangle },
+  revision_needed: { label: "Revision Requested", color: "bg-orange-500/10 text-orange-600 border-orange-500/20", icon: RotateCcw },
+  revision_requested: { label: "Revision Requested", color: "bg-orange-500/10 text-orange-600 border-orange-500/20", icon: RotateCcw },
+  rejected: { label: "Rejected", color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle },
 };
 
 const getPMs = (c: Centre): string[] => {
@@ -80,8 +83,10 @@ const ChangeStoriesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCentreId = searchParams.get("centre");
   const setSelectedCentreId = (id: string | null) => {
-    if (id) setSearchParams({ centre: id });
-    else setSearchParams({});
+    const nextParams = new URLSearchParams(searchParams);
+    if (id) nextParams.set("centre", id);
+    else nextParams.delete("centre");
+    setSearchParams(nextParams);
   };
 
   const [centres, setCentres] = useState<Centre[]>([]);
@@ -92,8 +97,15 @@ const ChangeStoriesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [filterPM, setFilterPM] = useState<string>("all");
-  const [filterMonth, setFilterMonth] = useState<string>(new Date().getMonth().toString());
-  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState<string>(searchParams.get("month") || new Date().getMonth().toString());
+  const [filterYear, setFilterYear] = useState<string>(searchParams.get("year") || new Date().getFullYear().toString());
+
+  useEffect(() => {
+    const m = searchParams.get("month");
+    const y = searchParams.get("year");
+    if (m) setFilterMonth(m);
+    if (y) setFilterYear(y);
+  }, [searchParams]);
 
   // Form state
   const [formOpen, setFormOpen] = useState(false);
@@ -248,15 +260,20 @@ const ChangeStoriesPage = () => {
     }
   };
 
-  const handleReview = async (status: "approved" | "revision_needed") => {
+  const handleReview = async (status: "approved" | "revision_needed" | "rejected") => {
     if (!reviewingStory) return;
+    if ((status === "revision_needed" || status === "rejected") && !reviewComment.trim()) {
+      toast.error(status === "rejected" ? "Please provide a reason for rejection" : "Please provide revision instructions");
+      return;
+    }
     try {
       await api.put(`/change-stories/${reviewingStory._id}`, {
         status,
         reviewedBy: user?.name || user?.email || "Admin",
-        reviewComment,
+        reviewComment: reviewComment.trim(),
       });
-      toast.success(status === "approved" ? "Story approved!" : "Revision requested");
+      const msg = status === "approved" ? "Story approved!" : status === "rejected" ? "Story rejected & notification sent to fellow" : "Revision requested & notification sent to fellow";
+      toast.success(msg);
       setReviewOpen(false);
       setReviewingStory(null);
       setReviewComment("");
@@ -541,9 +558,14 @@ const ChangeStoriesPage = () => {
                             <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
                           </Button>
                         )}
-                        {isAdmin && story.status === "pending" && (
-                          <Button size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px]" onClick={() => { setReviewingStory(story); setReviewComment(""); setReviewOpen(true); }}>
-                            Review
+                        {isAdmin && (
+                          <Button 
+                            size="sm" 
+                            variant={story.status === "pending" ? "default" : "outline"} 
+                            className="rounded-xl font-black uppercase tracking-widest text-[10px]" 
+                            onClick={() => { setReviewingStory(story); setReviewComment(story.reviewComment || ""); setReviewOpen(true); }}
+                          >
+                            {story.status === "pending" ? "Review" : "Change Review"}
                           </Button>
                         )}
                       </div>
@@ -561,12 +583,56 @@ const ChangeStoriesPage = () => {
                     )}
                   </div>
 
-                  {/* Review info */}
-                  {story.reviewedBy && (
+                  {/* Review feedback banners */}
+                  {(story.status === "revision_needed" || story.status === "revision_requested") && (
                     <div className="px-8 pb-8">
-                      <div className="bg-muted/30 rounded-xl p-4 space-y-1">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Review by {story.reviewedBy}</p>
-                        {story.reviewComment && <p className="text-sm font-medium text-muted-foreground italic">"{story.reviewComment}"</p>}
+                      <div className="bg-orange-50 text-orange-950 rounded-2xl p-4 border border-orange-200 space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-black text-orange-800 text-xs uppercase tracking-wider">
+                          <RotateCcw className="h-4 w-4 text-orange-600" /> Revision Requested
+                        </div>
+                        {story.reviewComment && (
+                          <p className="text-xs font-medium text-orange-950 leading-relaxed">
+                            <strong>Instructions:</strong> {story.reviewComment}
+                          </p>
+                        )}
+                        {story.reviewedBy && (
+                          <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wider pt-1 border-t border-orange-200/60">
+                            Requested by: {story.reviewedBy} {story.reviewedAt && `on ${formatDateDMY(story.reviewedAt)}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {story.status === "rejected" && (
+                    <div className="px-8 pb-8">
+                      <div className="bg-destructive/10 text-destructive rounded-2xl p-4 border border-destructive/20 space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-black text-destructive text-xs uppercase tracking-wider">
+                          <XCircle className="h-4 w-4 text-destructive" /> Story Rejected
+                        </div>
+                        {story.reviewComment && (
+                          <p className="text-xs font-medium text-destructive/90 leading-relaxed">
+                            <strong>Reason:</strong> {story.reviewComment}
+                          </p>
+                        )}
+                        {story.reviewedBy && (
+                          <p className="text-[10px] font-bold text-destructive/70 uppercase tracking-wider pt-1 border-t border-destructive/20">
+                            Rejected by: {story.reviewedBy} {story.reviewedAt && `on ${formatDateDMY(story.reviewedAt)}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {story.status === "approved" && story.reviewedBy && (
+                    <div className="px-8 pb-8">
+                      <div className="bg-emerald-50 text-emerald-850 rounded-2xl p-4 border border-emerald-200 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-800 uppercase tracking-wider">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Approved by {story.reviewedBy} {story.reviewedAt && `on ${formatDateDMY(story.reviewedAt)}`}
+                        </div>
+                        {story.reviewComment && (
+                          <p className="text-xs font-medium text-emerald-700 italic">"{story.reviewComment}"</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -639,17 +705,41 @@ const ChangeStoriesPage = () => {
               <p className="text-sm font-medium whitespace-pre-wrap leading-relaxed">{reviewingStory?.story}</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Review Comment (optional)</Label>
-              <Textarea placeholder="Add feedback or comments..." value={reviewComment} onChange={e => setReviewComment(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[80px] resize-y" />
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                Review Feedback / Reason
+              </Label>
+              <Textarea 
+                placeholder="Add feedback, revision instructions, or rejection reason..." 
+                value={reviewComment} 
+                onChange={e => setReviewComment(e.target.value)} 
+                className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[90px] resize-y text-xs" 
+              />
+              <p className="text-[11px] text-muted-foreground">
+                When revision is requested or rejected, a notification will be delivered directly to the fellow.
+              </p>
             </div>
           </div>
-          <DialogFooter className="p-6 pt-0 flex gap-3">
+          <DialogFooter className="p-6 pt-0 flex flex-wrap gap-2">
             <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
-            <Button variant="outline" className="rounded-xl h-12 px-6 font-black uppercase tracking-widest text-[10px] text-destructive border-destructive/20 hover:bg-destructive/5" onClick={() => handleReview("revision_needed")}>
-              Request Revision
+            <Button 
+              variant="outline" 
+              className="rounded-xl h-12 px-5 font-black uppercase tracking-widest text-[10px] text-destructive border-destructive/20 hover:bg-destructive hover:text-white" 
+              onClick={() => handleReview("rejected")}
+            >
+              <XCircle className="h-4 w-4 mr-1.5" /> Reject
             </Button>
-            <Button className="rounded-xl h-12 px-6 font-black uppercase tracking-widest text-[10px] bg-success hover:bg-success/90 text-white" onClick={() => handleReview("approved")}>
-              Approve
+            <Button 
+              variant="outline" 
+              className="rounded-xl h-12 px-5 font-black uppercase tracking-widest text-[10px] text-orange-600 border-orange-500/30 hover:bg-orange-500 hover:text-white" 
+              onClick={() => handleReview("revision_needed")}
+            >
+              <RotateCcw className="h-4 w-4 mr-1.5" /> Request Revision
+            </Button>
+            <Button 
+              className="rounded-xl h-12 px-6 font-black uppercase tracking-widest text-[10px] bg-success hover:bg-success/90 text-white ml-auto" 
+              onClick={() => handleReview("approved")}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
             </Button>
           </DialogFooter>
         </DialogContent>

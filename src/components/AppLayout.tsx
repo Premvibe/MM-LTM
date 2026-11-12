@@ -25,7 +25,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const fetchUnreadCount = async () => {
       if (!user) return;
       try {
-        const res = await api.get(`/notifications/unread-count?role=${user.role}`);
+        const res = await api.get(`/notifications/unread-count?role=${user.role}${user.email ? `&email=${encodeURIComponent(user.email)}` : ''}${user.id ? `&userId=${user.id}` : ''}`);
         setUnreadCount(res.data.count);
       } catch (error) {
         console.error("Failed to fetch unread count", error);
