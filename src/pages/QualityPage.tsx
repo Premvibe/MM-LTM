@@ -400,7 +400,7 @@ const QualityPage = () => {
                           centreName={centresList.find(c => c._id === formCentreId)?.name}
                           context="Quality"
                           label="Attach Video Observations / Documents"
-                          maxFiles={3}
+                          maxFiles={20}
                         />
                       </div>
                     </div>

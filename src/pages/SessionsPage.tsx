@@ -771,10 +771,6 @@ const SessionsPage = () => {
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan</Label>
               <Textarea placeholder="Write or paste your session plan here..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[100px] resize-y" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Documentation (Photos/Videos)</Label>
-              <Input placeholder="https://drive.google.com/..." value={documentationLink} onChange={e => setDocumentationLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-            </div>
 
             <div className="pt-2 border-t border-muted/50 flex items-center justify-between pr-4">
               <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-muted/30 transition-colors">
@@ -807,16 +803,64 @@ const SessionsPage = () => {
               </div>
             )}
 
-            <FileUpload
-              files={sessionFiles}
-              onFilesChange={setSessionFiles}
-              centreId={selectedCentreId || centreId || undefined}
-              centreName={selectedCentre?.name}
-              context="Sessions"
-              monthYear={`${months.find(m => m.value === filterMonth)?.label || 'Current'} ${filterYear}`}
-              label="Attach Session Plans / Photos / Videos"
-              maxFiles={5}
-            />
+            {/* Unified Documentation Section (Upload Directly OR Paste Cloud Link) */}
+            <div className="p-4 rounded-2xl bg-muted/20 border border-muted-foreground/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
+                    Documentation (Photos / Videos)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Upload files directly <span className="font-bold text-foreground">OR</span> paste an external link below.
+                  </p>
+                </div>
+                {(sessionFiles.length > 0 || documentationLink.trim()) && (
+                  <Badge className="bg-success/10 text-success border-none text-[10px] font-bold">
+                    ✓ Documented
+                  </Badge>
+                )}
+              </div>
+
+              {/* Option 1: Direct File Upload */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Option 1: Upload Files Directly
+                </span>
+                <FileUpload
+                  files={sessionFiles}
+                  onFilesChange={setSessionFiles}
+                  centreId={selectedCentreId || centreId || undefined}
+                  centreName={selectedCentre?.name || centresList.find(c => (c._id || c.id) === (selectedCentreId || centreId))?.name}
+                  context="Sessions"
+                  date={date}
+                  monthYear={`${months.find(m => m.value === filterMonth)?.label || 'Current'} ${filterYear}`}
+                  label=""
+                  maxFiles={20}
+                />
+              </div>
+
+              {/* OR Divider */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-muted-foreground/15"></div>
+                <span className="flex-shrink mx-3 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground border border-muted-foreground/10">
+                  OR
+                </span>
+                <div className="flex-grow border-t border-muted-foreground/15"></div>
+              </div>
+
+              {/* Option 2: Paste External Cloud Link */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                  Option 2: Paste External Cloud Link
+                </Label>
+                <Input
+                  placeholder="https://..."
+                  value={documentationLink}
+                  onChange={e => setDocumentationLink(e.target.value)}
+                  className="rounded-xl border-muted-foreground/10 bg-background focus:bg-white transition-all h-10 text-xs"
+                />
+              </div>
+            </div>
           </div>
         </ScrollArea>
         <div className="p-6 md:p-8 bg-muted/30 border-t flex justify-end gap-3 shrink-0">
@@ -1343,8 +1387,12 @@ const SessionsPage = () => {
                           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
                           {s.documentationLink ? (
                             <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">
-                              View Media <CheckCircle2 className="h-3 w-3" />
+                              View Link <CheckCircle2 className="h-3 w-3" />
                             </a>
+                          ) : (s.files && s.files.length > 0) ? (
+                            <span className="text-xs font-bold text-success mt-0.5 flex items-center gap-1">
+                              {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached <CheckCircle2 className="h-3 w-3" />
+                            </span>
                           ) : (
                             <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
                           )}
@@ -1352,7 +1400,7 @@ const SessionsPage = () => {
                       </div>
 
                       {s.files && s.files.length > 0 && (
-                        <FileGallery files={s.files} title="Drive Media & Attachments" />
+                        <FileGallery files={s.files} title="Media & Attachments" />
                       )}
                     </div>
 
@@ -1766,7 +1814,11 @@ const SessionsPage = () => {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
                     {s.documentationLink ? (
-                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">View Media <CheckCircle2 className="h-3 w-3" /></a>
+                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">View Link <CheckCircle2 className="h-3 w-3" /></a>
+                    ) : (s.files && s.files.length > 0) ? (
+                      <span className="text-xs font-bold text-success mt-0.5 flex items-center gap-1">
+                        {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached <CheckCircle2 className="h-3 w-3" />
+                      </span>
                     ) : (
                       <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
                     )}
@@ -1774,7 +1826,7 @@ const SessionsPage = () => {
                 </div>
 
                 {s.files && s.files.length > 0 && (
-                  <FileGallery files={s.files} title="Drive Media & Attachments" />
+                  <FileGallery files={s.files} title="Media & Attachments" />
                 )}
               </div>
               <div className="bg-muted/30 sm:w-64 p-8 flex flex-col justify-center gap-3 border-l">

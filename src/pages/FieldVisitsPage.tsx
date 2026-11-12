@@ -262,25 +262,60 @@ const FieldVisitsPage = () => {
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Critical Issues (if any)</Label>
                 <Textarea placeholder="Any blockers or red flags..." value={issues} onChange={e => setIssues(e.target.value)} className="rounded-2xl bg-muted/30 border-none min-h-[80px] resize-none focus-visible:ring-primary/20" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan Link</Label>
-                  <Input placeholder="Google Drive link..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl h-11 bg-muted/30 border-none font-bold" />
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan Link</Label>
+                <Input placeholder="https://..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl h-11 bg-muted/30 border-none font-bold" />
+              </div>
+
+              {/* Unified Documentation Section (Upload or Paste Link) */}
+              <div className="p-4 rounded-2xl bg-muted/20 border border-muted-foreground/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-foreground">
+                      Documentation (Photos / Videos / Reports)
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Upload files directly <span className="font-bold text-foreground">OR</span> paste an external link below.
+                    </p>
+                  </div>
+                  {(visitFiles.length > 0 || documentationLink.trim()) && (
+                    <Badge className="bg-success/10 text-success border-none text-[10px] font-bold">
+                      ✓ Documented
+                    </Badge>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Documentation</Label>
-                  <Input placeholder="Resource/Photo link..." value={documentationLink} onChange={e => setDocumentationLink(e.target.value)} className="rounded-xl h-11 bg-muted/30 border-none font-bold" />
+
+                <FileUpload
+                  files={visitFiles}
+                  onFilesChange={setVisitFiles}
+                  centreId={centreId || undefined}
+                  centreName={centresList.find(c => (c._id || c.id) === centreId)?.name}
+                  context="FieldVisits"
+                  date={date}
+                  label="Option 1: Upload Files Directly"
+                  maxFiles={20}
+                />
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-muted-foreground/15"></div>
+                  <span className="flex-shrink mx-3 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground border border-muted-foreground/10">
+                    OR
+                  </span>
+                  <div className="flex-grow border-t border-muted-foreground/15"></div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                    Option 2: Paste External Cloud Link
+                  </Label>
+                  <Input
+                    placeholder="https://..."
+                    value={documentationLink}
+                    onChange={e => setDocumentationLink(e.target.value)}
+                    className="rounded-xl border-muted-foreground/10 bg-background focus:bg-white transition-all h-10 text-xs"
+                  />
                 </div>
               </div>
-              <FileUpload
-                files={visitFiles}
-                onFilesChange={setVisitFiles}
-                centreId={centreId || undefined}
-                centreName={centresList.find(c => (c._id || c.id) === centreId)?.name}
-                context="FieldVisits"
-                label="Attach Field Visit Photos / Reports / Files"
-                maxFiles={5}
-              />
             </div>
             <div className="p-8 bg-muted/30 border-t flex justify-end gap-3">
               <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>

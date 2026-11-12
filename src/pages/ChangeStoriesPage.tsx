@@ -681,7 +681,7 @@ const ChangeStoriesPage = () => {
               context="ChangeStories"
               monthYear={`${months.find(m => m.value === filterMonth)?.label} ${filterYear}`}
               label="Attach Photos / Videos / Documents"
-              maxFiles={5}
+              maxFiles={20}
             />
           </div>
           <DialogFooter className="p-6 pt-0 flex gap-3">
