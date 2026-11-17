@@ -712,163 +712,170 @@ const SessionsPage = () => {
 
   const sessionModal = (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-      <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="bg-primary p-6 md:p-8 text-white shrink-0">
-          <DialogTitle className="text-2xl font-black tracking-tight">{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
-          <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
-            Operation LTM · {selectedCentre?.name || "All Centres"}
+      <DialogContent className="w-[96vw] max-w-full sm:max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl rounded-2xl sm:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="bg-primary p-5 sm:p-7 md:p-8 text-white shrink-0">
+          <DialogTitle className="text-xl sm:text-2xl font-black tracking-tight">{editItem ? "Edit Session" : "Log New Session"}</DialogTitle>
+          <p className="text-white/70 text-xs font-bold mt-1 uppercase tracking-widest">
+            Operation LTM · {selectedCentre?.name || (centresList.find(c => (c._id || c.id) === centreId)?.name) || "All Centres"}
           </p>
         </div>
-        <ScrollArea className="flex-1 overflow-y-auto max-h-[60vh] md:max-h-full">
-          <div className="p-6 md:p-8 space-y-6">
-            {!selectedCentreId && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Centre</Label>
-                <Select value={centreId} onValueChange={setCentreId}>
-                  <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
-                    <SelectValue placeholder="Select Centre..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-none shadow-2xl">
-                    {centresList.map(c => (
-                      <SelectItem key={c._id || c.id} value={c._id || c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Duration (Min)</Label>
-                <Input type="number" placeholder="60" value={duration} onChange={e => setDuration(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-              </div>
-            </div>
-            {isAdmin && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Fellow</Label>
-                <Select value={fellowId} onValueChange={setFellowId}>
-                  <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
-                    <SelectValue placeholder="Select Fellow..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-none shadow-2xl">
-                    {fellowsList.map(f => (
-                      <SelectItem key={f._id} value={f._id || f.id}>
-                        {f.name} {f.batch ? `(${f.batch})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Topic / Lesson Theme</Label>
-              <Input placeholder="e.g. Intro to Rhythm Patterns" value={topic} onChange={e => setTopic(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan</Label>
-              <Textarea placeholder="Write or paste your session plan here..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[100px] resize-y" />
-            </div>
-
-            <div className="pt-2 border-t border-muted/50 flex items-center justify-between pr-4">
-              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-muted/30 transition-colors">
-                <input type="checkbox" checked={isMusicBus} onChange={e => setIsMusicBus(e.target.checked)} className="h-5 w-5 rounded border-primary/20 text-primary focus:ring-primary/20 cursor-pointer" />
-                <span className="text-sm font-black tracking-tight flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /> Conducted in Music Bus</span>
-              </label>
-              {isMusicBus && date && (
-                <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase">
-                  {(() => {
-                    const month = new Date(date).getMonth();
-                    if (month >= 3 && month <= 5) return "Q1";
-                    if (month >= 6 && month <= 8) return "Q2";
-                    if (month >= 9 && month <= 11) return "Q3";
-                    return "Q4";
-                  })()} Visit
-                </Badge>
-              )}
-            </div>
-
-            {isMusicBus && (
-              <div className="space-y-4 pt-2 animate-fade-in">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Observations</Label>
-                  <textarea placeholder="Key findings and highlights..." value={observations} onChange={e => setObservations(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[80px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+        <ScrollArea className="flex-1 overflow-y-auto max-h-[calc(92vh-160px)]">
+          <div className="p-4 sm:p-6 md:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+              {/* Left Column: Core Session Fields (7 of 12 cols on desktop/laptop) */}
+              <div className="lg:col-span-7 space-y-5">
+                {!selectedCentreId && (
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Centre</Label>
+                    <Select value={centreId} onValueChange={setCentreId}>
+                      <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
+                        <SelectValue placeholder="Select Centre..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl">
+                        {centresList.map(c => (
+                          <SelectItem key={c._id || c.id} value={c._id || c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
+                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Duration (Min)</Label>
+                    <Input type="number" placeholder="60" value={duration} onChange={e => setDuration(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Critical Issues (if any)</Label>
-                  <textarea placeholder="Any blockers or red flags..." value={issues} onChange={e => setIssues(e.target.value)} className="w-full rounded-2xl bg-muted/30 border-none min-h-[60px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+                {isAdmin && (
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Fellow</Label>
+                    <Select value={fellowId} onValueChange={setFellowId}>
+                      <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
+                        <SelectValue placeholder="Select Fellow..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl">
+                        {fellowsList.map(f => (
+                          <SelectItem key={f._id} value={f._id || f.id}>
+                            {f.name} {f.batch ? `(${f.batch})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Topic / Lesson Theme</Label>
+                  <Input placeholder="e.g. Intro to Rhythm Patterns" value={topic} onChange={e => setTopic(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11" />
                 </div>
-              </div>
-            )}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Session Plan</Label>
+                  <Textarea placeholder="Write or paste your session plan here..." value={sessionPlanLink} onChange={e => setSessionPlanLink(e.target.value)} className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[110px] resize-y" />
+                </div>
 
-            {/* Unified Documentation Section (Upload Directly OR Paste Cloud Link) */}
-            <div className="p-4 rounded-2xl bg-muted/20 border border-muted-foreground/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
-                    Documentation (Photos / Videos)
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Upload files directly <span className="font-bold text-foreground">OR</span> paste an external link below.
-                  </p>
+                <div className="pt-2 border-t border-muted/50 flex items-center justify-between pr-2">
+                  <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl hover:bg-muted/30 transition-colors">
+                    <input type="checkbox" checked={isMusicBus} onChange={e => setIsMusicBus(e.target.checked)} className="h-5 w-5 rounded border-primary/20 text-primary focus:ring-primary/20 cursor-pointer" />
+                    <span className="text-sm font-black tracking-tight flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /> Conducted in Music Bus</span>
+                  </label>
+                  {isMusicBus && date && (
+                    <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase">
+                      {(() => {
+                        const month = new Date(date).getMonth();
+                        if (month >= 3 && month <= 5) return "Q1";
+                        if (month >= 6 && month <= 8) return "Q2";
+                        if (month >= 9 && month <= 11) return "Q3";
+                        return "Q4";
+                      })()} Visit
+                    </Badge>
+                  )}
                 </div>
-                {(sessionFiles.length > 0 || documentationLink.trim()) && (
-                  <Badge className="bg-success/10 text-success border-none text-[10px] font-bold">
-                    ✓ Documented
-                  </Badge>
+
+                {isMusicBus && (
+                  <div className="space-y-4 pt-2 animate-fade-in">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Observations</Label>
+                      <textarea placeholder="Key findings and highlights..." value={observations} onChange={e => setObservations(e.target.value)} className="w-full rounded-2xl bg-muted/30 border border-muted-foreground/10 min-h-[80px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Critical Issues (if any)</Label>
+                      <textarea placeholder="Any blockers or red flags..." value={issues} onChange={e => setIssues(e.target.value)} className="w-full rounded-2xl bg-muted/30 border border-muted-foreground/10 min-h-[60px] resize-none focus-visible:ring-primary/20 p-3 text-sm font-medium" />
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Option 1: Direct File Upload */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Option 1: Upload Files Directly
-                </span>
-                <FileUpload
-                  files={sessionFiles}
-                  onFilesChange={setSessionFiles}
-                  centreId={selectedCentreId || centreId || undefined}
-                  centreName={selectedCentre?.name || centresList.find(c => (c._id || c.id) === (selectedCentreId || centreId))?.name}
-                  context="Sessions"
-                  date={date}
-                  monthYear={`${months.find(m => m.value === filterMonth)?.label || 'Current'} ${filterYear}`}
-                  label=""
-                  maxFiles={20}
-                />
-              </div>
+              {/* Right Column: Documentation Section (5 of 12 cols on desktop/laptop) */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="p-4 sm:p-5 rounded-2xl bg-muted/20 border border-muted-foreground/10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
+                        Documentation (Photos / Videos)
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Upload files directly <span className="font-bold text-foreground">OR</span> paste external link.
+                      </p>
+                    </div>
+                    {(sessionFiles.length > 0 || documentationLink.trim()) && (
+                      <Badge className="bg-success/10 text-success border-none text-[10px] font-bold shrink-0">
+                        ✓ Documented
+                      </Badge>
+                    )}
+                  </div>
 
-              {/* OR Divider */}
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-muted-foreground/15"></div>
-                <span className="flex-shrink mx-3 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground border border-muted-foreground/10">
-                  OR
-                </span>
-                <div className="flex-grow border-t border-muted-foreground/15"></div>
-              </div>
+                  {/* Option 1: Direct File Upload */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Option 1: Upload Files Directly
+                    </span>
+                    <FileUpload
+                      files={sessionFiles}
+                      onFilesChange={setSessionFiles}
+                      centreId={selectedCentreId || centreId || undefined}
+                      centreName={selectedCentre?.name || centresList.find(c => (c._id || c.id) === (selectedCentreId || centreId))?.name}
+                      context="Sessions"
+                      date={date}
+                      monthYear={`${months.find(m => m.value === filterMonth)?.label || 'Current'} ${filterYear}`}
+                      label=""
+                      maxFiles={20}
+                    />
+                  </div>
 
-              {/* Option 2: Paste External Cloud Link */}
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                  Option 2: Paste External Cloud Link
-                </Label>
-                <Input
-                  placeholder="https://..."
-                  value={documentationLink}
-                  onChange={e => setDocumentationLink(e.target.value)}
-                  className="rounded-xl border-muted-foreground/10 bg-background focus:bg-white transition-all h-10 text-xs"
-                />
+                  {/* OR Divider */}
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-muted-foreground/15"></div>
+                    <span className="flex-shrink mx-3 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground border border-muted-foreground/10">
+                      OR
+                    </span>
+                    <div className="flex-grow border-t border-muted-foreground/15"></div>
+                  </div>
+
+                  {/* Option 2: Paste External Cloud Link */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                      Option 2: Paste External Cloud Link
+                    </Label>
+                    <Input
+                      placeholder="https://..."
+                      value={documentationLink}
+                      onChange={e => setDocumentationLink(e.target.value)}
+                      className="rounded-xl border-muted-foreground/10 bg-background focus:bg-white transition-all h-10 text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </ScrollArea>
-        <div className="p-6 md:p-8 bg-muted/30 border-t flex justify-end gap-3 shrink-0">
-          <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
+        <div className="p-4 sm:p-6 md:p-8 bg-muted/30 border-t flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3 shrink-0">
+          <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold h-11 sm:h-12">Cancel</Button></DialogClose>
           <Button 
             onClick={handleSubmit} 
             disabled={isSubmitting} 
-            className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:pointer-events-none transition-all shadow-lg shadow-primary/20"
+            className="rounded-xl h-11 sm:h-12 px-8 font-black uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:pointer-events-none transition-all shadow-lg shadow-primary/20"
           >
             {isSubmitting ? "Logging Session..." : (editItem ? "Save Changes" : "Confirm Log")}
           </Button>
@@ -1098,7 +1105,7 @@ const SessionsPage = () => {
 
         {/* View Mode: Centres View */}
         {viewMode === "centres" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredCentres.map(centre => {
               const cStats = getCentreSessionStats(centre);
               const studentCount = studentsList.filter(s => ((s.centreId as any)?._id || s.centreId) === (centre._id || centre.id)).length;
@@ -1209,8 +1216,8 @@ const SessionsPage = () => {
 
               return (
                 <Card key={s._id} className="border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] overflow-hidden group bg-white">
-                  <CardContent className="p-0 flex flex-col sm:flex-row">
-                    <div className="p-6 sm:p-8 flex-1 space-y-4">
+                  <CardContent className="p-0 flex flex-col lg:flex-row">
+                    <div className="p-5 sm:p-7 md:p-8 flex-1 space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
@@ -1239,7 +1246,7 @@ const SessionsPage = () => {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
+                        <h3 className="text-lg sm:text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
                         {s.approvalStatus === 'approved' && (
                           <div className="flex items-center gap-1.5">
                             <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>
@@ -1368,34 +1375,52 @@ const SessionsPage = () => {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-6">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Attendance</span>
-                          <span className="text-sm font-black flex items-center gap-1.5 mt-0.5"><Users className="h-4 w-4 text-info" />{s.studentsPresent} students</span>
+                      {/* Interactive responsive metadata stat chips */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 py-2">
+                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                          <div className="h-8 w-8 rounded-lg bg-info/10 text-info flex items-center justify-center shrink-0">
+                            <Users className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Attendance</span>
+                            <span className="text-xs sm:text-sm font-black text-foreground truncate">{s.studentsPresent} students</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Session Plan</span>
-                          {s.sessionPlanLink ? (
-                            <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success mt-0.5 flex items-center gap-1 hover:underline cursor-pointer">
-                              <CheckCircle2 className="h-3 w-3" /> View Plan
-                            </button>
-                          ) : (
-                            <span className="text-xs font-bold text-destructive mt-0.5">Missing Plan</span>
-                          )}
+
+                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                          <div className="h-8 w-8 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Session Plan</span>
+                            {s.sessionPlanLink ? (
+                              <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success hover:underline truncate block">
+                                View Plan
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-destructive truncate block">Missing Plan</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
-                          {s.documentationLink ? (
-                            <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">
-                              View Link <CheckCircle2 className="h-3 w-3" />
-                            </a>
-                          ) : (s.files && s.files.length > 0) ? (
-                            <span className="text-xs font-bold text-success mt-0.5 flex items-center gap-1">
-                              {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached <CheckCircle2 className="h-3 w-3" />
-                            </span>
-                          ) : (
-                            <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
-                          )}
+
+                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <ImageIcon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Documentation</span>
+                            {s.documentationLink ? (
+                              <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline truncate block">
+                                External Link ↗
+                              </a>
+                            ) : (s.files && s.files.length > 0) ? (
+                              <span className="text-xs font-bold text-success truncate block">
+                                {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-destructive truncate block">Missing Media</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1404,19 +1429,22 @@ const SessionsPage = () => {
                       )}
                     </div>
 
-                    <div className="bg-muted/30 sm:w-64 p-6 sm:p-8 flex flex-col justify-center gap-2.5 border-t sm:border-t-0 sm:border-l">
-                      <Button className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={() => openAttendance(s)}>
-                        <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
-                      </Button>
-                      {isAdmin && (
-                        <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
-                          Review Session
+                    {/* Responsive Actions: adapts from sleek vertical side column on desktop to horizontal toolbar on mobile */}
+                    <div className="bg-muted/25 p-4 sm:p-6 lg:p-7 lg:w-64 xl:w-72 flex flex-col justify-center gap-2.5 border-t lg:border-t-0 lg:border-l border-border/40 shrink-0">
+                      <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full">
+                        <Button className="w-full flex-1 rounded-xl h-10 font-black uppercase tracking-widest text-[10px] shadow-sm" onClick={() => openAttendance(s)}>
+                          <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
                         </Button>
-                      )}
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                        {isAdmin && (
+                          <Button variant="outline" className="w-full flex-1 rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
+                            Review Session
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex gap-2 self-end sm:self-center lg:self-auto w-full justify-end lg:justify-start">
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20 hover:border-primary/40 hover:text-primary transition-all" onClick={() => openEdit(s)} title="Edit Session"><Pencil className="h-4 w-4" /></Button>
                         {isMEManager && (
-                          <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDelete(s._id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all" onClick={() => handleDelete(s._id)} title="Delete Session"><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
                     </div>
@@ -1657,11 +1685,11 @@ const SessionsPage = () => {
             return matchesSearch;
           })
           .map(s => (
-          <Card key={s._id} className="border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] overflow-hidden group">
-            <CardContent className="p-0 flex flex-col sm:flex-row">
-              <div className="p-8 flex-1 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+          <Card key={s._id} className="border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] overflow-hidden group bg-white">
+            <CardContent className="p-0 flex flex-col lg:flex-row">
+              <div className="p-5 sm:p-7 md:p-8 flex-1 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">{formatDateDMY(s.date)}</Badge>
                     {s.createdAt && (
                       <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-muted-foreground/10 rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">
@@ -1670,16 +1698,16 @@ const SessionsPage = () => {
                     )}
                     {s.isMusicBus && <Badge className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-500/20 rounded-lg px-2 py-1 font-black text-[10px] uppercase tracking-widest flex items-center gap-1"><Truck className="h-3 w-3" /> Music Bus</Badge>}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-bold text-muted-foreground">{s.duration} mins</span>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span className="text-xs font-bold">{s.duration} mins</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-black tracking-tight group-hover:text-primary transition-colors">{s.topic}</h3>
                   {s.approvalStatus === 'approved' && (
                     <div className="flex items-center gap-1.5">
-                      <Badge className="bg-success text-white">Approved</Badge>
+                      <Badge className="bg-emerald-600 text-white font-bold">Approved</Badge>
                       {getReviewerInfo(s) && (
                         <Badge variant="outline" className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border-emerald-200">
                           by {getReviewerInfo(s)?.name}
@@ -1689,7 +1717,7 @@ const SessionsPage = () => {
                   )}
                   {s.approvalStatus === 'rejected' && (
                     <div className="flex items-center gap-1.5">
-                      <Badge className="bg-destructive text-white">Rejected</Badge>
+                      <Badge className="bg-rose-600 text-white font-bold">Rejected</Badge>
                       {getReviewerInfo(s) && (
                         <Badge variant="outline" className="text-[10px] font-bold text-rose-700 bg-rose-50 border-rose-200">
                           by {getReviewerInfo(s)?.name}
@@ -1709,7 +1737,11 @@ const SessionsPage = () => {
                       )}
                     </div>
                   )}
-                  {(!s.approvalStatus || s.approvalStatus === 'pending') && <Badge className="bg-warning text-white">Pending Review</Badge>}
+                  {(!s.approvalStatus || s.approvalStatus === 'pending') && (
+                    <Badge className="bg-amber-500 text-white font-bold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> Pending Review
+                    </Badge>
+                  )}
                 </div>
                 {(s.approvalStatus === 'revision_requested' || s.approvalStatus === 'revision_needed') && (s.reviewNote || (getReviewerInfo(s))) && (
                   <div className="bg-orange-50 text-orange-800 text-sm p-3.5 rounded-xl space-y-1.5 border border-orange-200">
@@ -1798,30 +1830,53 @@ const SessionsPage = () => {
                     )}
                   </div>
                 )}
-                <div className="flex items-center gap-6">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Attendance</span>
-                    <span className="text-sm font-black flex items-center gap-1.5 mt-0.5"><Users className="h-4 w-4 text-info" />{s.studentsPresent} students</span>
+
+                {/* Interactive responsive metadata stat chips */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 py-2">
+                  <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                    <div className="h-8 w-8 rounded-lg bg-info/10 text-info flex items-center justify-center shrink-0">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Attendance</span>
+                      <span className="text-xs sm:text-sm font-black text-foreground truncate">{s.studentsPresent} students</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Session Plan</span>
-                    {s.sessionPlanLink ? (
-                      <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success mt-0.5 flex items-center gap-1 hover:underline cursor-pointer"><CheckCircle2 className="h-3 w-3" /> View Plan</button>
-                    ) : (
-                      <span className="text-xs font-bold text-destructive mt-0.5">Missing Plan</span>
-                    )}
+
+                  <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                    <div className="h-8 w-8 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Session Plan</span>
+                      {s.sessionPlanLink ? (
+                        <button onClick={() => setViewPlanText(s.sessionPlanLink!)} className="text-xs font-bold text-success hover:underline truncate block">
+                          View Plan
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold text-destructive truncate block">Missing Plan</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Documentation</span>
-                    {s.documentationLink ? (
-                      <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline mt-0.5 flex items-center gap-1">View Link <CheckCircle2 className="h-3 w-3" /></a>
-                    ) : (s.files && s.files.length > 0) ? (
-                      <span className="text-xs font-bold text-success mt-0.5 flex items-center gap-1">
-                        {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached <CheckCircle2 className="h-3 w-3" />
-                      </span>
-                    ) : (
-                      <span className="text-xs font-bold text-destructive mt-0.5">Missing Media</span>
-                    )}
+
+                  <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <ImageIcon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Documentation</span>
+                      {s.documentationLink ? (
+                        <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline truncate block">
+                          External Link ↗
+                        </a>
+                      ) : (s.files && s.files.length > 0) ? (
+                        <span className="text-xs font-bold text-success truncate block">
+                          {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-destructive truncate block">Missing Media</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1829,19 +1884,23 @@ const SessionsPage = () => {
                   <FileGallery files={s.files} title="Media & Attachments" />
                 )}
               </div>
-              <div className="bg-muted/30 sm:w-64 p-8 flex flex-col justify-center gap-3 border-l">
-                <Button className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={() => openAttendance(s)}>
-                  <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
-                </Button>
-                {isAdmin && (
-                  <Button variant="outline" className="w-full rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
-                    Review Session
+
+              {/* Responsive Actions: adapts from sleek vertical side column on desktop to horizontal toolbar on mobile */}
+              <div className="bg-muted/25 p-4 sm:p-6 lg:p-7 lg:w-64 xl:w-72 flex flex-col justify-center gap-2.5 border-t lg:border-t-0 lg:border-l border-border/40 shrink-0">
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full">
+                  <Button className="w-full flex-1 rounded-xl h-10 font-black uppercase tracking-widest text-[10px] shadow-sm" onClick={() => openAttendance(s)}>
+                    <ClipboardCheck className="h-4 w-4 mr-2" /> Mark Attendance
                   </Button>
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                  {isAdmin && (
+                    <Button variant="outline" className="w-full flex-1 rounded-xl h-10 font-black uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5" onClick={() => openReview(s)}>
+                      Review Session
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2 self-end sm:self-center lg:self-auto w-full justify-end lg:justify-start">
+                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-muted-foreground/20 hover:border-primary/40 hover:text-primary transition-all" onClick={() => openEdit(s)} title="Edit Session"><Pencil className="h-4 w-4" /></Button>
                   {isMEManager && (
-                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDelete(s._id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all" onClick={() => handleDelete(s._id)} title="Delete Session"><Trash2 className="h-4 w-4" /></Button>
                   )}
                 </div>
               </div>
@@ -1863,10 +1922,10 @@ const SessionsPage = () => {
 
       {/* Shared Quick Attendance Dialog */}
       <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
-        <DialogContent className="max-w-[500px] rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-primary p-8 text-white">
-            <DialogTitle className="text-2xl font-black tracking-tight">Quick Attendance</DialogTitle>
-            <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mt-1">
+        <DialogContent className="w-[96vw] max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[92vh] rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col">
+          <div className="bg-primary p-5 sm:p-7 md:p-8 text-white shrink-0">
+            <DialogTitle className="text-xl sm:text-2xl font-black tracking-tight">Quick Attendance</DialogTitle>
+            <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mt-1">
               {activeSession?.topic} · {activeSession?.date}
             </p>
             <div className="mt-4 relative">
@@ -1905,42 +1964,42 @@ const SessionsPage = () => {
               </Button>
             </div>
           </div>
-          <ScrollArea className="h-[340px] p-8">
-            <div className="space-y-3">
+          <ScrollArea className="flex-1 max-h-[48vh] p-4 sm:p-6 md:p-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {attendanceStudents.map(s => {
                 const sId = s._id || s.id;
                 const isChecked = checkedStudentIds.includes(sId);
                 return (
                   <div 
                     key={sId} 
-                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${isChecked ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/20'}`} 
+                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer ${isChecked ? 'border-primary bg-primary/5 shadow-sm' : 'border-muted hover:border-muted-foreground/20'}`} 
                     onClick={() => setCheckedStudentIds(prev => prev.includes(sId) ? prev.filter(id => id !== sId) : [...prev, sId])}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isChecked ? 'bg-primary text-white' : 'bg-muted text-transparent'}`}>
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      <div className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-primary text-white' : 'bg-muted text-transparent'}`}>
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
-                      <div>
-                        <span className="text-sm font-black tracking-tight">{s.name}</span>
-                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mt-0.5">
+                      <div className="min-w-0">
+                        <span className="text-sm font-black tracking-tight truncate block">{s.name}</span>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mt-0.5 truncate">
                           {[s.age ? `Age ${s.age}` : null, s.gender, (s.grade || s.section) ? `Class ${s.grade || ''}${s.section ? `-${s.section}` : ''}`.trim() : null].filter(Boolean).join(" · ")}
                         </p>
                       </div>
                     </div>
                     {(s.grade || s.section) && (
-                      <Badge variant="outline" className="rounded-lg text-[10px] font-bold opacity-70 uppercase">{s.grade || ''}{s.section ? `-${s.section}` : ''}</Badge>
+                      <Badge variant="outline" className="rounded-lg text-[10px] font-bold opacity-70 uppercase shrink-0">{s.grade || ''}{s.section ? `-${s.section}` : ''}</Badge>
                     )}
                   </div>
                 );
               })}
               {attendanceStudents.length === 0 && (
-                <div className="text-center py-8 text-xs font-bold text-muted-foreground">
+                <div className="col-span-full text-center py-8 text-xs font-bold text-muted-foreground">
                   No students found for this centre.
                 </div>
               )}
             </div>
           </ScrollArea>
-          <div className="px-8 pb-4">
+          <div className="px-4 sm:px-6 md:px-8 pb-3">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1.5">
               Review Note <span className="font-medium text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
             </label>
@@ -1948,14 +2007,14 @@ const SessionsPage = () => {
               placeholder="Add session reflections, key observations, or any attendance remarks..."
               value={attendanceReviewNote}
               onChange={(e) => setAttendanceReviewNote(e.target.value)}
-              className="rounded-2xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all text-xs min-h-[70px] resize-none"
+              className="rounded-2xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all text-xs min-h-[65px] resize-none"
             />
           </div>
-          <div className="px-8 pb-8 bg-muted/30 border-t pt-4 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{checkedStudentIds.length} Selected</span>
-            <div className="flex gap-3">
-              <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Cancel</Button></DialogClose>
-              <Button className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px] disabled:pointer-events-none disabled:opacity-50" onClick={handleSaveAttendance} disabled={isSubmittingAttendance}>{isSubmittingAttendance ? "Saving..." : "Save Attendance"}</Button>
+          <div className="p-4 sm:p-6 md:p-8 bg-muted/30 border-t flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest order-2 sm:order-1">{checkedStudentIds.length} Selected</span>
+            <div className="flex gap-2.5 sm:gap-3 w-full sm:w-auto order-1 sm:order-2">
+              <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold flex-1 sm:flex-initial h-11">Cancel</Button></DialogClose>
+              <Button className="rounded-xl h-11 px-7 font-black uppercase tracking-widest text-[10px] flex-1 sm:flex-initial disabled:pointer-events-none disabled:opacity-50" onClick={handleSaveAttendance} disabled={isSubmittingAttendance}>{isSubmittingAttendance ? "Saving..." : "Save Attendance"}</Button>
             </div>
           </div>
         </DialogContent>
@@ -1963,7 +2022,7 @@ const SessionsPage = () => {
       
       {/* Review Session Dialog */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
-        <DialogContent className="max-w-[400px] rounded-[2rem] p-6 border-none shadow-2xl">
+        <DialogContent className="w-[95vw] sm:max-w-md md:max-w-lg rounded-2xl sm:rounded-[2rem] p-5 sm:p-6 border-none shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-black tracking-tight">Review Session</DialogTitle>
             <DialogDescription className="text-xs font-bold uppercase tracking-widest">
@@ -2031,13 +2090,13 @@ const SessionsPage = () => {
       
       {/* View Session Plan Dialog */}
       <Dialog open={viewPlanText !== null} onOpenChange={(o) => { if (!o) setViewPlanText(null); }}>
-        <DialogContent className="rounded-[2rem] border-none shadow-2xl max-w-lg">
-          <DialogHeader className="bg-gradient-to-r from-primary to-primary/80 text-white p-6 -m-6 mb-0 rounded-t-[2rem]">
+        <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl rounded-2xl sm:rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-primary to-primary/80 text-white p-5 sm:p-6 mb-0">
             <DialogTitle className="text-lg font-black tracking-tight">Session Plan</DialogTitle>
             <DialogDescription className="text-white/70 text-xs font-bold uppercase tracking-widest">Plan Details</DialogDescription>
           </DialogHeader>
-          <div className="p-2 pt-6">
-            <div className="bg-muted/30 rounded-xl p-4 max-h-[400px] overflow-y-auto">
+          <div className="p-4 sm:p-6">
+            <div className="bg-muted/30 rounded-xl p-4 max-h-[450px] overflow-y-auto">
               {viewPlanText && (viewPlanText.startsWith('http://') || viewPlanText.startsWith('https://')) ? (
                 <a href={viewPlanText} target="_blank" rel="noreferrer" className="text-sm font-bold text-primary hover:underline break-all">{viewPlanText}</a>
               ) : (
@@ -2045,7 +2104,7 @@ const SessionsPage = () => {
               )}
             </div>
           </div>
-          <DialogFooter className="px-2 pb-2">
+          <DialogFooter className="p-4 sm:p-6 pt-0">
             <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold">Close</Button></DialogClose>
           </DialogFooter>
         </DialogContent>

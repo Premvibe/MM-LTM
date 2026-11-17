@@ -164,7 +164,7 @@ export const FileGallery: React.FC<FileGalleryProps> = ({ files = [], title }) =
       )}
 
       {/* Grid of inline previews */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
         {files.map((file, idx) => {
           const image = isImage(file);
           const video = isVideo(file);
@@ -172,12 +172,12 @@ export const FileGallery: React.FC<FileGalleryProps> = ({ files = [], title }) =
           return (
             <div
               key={file.fileId || idx}
-              className="group relative bg-muted/30 border border-muted-foreground/10 rounded-2xl overflow-hidden flex flex-col hover:border-primary/40 transition-all shadow-sm"
+              className="group relative bg-muted/30 border border-muted-foreground/10 rounded-2xl overflow-hidden flex flex-col hover:border-primary/40 hover:shadow-md transition-all shadow-sm"
             >
               {/* Media Preview Area */}
               {image ? (
                 <div
-                  className="relative h-44 sm:h-52 w-full bg-black/5 dark:bg-white/5 overflow-hidden cursor-pointer"
+                  className="relative h-44 sm:h-48 md:h-52 w-full bg-black/5 dark:bg-white/5 overflow-hidden cursor-pointer"
                   onClick={() => setActivePreviewIndex(idx)}
                 >
                   <img
@@ -199,7 +199,7 @@ export const FileGallery: React.FC<FileGalleryProps> = ({ files = [], title }) =
                   </div>
                 </div>
               ) : video ? (
-                <div className="relative h-48 sm:h-56 w-full bg-black overflow-hidden">
+                <div className="relative h-48 sm:h-52 md:h-56 w-full bg-black overflow-hidden">
                   {/* Inline Playable Video Player */}
                   {file.fileId ? (
                     <iframe
@@ -228,7 +228,7 @@ export const FileGallery: React.FC<FileGalleryProps> = ({ files = [], title }) =
               ) : (
                 /* Document / PDF Tile */
                 <div
-                  className="h-44 w-full flex flex-col items-center justify-center p-4 bg-muted/40 cursor-pointer hover:bg-muted/60 transition-colors"
+                  className="h-44 sm:h-48 md:h-52 w-full flex flex-col items-center justify-center p-4 bg-muted/40 cursor-pointer hover:bg-muted/60 transition-colors"
                   onClick={() => setActivePreviewIndex(idx)}
                 >
                   <FileText className="h-12 w-12 text-red-500 mb-2" />

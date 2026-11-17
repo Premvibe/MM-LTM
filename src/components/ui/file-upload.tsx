@@ -330,22 +330,22 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
       {/* Inline previews for images and videos */}
       {files.length > 0 && (
-        <div className="space-y-3 mt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           {files.map((file, idx) => (
             <div
               key={file.fileId || idx}
-              className="rounded-xl border border-muted-foreground/10 overflow-hidden bg-muted/30 shadow-sm"
+              className="rounded-xl border border-muted-foreground/10 overflow-hidden bg-muted/30 shadow-sm flex flex-col justify-between hover:border-primary/40 transition-all"
             >
               {/* Image inline preview */}
               {isImage(file.mimeType, file.fileName) && (
                 <div
-                  className="relative bg-black/5 dark:bg-white/5 cursor-pointer group"
+                  className="relative h-40 sm:h-44 w-full bg-black/5 dark:bg-white/5 cursor-pointer group overflow-hidden"
                   onClick={() => setPreviewModalFile(file)}
                 >
                   <img
                     src={getPreviewSrc(file)}
                     alt={file.fileName}
-                    className="w-full max-h-[300px] object-contain transition-transform group-hover:scale-[1.01]"
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -360,13 +360,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
               {/* Video inline player */}
               {isVideo(file.mimeType, file.fileName) && (
-                <div className="relative bg-black">
+                <div className="relative h-44 sm:h-48 w-full bg-black overflow-hidden">
                   {file.previewUrl ? (
                     <video
                       src={file.previewUrl}
                       controls
                       preload="metadata"
-                      className="w-full max-h-[300px]"
+                      className="w-full h-full object-contain"
                     />
                   ) : (
                     <iframe
