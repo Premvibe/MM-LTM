@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check, RotateCcw, Image as ImageIcon } from "lucide-react";
+import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check, RotateCcw, Image as ImageIcon, Upload } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -1404,28 +1404,68 @@ const SessionsPage = () => {
                         </div>
 
                         <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            s.documentationLink || (s.files && s.files.length > 0)
+                              ? "bg-success/10 text-success"
+                              : "bg-primary/10 text-primary"
+                          }`}>
                             <ImageIcon className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
                             <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Documentation</span>
                             {s.documentationLink ? (
-                              <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline truncate block">
-                                External Link ↗
+                              <a
+                                href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-bold text-success hover:underline truncate flex items-center gap-1 cursor-pointer"
+                              >
+                                View Media <CheckCircle2 className="h-3 w-3" />
                               </a>
                             ) : (s.files && s.files.length > 0) ? (
-                              <span className="text-xs font-bold text-success truncate block">
-                                {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const el = document.getElementById(`media-gallery-${s._id}`);
+                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                }}
+                                className="text-xs font-bold text-success hover:underline truncate flex items-center gap-1 cursor-pointer"
+                              >
+                                View Media ({s.files.length}) <CheckCircle2 className="h-3 w-3" />
+                              </button>
                             ) : (
-                              <span className="text-xs font-bold text-destructive truncate block">Missing Media</span>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(s)}
+                                className="text-xs font-bold text-primary hover:underline truncate flex items-center gap-1 cursor-pointer"
+                              >
+                                Upload Media <Upload className="h-3 w-3" />
+                              </button>
                             )}
                           </div>
                         </div>
                       </div>
 
                       {s.files && s.files.length > 0 && (
-                        <FileGallery files={s.files} title="Media & Attachments" />
+                        <div id={`media-gallery-${s._id}`}>
+                          <FileGallery files={s.files} title="Media & Attachments" />
+                        </div>
+                      )}
+                      {s.documentationLink && (!s.files || s.files.length === 0) && (
+                        <div className="p-3 rounded-2xl bg-muted/20 border border-muted-foreground/10 flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                            <span className="text-xs font-bold truncate text-muted-foreground">{s.documentationLink}</span>
+                          </div>
+                          <a
+                            href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-black text-primary hover:underline shrink-0 ml-3 flex items-center gap-1"
+                          >
+                            View Media ↗
+                          </a>
+                        </div>
                       )}
                     </div>
 
@@ -1860,28 +1900,68 @@ const SessionsPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/20 border border-muted-foreground/10">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      s.documentationLink || (s.files && s.files.length > 0)
+                        ? "bg-success/10 text-success"
+                        : "bg-primary/10 text-primary"
+                    }`}>
                       <ImageIcon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
                       <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground block truncate">Documentation</span>
                       {s.documentationLink ? (
-                        <a href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline truncate block">
-                          External Link ↗
+                        <a
+                          href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-success hover:underline truncate flex items-center gap-1 cursor-pointer"
+                        >
+                          View Media <CheckCircle2 className="h-3 w-3" />
                         </a>
                       ) : (s.files && s.files.length > 0) ? (
-                        <span className="text-xs font-bold text-success truncate block">
-                          {s.files.length} File{s.files.length > 1 ? 's' : ''} Attached
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const el = document.getElementById(`centre-gallery-${s._id}`);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                          }}
+                          className="text-xs font-bold text-success hover:underline truncate flex items-center gap-1 cursor-pointer"
+                        >
+                          View Media ({s.files.length}) <CheckCircle2 className="h-3 w-3" />
+                        </button>
                       ) : (
-                        <span className="text-xs font-bold text-destructive truncate block">Missing Media</span>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(s)}
+                          className="text-xs font-bold text-primary hover:underline truncate flex items-center gap-1 cursor-pointer"
+                        >
+                          Upload Media <Upload className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
                   </div>
                 </div>
 
                 {s.files && s.files.length > 0 && (
-                  <FileGallery files={s.files} title="Media & Attachments" />
+                  <div id={`centre-gallery-${s._id}`}>
+                    <FileGallery files={s.files} title="Media & Attachments" />
+                  </div>
+                )}
+                {s.documentationLink && (!s.files || s.files.length === 0) && (
+                  <div className="p-3 rounded-2xl bg-muted/20 border border-muted-foreground/10 flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                      <span className="text-xs font-bold truncate text-muted-foreground">{s.documentationLink}</span>
+                    </div>
+                    <a
+                      href={s.documentationLink.startsWith('http') ? s.documentationLink : `https://${s.documentationLink}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-black text-primary hover:underline shrink-0 ml-3 flex items-center gap-1"
+                    >
+                      View Media ↗
+                    </a>
+                  </div>
                 )}
               </div>
 
