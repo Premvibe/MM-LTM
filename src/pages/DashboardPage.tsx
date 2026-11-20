@@ -269,20 +269,45 @@ const DashboardPage = () => {
       {/* ===== ROW 2: STAT CARDS ===== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Students */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Students</p>
-              <p className="text-3xl font-black mt-2 tracking-tight">{stats.totalStudents}</p>
-              {studentChange && (
-                <div className={`flex items-center gap-1 mt-2 text-[10px] font-bold ${studentChange.color}`}>
-                  <studentChange.icon className="h-3 w-3" /> {studentChange.pct}% <span className="text-muted-foreground font-normal">vs last month</span>
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-3xl font-black tracking-tight">{stats.totalStudents}</p>
+                <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[9px] font-bold uppercase tracking-widest">Enrolled</Badge>
+              </div>
+            </div>
+            <div className="h-11 w-11 rounded-xl bg-blue-50 flex items-center justify-center">
+              <GraduationCap className="h-5 w-5 text-blue-500" />
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className={`grid ${(stats.totalUnspecified ?? (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))) > 0 ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+              <div>
+                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">Males</p>
+                <p className="text-base sm:text-lg font-black text-slate-800">{stats.totalMales !== undefined ? stats.totalMales : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-pink-600 uppercase tracking-widest">Females</p>
+                <p className="text-base sm:text-lg font-black text-slate-800">{stats.totalFemales !== undefined ? stats.totalFemales : '-'}</p>
+              </div>
+              {(stats.totalUnspecified ?? (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))) > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest" title="Gender not yet recorded in student profile">Not Set</p>
+                  <p className="text-base sm:text-lg font-black text-slate-700">
+                    {stats.totalUnspecified !== undefined ? stats.totalUnspecified : (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))}
+                  </p>
                 </div>
               )}
             </div>
-            <div className="h-11 w-11 rounded-xl bg-blue-50 flex items-center justify-center"><GraduationCap className="h-5 w-5 text-blue-500" /></div>
+            {studentChange && (
+              <div className={`flex items-center gap-1 mt-3 text-[10px] font-bold ${studentChange.color}`}>
+                <studentChange.icon className="h-3 w-3" /> {studentChange.pct}% <span className="text-muted-foreground font-normal">vs last month</span>
+              </div>
+            )}
           </div>
-          <Badge className="mt-3 bg-blue-50 text-blue-600 border-blue-100 text-[9px] font-bold uppercase tracking-widest">Enrolled</Badge>
         </div>
 
         {/* Sessions */}

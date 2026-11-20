@@ -741,8 +741,12 @@ const StudentsPage = () => {
               <h1 className="text-xl md:text-4xl font-[1000] tracking-tighter text-foreground">{selectedCentre?.name}</h1>
               <Badge variant={selectedCentre?.type === "In-school" ? "default" : "secondary"} className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest h-fit border-none">{selectedCentre?.type}</Badge>
             </div>
-            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
-              {centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) === "Active").length} Active / {centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) !== "Left").length} Total Students
+            <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px] mt-1 flex flex-wrap items-center gap-1.5">
+              <span>{centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) === "Active").length} Active / {centreStudents.filter(s => isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) !== "Left").length} Total Students</span>
+              <span>•</span>
+              <span className="text-blue-600 font-bold">{centreStudents.filter(s => (s.gender?.toLowerCase() === 'male' || s.gender === 'Male') && isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) !== "Left").length} Males</span>
+              <span>/</span>
+              <span className="text-pink-600 font-bold">{centreStudents.filter(s => (s.gender?.toLowerCase() === 'female' || s.gender === 'Female') && isEnrolledInMonth(s, selectedMonth, selectedYear) && getStatusForMonth(s, selectedMonth, selectedYear) !== "Left").length} Females</span>
             </p>
           </div>
         </div>
