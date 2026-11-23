@@ -298,7 +298,7 @@ const AdminsPage = () => {
               <Plus className="h-4 w-4 mr-2" />Add Administrator / Manager
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-lg">
+          <DialogContent aria-describedby={undefined} className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden max-w-lg">
             <form onSubmit={handleSave}>
               <div className="bg-primary p-8 text-white">
                 <DialogTitle className="text-2xl font-black tracking-tight">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import api from "@/lib/api";
+import api, { clearApiCache } from "@/lib/api";
 
 export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    clearApiCache();
     setUser(null);
     localStorage.removeItem("manzil_user");
   }, []);

@@ -37,10 +37,15 @@ const navItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  // On phones the sidebar is an overlay; close it once the user navigates
+  React.useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [location.pathname, isMobile, setOpenMobile]);
 
   const filteredItems = navItems.filter(item => {
     if (!user) return false;
