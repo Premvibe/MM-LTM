@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Plus, CalendarDays, Clock, Users, Pencil, ArrowLeft, MapPin, Search, Filter, Trash2, X, ClipboardCheck, CheckCircle2, Building2, Truck, AlertCircle, XCircle, Calendar, Layers, Check, RotateCcw, Image as ImageIcon, Upload } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -166,7 +166,7 @@ const SessionsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [filterMonth, filterYear]);
+  }, [filterMonth, filterYear, filterDate]);
 
   useEffect(() => {
     if (!editItem) {
@@ -195,12 +195,17 @@ const SessionsPage = () => {
         : user?.role === 'program_manager' 
           ? `?role=program_manager&email=${user.email}` 
           : '';
-      const dateParams = `?month=${filterMonth}&year=${filterYear}`;
+      // The server returns only the requested month. A picked date can be outside the month filter,
+      // so in that case ask for the picked date's month instead.
+      const dateParams = filterDate
+        ? `?month=${parseInt(filterDate.slice(5, 7)) - 1}&year=${filterDate.slice(0, 4)}`
+        : `?month=${filterMonth}&year=${filterYear}`;
       const [sessionsRes, centresRes, fellowsRes, studentsRes, adminsRes] = await Promise.all([
         api.get(`/sessions${dateParams}${params}`),
         api.get(`/centres${paramsQuery}`),
         api.get(`/fellows${paramsQuery}`),
-        api.get(`/students${paramsQuery}`),
+        // Students are only listed (attendance dialog, centre counts) on this page, never edited
+        api.get(withQuery(`/students${paramsQuery}`, { fields: "id,centreId,name,age,gender,grade,section", stats: false })),
         api.get('/admins').catch(() => ({ data: [] }))
       ]);
       setSessionsList(sessionsRes.data);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -145,7 +145,8 @@ const AttendancePage = () => {
       const [studentsRes, centresRes, sessionsRes, fellowsRes] = await Promise.all([
         api.get(`/students${params}`),
         api.get(`/centres${params}`),
-        api.get(`/sessions${params}`),
+        // All months are kept (the Pending Attendance list spans months); only unused fields are dropped
+        api.get(withQuery(`/sessions${params}`, { fields: "date,centreId,approvalStatus,presentStudentIds,reviewNote,topic,duration" })),
         api.get(`/fellows${params}`)
       ]);
       setStudentsList(studentsRes.data);

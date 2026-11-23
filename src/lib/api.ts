@@ -97,4 +97,13 @@ const cachingAdapter: AxiosAdapter = async (config) => {
 
 api.defaults.adapter = cachingAdapter;
 
+/** Append extra query params to a path that may already have a query string, e.g. "/sessions?role=fellow&email=…". */
+export function withQuery(path: string, extra: Record<string, string | number | boolean | undefined>) {
+  const parts = Object.entries(extra)
+    .filter(([, v]) => v !== undefined && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+  if (!parts.length) return path;
+  return path + (path.includes("?") ? "&" : "?") + parts.join("&");
+}
+
 export default api;

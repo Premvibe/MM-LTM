@@ -668,12 +668,13 @@ const ReportsPage = () => {
                 {(stats.centrePerformance || []).slice(0, 5).map((centre: any, idx: number) => (
                   <TableRow key={idx} className="border-slate-100/50 hover:bg-slate-50/50">
                     <TableCell className="pl-6 py-3 font-bold text-xs text-slate-800 truncate max-w-[160px]">{centre.fullName || centre.name}</TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-600">{centre.studentsCount || Math.floor(Math.random() * 20) + 20}</TableCell>
+                    <TableCell className="text-xs font-semibold text-slate-600">{centre.studentsCount ?? "—"}</TableCell>
                     <TableCell className="text-xs font-semibold text-slate-600">{centre.attendance}%</TableCell>
                     <TableCell className="text-xs font-semibold text-slate-600">{centre.sessions}</TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-600">{centre.sessionCoverage || Math.floor(Math.random() * 40) + 40}%</TableCell>
+                    <TableCell className="text-xs font-semibold text-slate-600">{centre.sessionCoverage ?? 0}%</TableCell>
                     <TableCell className="text-xs font-semibold text-slate-600">{centre.learning}/5</TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-600">{centre.qualityIndex || Math.floor(Math.random() * 30) + 50}%</TableCell>
+                    {/* No quality index is calculated on the server yet, so show a dash rather than a made-up number */}
+                    <TableCell className="text-xs font-semibold text-slate-600">{centre.qualityIndex != null ? `${centre.qualityIndex}%` : "—"}</TableCell>
                     <TableCell className="pr-6 text-right">
                       <Badge className={`rounded-md text-[9px] font-black uppercase px-2 py-0.5 border-none ${
                         centre.status === 'On track' ? 'bg-emerald-100 text-emerald-700' :

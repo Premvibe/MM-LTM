@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ const StudentsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   const fetchData = async () => {
     try {
@@ -136,8 +136,9 @@ const StudentsPage = () => {
         api.get(`/students${params}`),
         api.get(`/centres${params}`),
         api.get(`/fellows${params}`),
-        api.get(`/sessions${params}`),
-        api.get(`/assessments${params}`)
+        // Only the selected month is needed for the monthly stats; the student list stays complete (it feeds the edit form)
+        api.get(withQuery(`/sessions${params}`, { month: selectedMonth, year: selectedYear, fields: "centreId,date,presentStudentIds" })),
+        api.get(withQuery(`/assessments${params}`, { month: selectedMonth, year: selectedYear, fields: "studentId,date,averageScore", populate: false }))
       ]);
       setStudentsList(studentsRes.data);
       setCentresList(centresRes.data);

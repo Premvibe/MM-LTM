@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { compareStudentsByClassAndName } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +145,7 @@ const CentreDetailPage = () => {
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, selectedMonth, selectedYear]);
 
   const fetchData = async () => {
     try {
@@ -153,8 +153,9 @@ const CentreDetailPage = () => {
         api.get(`/centres/${id}`),
         api.get("/fellows"),
         api.get("/students"),
-        api.get("/sessions"),
-        api.get("/assessments"),
+        // This page only shows the selected month, and only reads these fields
+        api.get(withQuery("/sessions", { month: selectedMonth, year: selectedYear, fields: "date,centreId,fellowId,topic,duration,studentsPresent,presentStudentIds,reviewNote,approvalStatus" })),
+        api.get(withQuery("/assessments", { month: selectedMonth, year: selectedYear, fields: "studentId,date,averageScore", populate: false })),
         api.get("/change-stories"),
       ]);
       setCentre(centreRes.data);

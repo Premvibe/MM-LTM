@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import api from "@/lib/api";
+import React, { useState, useEffect, useRef } from "react";
+import api, { withQuery } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ const QualityPage = () => {
   const [observationNote, setObservationNote] = useState("");
   const [qualityFiles, setQualityFiles] = useState<DriveFile[]>([]);
 
-  const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
+  const autoCalcRequestRef = useRef(0);
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -90,19 +90,19 @@ const QualityPage = () => {
     try {
       // Allow program managers to see all centres on the Quality Page, just like super admins
       const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
-      const [qualityRes, sessionsRes, centresRes, fellowsRes, assessmentsRes, studentsRes] = await Promise.all([
+      // Sessions/students are only used by the auto-calculation, so fetch just the fields it reads.
+      // Assessments are fetched per form month inside autoCalculateMetrics instead of all at once.
+      const [qualityRes, sessionsRes, centresRes, fellowsRes, studentsRes] = await Promise.all([
         api.get(`/quality${params}`),
-        api.get(`/sessions${params}`),
+        api.get(withQuery(`/sessions${params}`, { fields: "centreId,date,studentsPresent" })),
         api.get(`/centres${params}`),
         api.get(`/fellows${params}`),
-        api.get(`/assessments${params}`),
-        api.get(`/students${params}`)
+        api.get(withQuery(`/students${params}`, { fields: "id,centreId", stats: false }))
       ]);
       setQualityList(qualityRes.data);
       setSessionsList(sessionsRes.data);
       setCentresList(centresRes.data);
       setFellowsList(fellowsRes.data);
-      setAssessmentsList(assessmentsRes.data);
       setStudentsList(studentsRes.data);
     } catch (error) {
       toast.error("Failed to load data");
@@ -111,12 +111,25 @@ const QualityPage = () => {
     }
   };
 
-  const autoCalculateMetrics = () => {
+  const autoCalculateMetrics = async () => {
     if (!formCentreId) return;
     const centre = centresList.find(c => c._id === formCentreId);
     if (!centre) return;
     const month = parseInt(formMonth);
     const year = parseInt(formYear);
+
+    // Load only this month's assessments; ignore the result if the form changed while it was loading
+    const requestId = ++autoCalcRequestRef.current;
+    let assessmentsList: any[] = [];
+    try {
+      const params = user?.role === 'fellow' ? `?role=fellow&email=${user.email}` : '';
+      const res = await api.get(withQuery(`/assessments${params}`, { month, year, fields: "studentId,date", populate: false }));
+      assessmentsList = res.data;
+    } catch {
+      toast.error("Could not load assessments for auto-calculation");
+      return;
+    }
+    if (requestId !== autoCalcRequestRef.current) return;
 
     // 1. Session Numbers (this month)
     const monthlySessions = sessionsList.filter(s => {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -365,14 +365,20 @@ const AssessmentsPage = () => {
         : '';
   };
 
+  // Monthly (Continuous) records for the selected month only, every Pre/Mid/Post record (for Annual Milestones),
+  // and each student's latest earlier monthly record (for the "PREV" fallback)
+  const getAssessmentsUrl = () => withQuery(`/assessments${getRoleParams()}`, {
+    month: selectedMonth, year: selectedYear, includePrevious: true, populate: false
+  });
+
   useEffect(() => {
     const params = getRoleParams();
     Promise.all([
-      api.get(`/students${params}`), 
+      api.get(withQuery(`/students${params}`, { fields: "id,centreId,name,grade,section,status", stats: false })),
       api.get(`/centres${params}`),
       api.get(`/fellows${params}`),
-      api.get(`/assessments${params}`),
-      api.get(`/sessions${params}`)
+      api.get(getAssessmentsUrl()),
+      api.get(withQuery(`/sessions${params}`, { month: selectedMonth, year: selectedYear, fields: "centreId,date,presentStudentIds" }))
     ])
       .then(([sRes, cRes, fRes, aRes, sessRes]) => {
         setStudents(sRes.data);
@@ -382,7 +388,7 @@ const AssessmentsPage = () => {
         setSessionsData(sessRes.data);
       })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, selectedMonth, selectedYear]);
 
   const handleLogAssessment = async () => {
     if (isSubmitting) return;
@@ -452,7 +458,7 @@ const AssessmentsPage = () => {
       setEditingAssessmentId(null);
       setEditingAssessmentDate(null);
       setIsLogOpen(false);
-      const aRes = await api.get(`/assessments${getRoleParams()}`);
+      const aRes = await api.get(getAssessmentsUrl());
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to log assessment");
@@ -471,7 +477,7 @@ const AssessmentsPage = () => {
       setEditingAssessmentId(null);
       setEditingAssessmentDate(null);
       setIsLogOpen(false);
-      const aRes = await api.get(`/assessments${getRoleParams()}`);
+      const aRes = await api.get(getAssessmentsUrl());
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to delete assessment");
@@ -519,7 +525,7 @@ const AssessmentsPage = () => {
       await api.post("/assessments/bulk", { assessments });
       toast.success(`Successfully logged ${assessments.length} assessments`);
       setIsBulkOpen(false);
-      const aRes = await api.get(`/assessments${getRoleParams()}`);
+      const aRes = await api.get(getAssessmentsUrl());
       setAssessmentsData(aRes.data);
     } catch (error) {
       toast.error("Failed to save bulk assessments");

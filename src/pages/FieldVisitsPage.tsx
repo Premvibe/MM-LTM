@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "@/lib/api";
+import api, { withQuery } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,7 +93,8 @@ const FieldVisitsPage = () => {
       const [visitsRes, centresRes, sessionsRes] = await Promise.all([
         api.get(`/field-visits${params}`),
         api.get(`/centres${params}`),
-        api.get(`/sessions${params}`)
+        // This page only shows Music Bus sessions
+        api.get(withQuery(`/sessions${params}`, { isMusicBus: true, fields: "isMusicBus,date,centreId,observations,issues,sessionPlanLink,documentationLink" }))
       ]);
       
       const centresData = centresRes.data;
