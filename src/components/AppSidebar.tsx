@@ -1,7 +1,7 @@
 import React from "react";
 import {
   LayoutDashboard, Building2, Users, GraduationCap, CalendarDays,
-  ClipboardCheck, Award, ShieldCheck, Bus, BarChart3, Bell, LogOut, Music, MessageSquarePlus, BookHeart
+  ClipboardCheck, Award, ShieldCheck, Bus, BarChart3, Bell, LogOut, Music, MessageSquarePlus, BookHeart, HandHeart
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ["admin", "fellow", "mne_officer"] },
   { title: "Centres", url: "/centres", icon: Building2, roles: ["admin"] },
   { title: "Fellows", url: "/fellows", icon: Users, roles: ["admin"] },
+  { title: "Donors", url: "/donors", icon: HandHeart, roles: ["admin"] },
   { title: "Students", url: "/students", icon: GraduationCap, roles: ["admin", "fellow"] },
   { title: "Sessions", url: "/sessions", icon: CalendarDays, roles: ["admin", "fellow"] },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck, roles: ["admin", "fellow"] },

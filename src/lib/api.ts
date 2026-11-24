@@ -97,6 +97,34 @@ const cachingAdapter: AxiosAdapter = async (config) => {
 
 api.defaults.adapter = cachingAdapter;
 
+// ---------------------------------------------------------------------------
+// Auth token
+//
+// Login returns a token, stored with the user in localStorage. It is sent on
+// every request. Routes that require it (donors, sponsorships, replacing a
+// fellow) answer 401 + code AUTH_REQUIRED when it is missing or expired, and
+// AuthContext then logs the user out so they can sign in again.
+// ---------------------------------------------------------------------------
+export const AUTH_EXPIRED_EVENT = "manzil:auth-expired";
+
+api.interceptors.request.use((config) => {
+  try {
+    const saved = localStorage.getItem("manzil_user");
+    const token = saved ? JSON.parse(saved)?.token : undefined;
+    if (token) config.headers.set("Authorization", `Bearer ${token}`);
+  } catch {
+    // No stored user, nothing to attach
+  }
+  return config;
+});
+
+api.interceptors.response.use(undefined, (error) => {
+  if (error?.response?.status === 401 && error.response.data?.code === "AUTH_REQUIRED") {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
+  return Promise.reject(error);
+});
+
 /** Append extra query params to a path that may already have a query string, e.g. "/sessions?role=fellow&email=…". */
 export function withQuery(path: string, extra: Record<string, string | number | boolean | undefined>) {
   const parts = Object.entries(extra)
@@ -107,3 +135,13 @@ export function withQuery(path: string, extra: Record<string, string | number | 
 }
 
 export default api;
+
+/** The server's error message from a failed request, or the fallback text. */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  return (axios.isAxiosError(error) && error.response?.data?.message) || fallback;
+}
+
+/** True when the request failed because the user needs to log in again (handled globally above). */
+export function isAuthError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 401;
+}

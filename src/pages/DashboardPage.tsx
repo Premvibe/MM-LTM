@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Building2, Users, GraduationCap, CalendarDays, TrendingUp, TrendingDown, Filter, X, ClipboardCheck, BookOpen, AlertCircle, CheckCircle2, UserPlus, ChevronRight, BarChart3, Clock, MapPin, Activity, Calendar, User, RotateCcw } from "lucide-react";
+import { Building2, Users, GraduationCap, CalendarDays, TrendingUp, TrendingDown, Filter, X, ClipboardCheck, BookOpen, AlertCircle, CheckCircle2, UserPlus, ChevronRight, BarChart3, Clock, MapPin, Activity, Calendar, User, RotateCcw, HandHeart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart, Legend } from "recharts";
 import api from "@/lib/api";
@@ -21,6 +21,9 @@ const getChangeIcon = (current: number, previous: number) => {
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
   const [stats, setStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [filterStartMonth, setFilterStartMonth] = useState<string>("all");
   const [filterEndMonth, setFilterEndMonth] = useState<string>("all");
   const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
@@ -30,6 +33,9 @@ const DashboardPage = () => {
   const [centreAttendanceFilter, setCentreAttendanceFilter] = useState<string>("all");
   const [centres, setCentres] = useState<any[]>([]);
   const [fellows, setFellows] = useState<any[]>([]);
+  const [filterDonor, setFilterDonor] = useState<string>("all");
+  const [donors, setDonors] = useState<{ _id: string; name: string; type: string }[]>([]);
+  const [sponsorships, setSponsorships] = useState<{ _id: string; donorId: string; fellowId: string; program?: string; status: string }[]>([]);
 
   const months = [
     { value: "0", label: "January" }, { value: "1", label: "February" }, { value: "2", label: "March" },
@@ -46,16 +52,43 @@ const DashboardPage = () => {
         api.get(`/centres${emailParams}`),
         api.get(`/fellows${emailParams}`)
       ]).then(([cRes, fRes]) => { setCentres(cRes.data); setFellows(fRes.data); }).catch(() => {});
+      // Donor data is on protected routes; if it fails the dashboard simply has no donor filter
+      Promise.all([api.get("/donors"), api.get("/sponsorships")])
+        .then(([dRes, sRes]) => { setDonors(dRes.data); setSponsorships(sRes.data); })
+        .catch(() => {});
     }
   }, [user]);
 
+  // Fellows the selected donor funds now, and those it funded before (left / replaced)
+  const donorFellows = useMemo(() => {
+    if (filterDonor === "all") return null;
+    const rows = sponsorships.filter(s => s.donorId === filterDonor);
+    const byId = (id: string) => fellows.find(f => f._id === id);
+    const pick = (status: (s: string) => boolean) => rows
+      .filter(s => status(s.status))
+      .map(s => ({ link: s, fellow: byId(s.fellowId) }))
+      .filter(r => r.fellow)
+      .sort((a, b) => (a.link.program || "").localeCompare(b.link.program || "") || a.fellow.name.localeCompare(b.fellow.name));
+    return { current: pick(st => st === "Active"), past: pick(st => st !== "Active") };
+  }, [filterDonor, sponsorships, fellows]);
+  const donorFellowIds = useMemo(
+    () => (donorFellows ? new Set(donorFellows.current.map(r => r.fellow._id as string)) : null),
+    [donorFellows]
+  );
+
   const filteredCentres = useMemo(() => {
-    if (filterFellow === "all") return centres;
+    if (filterFellow === "all") {
+      if (!donorFellowIds) return centres;
+      const donorList = fellows.filter(f => donorFellowIds.has(f._id));
+      return centres.filter(c =>
+        donorList.some(f => (c.fellowIds || []).includes(f._id) || (f.id && (c.fellowIds || []).includes(f.id)) || (f.centreIds || []).includes(c._id))
+      );
+    }
     return centres.filter(c => 
       (c.fellowIds || []).includes(filterFellow) || 
       (fellows.find(f => (f._id || f.id) === filterFellow)?.centreIds || []).includes(c._id || c.id)
     );
-  }, [centres, fellows, filterFellow]);
+  }, [centres, fellows, filterFellow, donorFellowIds]);
 
   useEffect(() => {
     if (!user) return;
@@ -63,15 +96,42 @@ const DashboardPage = () => {
     const dateParams = filterStartMonth !== 'all' && filterEndMonth !== 'all' 
       ? `startMonth=${filterStartMonth}&endMonth=${filterEndMonth}&year=${filterYear}`
       : `month=${filterStartMonth}&year=${filterYear}`;
-    const adminParams = isAdmin ? `centreId=${filterCentre}&fellowId=${filterFellow}` : '';
+    const adminParams = isAdmin ? `centreId=${filterCentre}&fellowId=${filterFellow}&donorId=${filterDonor}` : '';
     const modelParams = `type=${filterModel}`;
     const queryString = [roleParams, dateParams, adminParams, modelParams].filter(Boolean).join('&');
-    api.get(`/dashboard/stats?${queryString}`).then(res => setStats(res.data)).catch(() => {});
-  }, [user, filterStartMonth, filterEndMonth, filterYear, filterCentre, filterFellow, filterModel]);
+    // Ignore responses from requests that a newer filter change has replaced,
+    // so a slow older request can never overwrite the latest numbers
+    let current = true;
+    setStatsLoading(true);
+    setStatsError(false);
+    api.get(`/dashboard/stats?${queryString}`)
+      .then(res => { if (current) setStats(res.data); })
+      .catch(() => { if (current) setStatsError(true); })
+      .finally(() => { if (current) setStatsLoading(false); });
+    return () => { current = false; };
+  }, [user, filterStartMonth, filterEndMonth, filterYear, filterCentre, filterFellow, filterModel, filterDonor, reloadKey]);
 
-  const hasActiveFilters = filterStartMonth !== 'all' || filterEndMonth !== 'all' || filterCentre !== 'all' || filterFellow !== 'all' || filterModel !== 'all';
+  const hasActiveFilters = filterStartMonth !== 'all' || filterEndMonth !== 'all' || filterCentre !== 'all' || filterFellow !== 'all' || filterModel !== 'all' || filterDonor !== 'all';
+  const selectedDonor = donors.find(d => d._id === filterDonor);
 
-  if (!stats) return <div className="h-[200px] w-full flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+  if (!stats) {
+    return (
+      <div className="h-[260px] w-full flex flex-col items-center justify-center gap-3 text-center">
+        {statsError ? (
+          <>
+            <AlertCircle className="h-8 w-8 text-red-500" />
+            <p className="text-sm font-semibold">Couldn't load the dashboard</p>
+            <Button variant="outline" size="sm" onClick={() => setReloadKey(k => k + 1)}>Try again</Button>
+          </>
+        ) : (
+          <>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-sm text-muted-foreground font-medium">Loading dashboard…</p>
+          </>
+        )}
+      </div>
+    );
+  }
 
   const donutData = [
     { name: "Completed", value: stats.totalAssessedStudents || 0 },
@@ -182,6 +242,26 @@ const DashboardPage = () => {
 
           {isAdmin && (
             <>
+              {donors.length > 0 && (
+                <Select value={filterDonor} onValueChange={(v) => { setFilterDonor(v); setFilterFellow("all"); setFilterCentre("all"); }}>
+                  <SelectTrigger className="h-12 bg-white border border-gray-100 shadow-sm rounded-xl px-3.5 flex items-center justify-start text-left gap-3 w-44 hover:bg-gray-50/50 transition-colors focus:ring-0 [&>span]:w-full">
+                    <HandHeart className="h-4 w-4 text-slate-500 shrink-0" />
+                    <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+                      <span className="text-[10px] font-medium text-slate-500">Donor</span>
+                      <span className="text-xs font-bold text-slate-900 truncate">
+                        <SelectValue placeholder="All Donors" />
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="all" className="text-xs font-semibold">All Donors</SelectItem>
+                    {donors.map(d => (
+                      <SelectItem key={d._id} value={d._id} className="text-xs">{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
               <Select value={filterCentre} onValueChange={setFilterCentre}>
                 <SelectTrigger className="h-12 bg-white border border-gray-100 shadow-sm rounded-xl px-3.5 flex items-center justify-start text-left gap-3 w-40 hover:bg-gray-50/50 transition-colors focus:ring-0 [&>span]:w-full">
                   <Building2 className="h-4 w-4 text-slate-500 shrink-0" />
@@ -213,7 +293,7 @@ const DashboardPage = () => {
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all" className="text-xs font-semibold">All Fellows</SelectItem>
                   {(() => {
-                    const activeFellows = fellows.filter(f => f.status === 'Active');
+                    const activeFellows = fellows.filter(f => f.status === 'Active' && (!donorFellowIds || donorFellowIds.has(f._id)));
                     const batches = [...new Set(activeFellows.map(f => f.batch || 'Unknown'))].sort();
                     return batches.map(batch => (
                       <SelectGroup key={batch}>
@@ -249,13 +329,91 @@ const DashboardPage = () => {
           <Button 
             variant="outline" 
             className="h-12 bg-white border border-gray-100 shadow-sm rounded-xl px-4 flex items-center gap-2 hover:bg-gray-50 transition-colors"
-            onClick={() => { setFilterStartMonth('all'); setFilterEndMonth('all'); setFilterCentre('all'); setFilterFellow('all'); setFilterModel('all'); }}
+            onClick={() => { setFilterStartMonth('all'); setFilterEndMonth('all'); setFilterCentre('all'); setFilterFellow('all'); setFilterModel('all'); setFilterDonor('all'); }}
           >
             <RotateCcw className="h-4 w-4 text-slate-600" />
             <span className="text-xs font-bold text-slate-700">Reset</span>
           </Button>
         </div>
       </div>
+
+      {statsLoading && (
+        <div role="status" aria-live="polite" className="sticky top-2 z-20 mx-auto w-fit flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-bold shadow-lg">
+          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground"></div>
+          Updating dashboard…
+        </div>
+      )}
+      {!statsLoading && statsError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />Couldn't update the dashboard. The figures below are from the previous filters.</span>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setReloadKey(k => k + 1)}>Try again</Button>
+        </div>
+      )}
+
+      <div aria-busy={statsLoading} className={`space-y-6 transition-opacity duration-200 ${statsLoading ? "opacity-40 pointer-events-none select-none" : ""}`}>
+      {/* ===== DONOR FELLOWS (when a donor is selected) ===== */}
+      {selectedDonor && donorFellows && (
+        <Card className="rounded-2xl border border-amber-100 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-base font-black flex items-center gap-2">
+                <HandHeart className="h-4 w-4 text-amber-600" />
+                {selectedDonor.name}
+                <Badge variant="outline" className="text-[10px] font-semibold">{selectedDonor.type}</Badge>
+              </CardTitle>
+              <span className="text-xs text-muted-foreground font-semibold">
+                {donorFellows.current.length} fellow{donorFellows.current.length !== 1 ? "s" : ""} funded now
+                {filterFellow !== "all" && (
+                  <button type="button" className="ml-2 text-primary hover:underline" onClick={() => { setFilterFellow("all"); setFilterCentre("all"); }}>Show all</button>
+                )}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">The figures below cover these fellows' centres. Click a fellow to see only their numbers.</p>
+          </CardHeader>
+          <CardContent>
+            {donorFellows.current.length === 0 ? (
+              <p className="text-sm text-muted-foreground">This donor has no fellows linked right now.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                {donorFellows.current.map(({ link, fellow }) => {
+                  const replaced = fellow.replacesFellowId ? fellows.find(f => f._id === fellow.replacesFellowId) : null;
+                  const selected = filterFellow === fellow._id;
+                  return (
+                    <button
+                      key={link._id}
+                      type="button"
+                      onClick={() => { setFilterFellow(selected ? "all" : fellow._id); setFilterCentre("all"); }}
+                      className={`text-left rounded-xl border p-3 transition-colors ${selected ? "border-primary bg-primary/5" : "border-gray-100 hover:bg-gray-50"}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold truncate">{fellow.name}</span>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">Batch {fellow.batch || "N/A"}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {link.program && <Badge variant="secondary" className="text-[9px] h-4 px-1.5 py-0 font-normal">{link.program}</Badge>}
+                        {replaced && <span className="text-[10px] text-muted-foreground">Replacement for {replaced.name}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                        <span><strong className="text-foreground">{fellow.sessionsCompleted ?? 0}</strong> sessions</span>
+                        <span><strong className="text-foreground">{fellow.attendanceRate ?? 0}%</strong> attendance</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {donorFellows.past.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-3">
+                <span className="font-bold uppercase tracking-widest text-[9px] mr-1">Previously funded:</span>
+                {donorFellows.past.map(({ link, fellow }) => {
+                  const by = fellow.replacedByFellowId ? fellows.find(f => f._id === fellow.replacedByFellowId) : null;
+                  return `${fellow.name}${by ? ` (replaced by ${by.name})` : link.status === "Ended" ? " (ended)" : ""}`;
+                }).join(", ")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Date context */}
       {stats.dateContext && (
@@ -705,6 +863,7 @@ const DashboardPage = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
-import api, { clearApiCache } from "@/lib/api";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { toast } from "sonner";
+import api, { clearApiCache, AUTH_EXPIRED_EVENT } from "@/lib/api";
 
 export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
@@ -9,6 +10,7 @@ interface User {
   email: string;
   role: UserRole;
   phone?: string;
+  token?: string;
   assignedFellowIds?: string[];
   assignedCentreIds?: string[];
 }
@@ -52,6 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("manzil_user");
   }, []);
+
+  // A protected route rejected the token (missing after this update, or expired): ask the user to sign in again
+  useEffect(() => {
+    const onExpired = () => {
+      if (!localStorage.getItem("manzil_user")) return;
+      logout();
+      toast.info("Please log in again to continue");
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+  }, [logout]);
 
   const updateProfile = useCallback((data: Partial<User>) => {
     setUser(prev => {

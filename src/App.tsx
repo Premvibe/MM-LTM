@@ -24,6 +24,7 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const AdminsPage = lazy(() => import("./pages/AdminsPage"));
 const ChangeStoriesPage = lazy(() => import("./pages/ChangeStoriesPage"));
+const DonorsPage = lazy(() => import("./pages/DonorsPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -60,6 +61,7 @@ const App = () => (
                 <Route path="/centres" element={<ProtectedRoute><CentresPage /></ProtectedRoute>} />
                 <Route path="/centres/:id" element={<ProtectedRoute><CentreDetailPage /></ProtectedRoute>} />
                 <Route path="/fellows" element={<ProtectedRoute><FellowsPage /></ProtectedRoute>} />
+                <Route path="/donors" element={<ProtectedRoute><DonorsPage /></ProtectedRoute>} />
                 <Route path="/students" element={<ProtectedRoute><StudentsPage /></ProtectedRoute>} />
                 <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
                 <Route path="/quality" element={<ProtectedRoute><QualityPage /></ProtectedRoute>} />

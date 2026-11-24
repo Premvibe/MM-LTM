@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import api from "@/lib/api";
+import api, { apiErrorMessage, isAuthError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Users, UserCheck, UserX, UserMinus, ShieldX, CalendarDays, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserCheck, UserX, UserMinus, ShieldX, CalendarDays, X, HandHeart, Repeat, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter } from "lucide-react";
@@ -26,7 +26,23 @@ type Fellow = {
   centreEndDate?: string;
   sessionsCompleted: number; 
   attendanceRate: number; 
-  programManagers?: string[] 
+  programManagers?: string[];
+  leftDate?: string;
+  leftReason?: string;
+  replacesFellowId?: string;
+  replacedByFellowId?: string;
+};
+type DonorOption = { _id: string; name: string; type: string; status: string };
+type Sponsorship = {
+  _id: string;
+  donorId: string;
+  donorName: string;
+  fellowId: string;
+  program?: string;
+  startDate?: string;
+  endDate?: string;
+  status: "Active" | "Ended" | "Transferred";
+  notes?: string;
 };
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 
@@ -42,7 +58,7 @@ const formatDateDMY = (dateStr?: string) => {
 };
 
 const FellowsPage = () => {
-  const { user, isMEManager, isSuperAdmin } = useAuth();
+  const { user, isMEManager, isSuperAdmin, isAdmin } = useAuth();
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +77,31 @@ const FellowsPage = () => {
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterDonor, setFilterDonor] = useState<string>("all");
+
+  // Donors
+  const [donorsList, setDonorsList] = useState<DonorOption[]>([]);
+  const [sponsorships, setSponsorships] = useState<Sponsorship[]>([]);
+  const [newLink, setNewLink] = useState({ donorId: "", program: "", startDate: "", endDate: "" });
+
+  // Mark Left & Replace
+  const [replaceTarget, setReplaceTarget] = useState<Fellow | null>(null);
+  const [replaceForm, setReplaceForm] = useState({
+    leftDate: "", leftReason: "", mode: "existing" as "existing" | "new", replacementFellowId: "",
+    name: "", email: "", phone: "", batch: "", password: "", joinDate: "", carryDonors: true, carryCentres: true, endReplacementDonors: true,
+  });
+  const [replacing, setReplacing] = useState(false);
+
+  const fellowById = useMemo(() => Object.fromEntries(fellowsList.map(f => [f._id, f])), [fellowsList]);
+  const activeDonorsByFellow = useMemo(() => {
+    const m: Record<string, Sponsorship[]> = {};
+    sponsorships.filter(s => s.status === "Active").forEach(s => { (m[s.fellowId] ||= []).push(s); });
+    return m;
+  }, [sponsorships]);
+  const programOptions = useMemo(
+    () => Array.from(new Set(sponsorships.map(s => s.program).filter(Boolean))).sort() as string[],
+    [sponsorships]
+  );
 
   // Status counts
   const statusCounts = useMemo(() => {
@@ -81,10 +122,14 @@ const FellowsPage = () => {
       
       const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
       const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
+
+      const fellowDonors = activeDonorsByFellow[f._id] || [];
+      const matchesDonor = filterDonor === "all" ||
+        (filterDonor === "none" ? fellowDonors.length === 0 : fellowDonors.some(s => s.donorId === filterDonor));
       
-      return matchesSearch && matchesBatch && matchesType && matchesStatus;
+      return matchesSearch && matchesBatch && matchesType && matchesStatus && matchesDonor;
     });
-  }, [fellowsList, centresList, searchQuery, filterBatch, filterType, filterStatus]);
+  }, [fellowsList, centresList, searchQuery, filterBatch, filterType, filterStatus, filterDonor, activeDonorsByFellow]);
 
   useEffect(() => {
     fetchData();
@@ -104,6 +149,91 @@ const FellowsPage = () => {
     } finally {
       setLoading(false);
     }
+    fetchDonorData();
+  };
+
+  // Donor data comes from protected routes, so it loads separately and never blocks the fellow list
+  const fetchDonorData = async () => {
+    if (!isAdmin) return;
+    try {
+      const [donorsRes, sponsorshipsRes] = await Promise.all([api.get("/donors"), api.get("/sponsorships")]);
+      setDonorsList(donorsRes.data);
+      setSponsorships(sponsorshipsRes.data);
+    } catch (error) {
+      if (!isAuthError(error)) toast.error("Failed to load donor information");
+    }
+  };
+
+  const addDonorLink = async () => {
+    if (!editItem) return;
+    if (!newLink.donorId) { toast.error("Choose a donor"); return; }
+    try {
+      await api.post("/sponsorships", { ...newLink, fellowId: editItem._id });
+      toast.success("Donor linked");
+      setNewLink({ donorId: "", program: "", startDate: "", endDate: "" });
+      fetchDonorData();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Failed to link donor"));
+    }
+  };
+
+  const removeDonorLink = async (s: Sponsorship) => {
+    if (!window.confirm(`Remove ${s.donorName} from this fellow? This deletes the record. To keep history, use "End" instead.`)) return;
+    try {
+      await api.delete(`/sponsorships/${s._id}`);
+      toast.success("Donor removed");
+      fetchDonorData();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Failed to remove donor"));
+    }
+  };
+
+  const endDonorLink = async (s: Sponsorship) => {
+    try {
+      await api.put(`/sponsorships/${s._id}`, { status: "Ended", endDate: s.endDate || new Date().toISOString().split("T")[0] });
+      toast.success(`${s.donorName} marked as ended`);
+      fetchDonorData();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Failed to update donor"));
+    }
+  };
+
+  const openReplace = (f: Fellow) => {
+    setReplaceTarget(f);
+    setReplaceForm({
+      leftDate: new Date().toISOString().split("T")[0], leftReason: "", mode: "existing", replacementFellowId: "",
+      name: "", email: "", phone: "", batch: f.batch || "", password: "", joinDate: "", carryDonors: true, carryCentres: true, endReplacementDonors: true,
+    });
+  };
+
+  const handleReplace = async () => {
+    if (!replaceTarget) return;
+    const r = replaceForm;
+    if (r.mode === "existing" && !r.replacementFellowId) { toast.error("Choose the replacement fellow"); return; }
+    if (r.mode === "new" && (!r.name.trim() || !r.email.trim() || !r.phone.trim() || !r.password.trim())) {
+      toast.error("Fill in the new fellow's name, email, phone and password"); return;
+    }
+    setReplacing(true);
+    try {
+      const res = await api.post(`/fellows/${replaceTarget._id}/replace`, {
+        leftDate: r.leftDate || undefined,
+        leftReason: r.leftReason.trim() || undefined,
+        joinDate: r.joinDate || undefined,
+        carryDonors: r.carryDonors,
+        carryCentres: r.carryCentres,
+        endReplacementDonors: r.mode === "existing" && r.endReplacementDonors,
+        ...(r.mode === "existing"
+          ? { replacementFellowId: r.replacementFellowId }
+          : { newFellow: { name: r.name.trim(), email: r.email.trim(), phone: r.phone.trim(), batch: r.batch.trim(), password: r.password } }),
+      });
+      toast.success(res.data.message);
+      setReplaceTarget(null);
+      fetchData();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Failed to record replacement"));
+    } finally {
+      setReplacing(false);
+    }
   };
 
   const resetForm = () => { 
@@ -117,6 +247,7 @@ const FellowsPage = () => {
     setCentreEndDate(""); 
     setSelectedCentreIds([]); 
     setEditItem(null); 
+    setNewLink({ donorId: "", program: "", startDate: "", endDate: "" });
   };
 
   const openEdit = (f: Fellow) => {
@@ -178,8 +309,8 @@ const FellowsPage = () => {
       await api.delete(`/fellows/${id}`);
       toast.success("Fellow deleted successfully");
       fetchData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to delete fellow");
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Failed to delete fellow"));
     }
   };
 
@@ -337,6 +468,59 @@ const FellowsPage = () => {
                 </div>
               </div>
 
+              {/* Donors (saved immediately, separate from "Save Changes") */}
+              {editItem && isAdmin && (
+                <div className="space-y-2 border-t border-border/50 pt-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold flex items-center gap-1.5"><HandHeart className="h-3.5 w-3.5 text-primary" /> Donors</Label>
+                    <span className="text-[10px] text-muted-foreground font-semibold">Changes here save immediately</span>
+                  </div>
+                  {sponsorships.filter(s => s.fellowId === editItem._id).length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">No donor linked yet.</p>
+                  ) : (
+                    <div className="border border-border/40 rounded-xl divide-y">
+                      {sponsorships.filter(s => s.fellowId === editItem._id).map(s => (
+                        <div key={s._id} className="flex items-center justify-between gap-2 p-2 text-xs">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold">{s.donorName}</span>
+                              {s.program && <Badge variant="secondary" className="text-[9px] h-4 px-1 py-0 font-normal">{s.program}</Badge>}
+                              {s.status !== "Active" && <Badge variant="outline" className="text-[9px] h-4 px-1 py-0">{s.status}</Badge>}
+                            </div>
+                            {(s.startDate || s.endDate) && (
+                              <p className="text-[10px] text-muted-foreground">{formatDateDMY(s.startDate) || "…"} – {formatDateDMY(s.endDate) || "ongoing"}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {s.status === "Active" && (
+                              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => endDonorLink(s)}>End</Button>
+                            )}
+                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeDonorLink(s)} title="Remove">
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 bg-muted/20 rounded-xl p-2">
+                    <Select value={newLink.donorId} onValueChange={v => setNewLink({ ...newLink, donorId: v })}>
+                      <SelectTrigger className="rounded-lg text-xs h-8"><SelectValue placeholder={donorsList.length ? "Choose donor" : "Add donors first"} /></SelectTrigger>
+                      <SelectContent>
+                        {donorsList.map(d => <SelectItem key={d._id} value={d._id} className="text-xs">{d.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input list="donor-programs" placeholder="Program, e.g. Mix" value={newLink.program} onChange={e => setNewLink({ ...newLink, program: e.target.value })} className="rounded-lg text-xs h-8" />
+                    <datalist id="donor-programs">{programOptions.map(p => <option key={p} value={p} />)}</datalist>
+                    <Input type="date" title="Start date" value={newLink.startDate} onChange={e => setNewLink({ ...newLink, startDate: e.target.value })} className="rounded-lg text-xs h-8" />
+                    <Input type="date" title="End date" value={newLink.endDate} onChange={e => setNewLink({ ...newLink, endDate: e.target.value })} className="rounded-lg text-xs h-8" />
+                    <Button type="button" size="sm" variant="secondary" className="col-span-2 h-8 text-xs font-bold" onClick={addDonorLink}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Link Donor
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5 border-t border-border/50 pt-3">
                 <Label htmlFor="fellow-password" className="text-xs font-bold">Password {editItem && <span className="text-muted-foreground text-[10px] uppercase font-black tracking-widest">(Leave blank to keep unchanged)</span>}</Label>
                 <Input id="fellow-password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="rounded-xl font-medium text-xs" />
@@ -458,6 +642,19 @@ const FellowsPage = () => {
             </SelectContent>
           </Select>
         </div>
+        {isAdmin && donorsList.length > 0 && (
+          <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[170px]">
+            <HandHeart className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterDonor} onValueChange={setFilterDonor}>
+              <SelectTrigger><SelectValue placeholder="Donor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Donors</SelectItem>
+                {donorsList.map(d => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}
+                <SelectItem value="none">No donor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-4">
@@ -497,6 +694,9 @@ const FellowsPage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {isAdmin && !f.replacedByFellowId && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Mark Left & Replace" onClick={(e) => { e.stopPropagation(); openReplace(f); }}><Repeat className="h-3.5 w-3.5" /></Button>
+                  )}
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEdit(f); }}><Pencil className="h-3.5 w-3.5" /></Button>
                   {isMEManager && (
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => handleDelete(e, f._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -506,6 +706,32 @@ const FellowsPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col gap-2">
+                {(activeDonorsByFellow[f._id] || []).length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {activeDonorsByFellow[f._id].map(s => (
+                      <Badge key={s._id} title={s.program || undefined} className="text-[10px] font-semibold py-0 h-5 gap-1 bg-amber-100 text-amber-800 border-none hover:bg-amber-200">
+                        <HandHeart className="h-3 w-3" />{s.donorName}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {(f.replacesFellowId || f.replacedByFellowId) && (
+                  <div className="flex flex-wrap gap-1 text-[10px]">
+                    {f.replacesFellowId && fellowById[f.replacesFellowId] && (
+                      <button type="button" className="rounded-full border px-2 py-0.5 text-muted-foreground hover:bg-muted" onClick={() => { setFilterStatus("all"); setSearchQuery(fellowById[f.replacesFellowId!].name); }}>
+                        Replacement for <strong className="text-foreground">{fellowById[f.replacesFellowId].name}</strong>
+                      </button>
+                    )}
+                    {f.replacedByFellowId && fellowById[f.replacedByFellowId] && (
+                      <button type="button" className="rounded-full border px-2 py-0.5 text-muted-foreground hover:bg-muted flex items-center gap-1" onClick={() => { setFilterStatus("all"); setSearchQuery(fellowById[f.replacedByFellowId!].name); }}>
+                        Replaced by <ArrowRight className="h-2.5 w-2.5" /> <strong className="text-foreground">{fellowById[f.replacedByFellowId].name}</strong>
+                      </button>
+                    )}
+                  </div>
+                )}
+                {f.leftDate && (
+                  <p className="text-[10px] text-muted-foreground">Left on <strong className="text-foreground">{formatDateDMY(f.leftDate)}</strong>{f.leftReason ? ` · ${f.leftReason}` : ""}</p>
+                )}
                 <div className="flex flex-wrap gap-1">
                   {fellowCentres.map(centre => (
                     <Badge key={centre._id} variant="secondary" className="text-[10px] font-normal">{centre.name.includes(' - ') ? centre.name.split(" - ")[1] : centre.name}</Badge>
@@ -560,6 +786,107 @@ const FellowsPage = () => {
           </Card>
         )})}
       </div>
+
+      {/* Mark Left & Replace */}
+      <Dialog open={!!replaceTarget} onOpenChange={(v) => { if (!v) setReplaceTarget(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl">
+          {replaceTarget && (
+            <>
+              <div className="bg-primary p-6 text-white flex-shrink-0">
+                <DialogTitle className="text-xl font-black tracking-tight">Replace {replaceTarget.name}</DialogTitle>
+                <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Marks them as Left and links the new fellow</p>
+              </div>
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="left-date" className="text-xs font-bold">Leaving date</Label>
+                    <Input id="left-date" type="date" value={replaceForm.leftDate} onChange={e => setReplaceForm({ ...replaceForm, leftDate: e.target.value })} className="rounded-xl text-xs" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="join-date" className="text-xs font-bold">Replacement joins on</Label>
+                    <Input id="join-date" type="date" value={replaceForm.joinDate} onChange={e => setReplaceForm({ ...replaceForm, joinDate: e.target.value })} className="rounded-xl text-xs" />
+                    <p className="text-[10px] text-muted-foreground">Defaults to the leaving date</p>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="left-reason" className="text-xs font-bold">Reason for leaving (optional)</Label>
+                  <Input id="left-reason" value={replaceForm.leftReason} onChange={e => setReplaceForm({ ...replaceForm, leftReason: e.target.value })} className="rounded-xl text-xs" />
+                </div>
+
+                <div className="space-y-2 border-t border-border/50 pt-3">
+                  <Label className="text-xs font-bold">Replacement fellow</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["existing", "new"] as const).map(m => (
+                      <Button key={m} type="button" variant={replaceForm.mode === m ? "default" : "outline"} size="sm" className="text-xs rounded-xl"
+                        onClick={() => setReplaceForm({ ...replaceForm, mode: m })}>
+                        {m === "existing" ? "Already in the app" : "Add a new fellow"}
+                      </Button>
+                    ))}
+                  </div>
+                  {replaceForm.mode === "existing" ? (
+                    <Select value={replaceForm.replacementFellowId} onValueChange={v => setReplaceForm({ ...replaceForm, replacementFellowId: v })}>
+                      <SelectTrigger className="rounded-xl text-xs"><SelectValue placeholder="Choose fellow" /></SelectTrigger>
+                      <SelectContent>
+                        {fellowsList
+                          .filter(x => x._id !== replaceTarget._id && !x.replacesFellowId && (x.status || "Active") === "Active")
+                          .map(x => <SelectItem key={x._id} value={x._id} className="text-xs">{x.name} · Batch {x.batch || "N/A"}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input placeholder="Full name" value={replaceForm.name} onChange={e => setReplaceForm({ ...replaceForm, name: e.target.value })} className="rounded-xl text-xs" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input type="email" placeholder="Email" value={replaceForm.email} onChange={e => setReplaceForm({ ...replaceForm, email: e.target.value })} className="rounded-xl text-xs" />
+                        <Input placeholder="Phone" value={replaceForm.phone} onChange={e => setReplaceForm({ ...replaceForm, phone: e.target.value })} className="rounded-xl text-xs" />
+                        <Input placeholder="Batch, e.g. 5.0" value={replaceForm.batch} onChange={e => setReplaceForm({ ...replaceForm, batch: e.target.value })} className="rounded-xl text-xs" />
+                        <Input type="password" placeholder="Password" value={replaceForm.password} onChange={e => setReplaceForm({ ...replaceForm, password: e.target.value })} className="rounded-xl text-xs" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-border/50 pt-3 text-xs">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" className="mt-0.5" checked={replaceForm.carryDonors} onChange={e => setReplaceForm({ ...replaceForm, carryDonors: e.target.checked })} />
+                    <span>
+                      <strong>Carry over donors</strong>
+                      <span className="block text-[10px] text-muted-foreground">
+                        {(activeDonorsByFellow[replaceTarget._id] || []).map(s => s.donorName).join(", ") || "No active donors"}
+                        {" "}move to the new fellow. The history stays with {replaceTarget.name}.
+                      </span>
+                    </span>
+                  </label>
+                  {replaceForm.mode === "existing" && (activeDonorsByFellow[replaceForm.replacementFellowId] || []).length > 0 && (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5" checked={replaceForm.endReplacementDonors} onChange={e => setReplaceForm({ ...replaceForm, endReplacementDonors: e.target.checked })} />
+                      <span>
+                        <strong>End {fellowById[replaceForm.replacementFellowId]?.name}'s current donors</strong>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {activeDonorsByFellow[replaceForm.replacementFellowId].map(s => s.donorName).join(", ")} will be marked Ended on the join date,
+                          e.g. when a self-funded fellow moves into this donor's seat
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" className="mt-0.5" checked={replaceForm.carryCentres} onChange={e => setReplaceForm({ ...replaceForm, carryCentres: e.target.checked })} />
+                    <span>
+                      <strong>Assign the same centres</strong>
+                      <span className="block text-[10px] text-muted-foreground">Adds the new fellow to {replaceTarget.name}'s centres</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div className="p-4 bg-muted/20 border-t flex items-center justify-end gap-3 flex-shrink-0">
+                <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold text-xs">Cancel</Button></DialogClose>
+                <Button onClick={handleReplace} disabled={replacing} className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10">
+                  {replacing ? "Saving..." : "Confirm Replacement"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
