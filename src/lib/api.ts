@@ -147,10 +147,9 @@ if (!MIDTOUCH_API_URL.endsWith("/api") && !MIDTOUCH_API_URL.endsWith("/api/")) {
   MIDTOUCH_API_URL = MIDTOUCH_API_URL.replace(/\/$/, "") + "/api";
 }
 
-// Facilitators sign in on this app's login page, then use the Mid touch app at /mid-touch
-// (same domain, so it reads the login saved under this key).
-export const MIDTOUCH_APP_PATH = import.meta.env.VITE_MIDTOUCH_APP_PATH || "/mid-touch/";
-export const MIDTOUCH_USER_KEY = "manzil_midtouch_user";
+// Facilitators use the Mid touch app on its own website and sign in there.
+// This app is for admins, managers and fellows; admins manage Mid touch here with the switch.
+export const MIDTOUCH_APP_URL = (import.meta.env.VITE_MIDTOUCH_APP_URL || "https://mm-ltm-mid-touch.vercel.app").replace(/\/$/, "");
 
 const storedUser = (): { role?: string; programModel?: string } | undefined => {
   try {

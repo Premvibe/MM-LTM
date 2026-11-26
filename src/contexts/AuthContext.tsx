@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import api, { clearApiCache, AUTH_EXPIRED_EVENT, MIDTOUCH_API_URL, MIDTOUCH_USER_KEY } from "@/lib/api";
+import api, { clearApiCache, AUTH_EXPIRED_EVENT, MIDTOUCH_API_URL, MIDTOUCH_APP_URL } from "@/lib/api";
 
 export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
@@ -23,8 +23,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isMEManager: boolean;
-  /** Resolves "mid-touch" for a facilitator, who continues in the Mid touch app */
-  login: (email: string, password: string) => Promise<"app" | "mid-touch">;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
 }
@@ -41,24 +40,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // One login page for everyone. Admins, managers and fellows are in the High touch backend;
-  // if the email isn't found there, try Mid touch facilitators. A facilitator's login is saved
-  // for the Mid touch app (same domain) and the caller sends them there.
-  const login = useCallback(async (email: string, password: string): Promise<"app" | "mid-touch"> => {
+  // Admins, managers and fellows sign in here (High touch backend). Facilitators have their own
+  // Mid touch website: if the details are a facilitator's, point them there instead of signing in.
+  const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await api.post("/auth/login", { email, password });
       const userData = response.data;
       setUser(userData);
       localStorage.setItem("manzil_user", JSON.stringify(userData));
-      return "app";
     } catch (error: any) {
-      if (!error.response || error.response.status === 401) {
-        try {
-          const mid = await api.post("/auth/login", { email, password }, { baseURL: MIDTOUCH_API_URL });
-          localStorage.setItem(MIDTOUCH_USER_KEY, JSON.stringify(mid.data));
-          return "mid-touch";
-        } catch {
-          // Not a facilitator either
+      if (error.response?.status === 401) {
+        const isFacilitator = await api
+          // Short timeout: a sleeping Mid touch server shouldn't hold up a wrong-password message
+          .post("/auth/login", { email, password }, { baseURL: MIDTOUCH_API_URL, timeout: 8000 })
+          .then(() => true, () => false);
+        if (isFacilitator) {
+          throw new Error(`Facilitators sign in on the Mid Touch website: ${MIDTOUCH_APP_URL.replace(/^https?:\/\//, "")}`);
         }
       }
       // Same message for a wrong password and an unknown email, so it doesn't reveal which accounts exist

@@ -1,17 +1,17 @@
 {
-  "rewrites": [
+  "redirects": [
     {
       "source": "/mid-touch",
-      "destination": "https://mm-ltm-mid-touch.vercel.app/mid-touch/"
-    },
-    {
-      "source": "/mid-touch/",
-      "destination": "https://mm-ltm-mid-touch.vercel.app/mid-touch/"
+      "destination": "https://mm-ltm-mid-touch.vercel.app/",
+      "permanent": false
     },
     {
       "source": "/mid-touch/:path*",
-      "destination": "https://mm-ltm-mid-touch.vercel.app/mid-touch/:path*"
-    },
+      "destination": "https://mm-ltm-mid-touch.vercel.app/:path*",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"

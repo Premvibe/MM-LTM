@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import api, { MIDTOUCH_API_URL, MIDTOUCH_APP_PATH } from "@/lib/api";
+import api from "@/lib/api";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -22,12 +22,7 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const destination = await login(email, password);
-      if (destination === "mid-touch") {
-        // Facilitators use the Mid touch app; it picks up the login just saved
-        window.location.assign(`${MIDTOUCH_APP_PATH}dashboard`);
-        return;
-      }
+      await login(email, password);
       navigate("/dashboard");
     } catch (err: any) {
       toast({ title: "Login Failed", description: err.message || "Invalid email or password", variant: "destructive" });
@@ -44,12 +39,7 @@ const LoginPage = () => {
     }
     setLoading(true);
     try {
-      // The email may be a fellow (High touch) or a facilitator (Mid touch): tell both
-      const results = await Promise.allSettled([
-        api.post('/auth/forgot-password', { email }),
-        api.post('/auth/forgot-password', { email }, { baseURL: MIDTOUCH_API_URL }),
-      ]);
-      if (results.every(r => r.status === "rejected")) throw new Error("Request failed");
+      await api.post('/auth/forgot-password', { email });
       toast({ title: "Request Sent", description: "A password reset request has been sent to the Admin." });
       setIsForgotPassword(false);
     } catch {
