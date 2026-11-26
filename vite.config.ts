@@ -11,6 +11,10 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: true,
     },
+    // Local copy of the Vercel rewrite: /mid-touch is the Mid touch app (npm run dev on port 8081)
+    proxy: {
+      "/mid-touch": { target: "http://localhost:8081", ws: true },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

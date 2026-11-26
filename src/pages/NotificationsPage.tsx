@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useTerms } from "@/contexts/ProgramContext";
 
 const iconMap = {
   warning: AlertTriangle,
@@ -28,6 +29,7 @@ const colorMap = {
 };
 
 const NotificationsPage = () => {
+  const terms = useTerms();
   const { user } = useAuth();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,7 +119,7 @@ const NotificationsPage = () => {
         recipientRole: "fellow",
         recipientId: replyingTo.relatedEntityId
       });
-      toast.success("Reply sent to fellow");
+      toast.success(`Reply sent to ${terms.fellow}`);
       setReplyingTo(null);
       setReplyMessage("");
     } catch (error) {
@@ -257,8 +259,8 @@ const NotificationsPage = () => {
                                   ? `To: ${adminsList.find(a => a._id === n.recipientId)?.name || 'Unknown Manager'}`
                                   : 'To: All Program Managers'
                                 : n.recipientId 
-                                  ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || 'Unknown Fellow'}` 
-                                  : 'To: All Fellows'}
+                                  ? `To: ${fellowsList.find(f => f._id === n.recipientId)?.name || `Unknown ${terms.Fellow}`}` 
+                                  : `To: All ${terms.Fellows}`}
                           </Badge>
                         )}
                       </div>
@@ -343,7 +345,7 @@ const NotificationsPage = () => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Reply className="h-5 w-5 text-primary" />
-            Reply to Fellow
+            Reply to {terms.Fellow}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -354,7 +356,7 @@ const NotificationsPage = () => {
           <div className="space-y-2">
             <Label>Your Message</Label>
             <Textarea 
-              placeholder="Type your message to the fellow here..." 
+              placeholder={`Type your message to the ${terms.fellow} here...`} 
               value={replyMessage}
               onChange={(e) => setReplyMessage(e.target.value)}
               className="min-h-[120px] rounded-2xl resize-none"
@@ -405,14 +407,14 @@ const NotificationsPage = () => {
                     <SelectSeparator />
 
                     <SelectGroup>
-                      <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">Fellows</SelectLabel>
-                      <SelectItem value="all_fellows" className="font-bold">All Fellows</SelectItem>
+                      <SelectLabel className="bg-muted/30 uppercase tracking-widest text-[10px] text-muted-foreground pt-3 pb-1">{terms.Fellows}</SelectLabel>
+                      <SelectItem value="all_fellows" className="font-bold">All {terms.Fellows}</SelectItem>
                       {fellowsList.map(f => <SelectItem key={f._id} value={f._id} className="pl-8">{f.name}</SelectItem>)}
                     </SelectGroup>
                   </>
                 ) : (
                   <>
-                    <SelectItem value="all_my_fellows" className="font-bold">All My Fellows</SelectItem>
+                    <SelectItem value="all_my_fellows" className="font-bold">All My {terms.Fellows}</SelectItem>
                     <SelectSeparator />
                     {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
                   </>

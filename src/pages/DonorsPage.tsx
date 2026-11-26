@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HandHeart, Plus, Pencil, Trash2, Search, Filter, Users, Building2, Layers, Mail, Phone, User, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useTerms } from "@/contexts/ProgramContext";
 
 const DONOR_TYPES = ["Corporate CSR", "Foundation", "Individual", "Government", "Internal", "Other"] as const;
 
@@ -24,6 +25,7 @@ type Donor = {
   status: "Active" | "Inactive";
   notes?: string;
   activeFellowCount: number;
+  fundedFellowCount?: number; // Active + Ended
   totalFellowCount: number;
   programs: string[];
 };
@@ -38,6 +40,9 @@ type DetailSponsorship = {
   notes?: string;
   fellow: { _id: string; name: string; batch?: string; status?: string; replacesFellowId?: string; replacedByFellowId?: string } | null;
 };
+
+// "Mix" (from the donor sheet) means the fellows work in both in-school and after-school centres
+const programLabel = (p: string) => (p.trim().toLowerCase() === "mix" ? "Mix (In-school + After-school)" : p);
 
 const formatDate = (d?: string) =>
   d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
@@ -58,6 +63,7 @@ const sponsorshipBadge = (status: string) => {
 const emptyForm = { name: "", type: "Corporate CSR", contactPerson: "", contactEmail: "", contactPhone: "", status: "Active", notes: "" };
 
 const DonorsPage = () => {
+  const terms = useTerms();
   const { isSuperAdmin } = useAuth();
   const [donors, setDonors] = useState<Donor[]>([]);
   const [fundedNow, setFundedNow] = useState(0);
@@ -160,7 +166,7 @@ const DonorsPage = () => {
   const stats = [
     { label: "Donors", value: donors.length, icon: HandHeart, tone: "text-primary bg-primary/10" },
     { label: "Active Donors", value: donors.filter(d => d.status === "Active").length, icon: Building2, tone: "text-emerald-600 bg-emerald-100" },
-    { label: "Fellows Funded Now", value: fundedNow, icon: Users, tone: "text-sky-600 bg-sky-100" },
+    { label: `${terms.Fellows} Funded Now`, value: fundedNow, icon: Users, tone: "text-sky-600 bg-sky-100" },
     { label: "Programs", value: donors.reduce((n, d) => n + d.programs.length, 0), icon: Layers, tone: "text-amber-600 bg-amber-100" },
   ];
 
@@ -169,7 +175,7 @@ const DonorsPage = () => {
       <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="page-title">Donors</h1>
-          <p className="page-description">CSR partners, foundations and other funders, and the fellows they support</p>
+          <p className="page-description">CSR partners, foundations and other funders, and the {terms.fellows} they support</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" />Add Donor</Button>
       </div>
@@ -213,7 +219,7 @@ const DonorsPage = () => {
         </div>
       ) : filtered.length === 0 ? (
         <Card><CardContent className="p-10 text-center text-sm text-muted-foreground">
-          {donors.length === 0 ? "No donors yet. Add your first donor to start linking fellows." : "No donors match your search."}
+          {donors.length === 0 ? `No donors yet. Add your first donor to start linking ${terms.fellows}.` : "No donors match your search."}
         </CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -246,7 +252,7 @@ const DonorsPage = () => {
               <CardContent className="space-y-3">
                 {d.programs.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {d.programs.map(p => <Badge key={p} variant="secondary" className="text-[10px] font-normal">{p}</Badge>)}
+                    {d.programs.map(p => <Badge key={p} variant="secondary" className="text-[10px] font-normal">{programLabel(p)}</Badge>)}
                   </div>
                 )}
                 {(d.contactPerson || d.contactEmail) && (
@@ -254,11 +260,16 @@ const DonorsPage = () => {
                 )}
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-muted-foreground text-xs">Fellows funded now</p>
-                    <p className="font-semibold">{d.activeFellowCount}</p>
+                    <p className="text-muted-foreground text-xs">{terms.Fellows} funded</p>
+                    <p className="font-semibold">
+                      {d.fundedFellowCount ?? d.activeFellowCount}
+                      {(d.fundedFellowCount ?? 0) > d.activeFellowCount && (
+                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">({d.activeFellowCount} active)</span>
+                      )}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-xs">All-time fellows</p>
+                    <p className="text-muted-foreground text-xs">All-time {terms.fellows}</p>
                     <p className="font-semibold">{d.totalFellowCount}</p>
                   </div>
                 </div>
@@ -333,7 +344,15 @@ const DonorsPage = () => {
               <div className="bg-primary p-6 text-white flex-shrink-0">
                 <DialogTitle className="text-xl font-black tracking-tight">{detail.name}</DialogTitle>
                 <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">
-                  {detail.type} · {detail.activeFellowCount} fellow{detail.activeFellowCount !== 1 ? "s" : ""} funded now
+                  {(() => {
+                    const fellowsWith = (st: string) => new Set(detail.sponsorships.filter(s => s.status === st).map(s => String(s.fellowId)));
+                    const activeIds = fellowsWith("Active");
+                    const endedIds = fellowsWith("Ended");
+                    const active = activeIds.size;
+                    const ended = [...endedIds].filter(id => !activeIds.has(id)).length;
+                    const funded = active + ended;
+                    return `${detail.type} · ${funded} ${funded !== 1 ? terms.fellows : terms.fellow} funded (${active} active · ${ended} ended)`;
+                  })()}
                 </p>
               </div>
               <div className="p-6 space-y-5 overflow-y-auto flex-1">
@@ -347,27 +366,27 @@ const DonorsPage = () => {
                 {detail.notes && <p className="text-xs bg-muted/40 rounded-xl p-3">{detail.notes}</p>}
 
                 {detailGroups.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No fellows linked yet. Link fellows from the Fellows page (edit a fellow → Donors).</p>
+                  <p className="text-sm text-muted-foreground">No {terms.fellows} linked yet. Link {terms.fellows} from the {terms.Fellows} page (edit a {terms.fellow} → Donors).</p>
                 ) : detailGroups.map(([program, rows]) => (
                   <div key={program}>
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
-                      {program} · {rows.filter(r => r.status === "Active").length} active
+                      {programLabel(program)} · {rows.filter(r => r.status === "Active").length} active
                     </h3>
                     <div className="border rounded-xl divide-y">
                       {rows.map(s => (
                         <div key={s._id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 text-xs ${s.status !== "Active" ? "opacity-70" : ""}`}>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold">{s.fellow?.name || "(deleted fellow)"}</span>
+                              <span className="font-semibold">{s.fellow?.name || `(deleted ${terms.fellow})`}</span>
                               {s.fellow?.batch && <Badge variant="outline" className="text-[9px] h-4 px-1 py-0">Batch {s.fellow.batch}</Badge>}
                               {sponsorshipBadge(s.status)}
                             </div>
                             {s.fellow?.replacesFellowId && (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">Replacement for {fellowNameById[s.fellow.replacesFellowId] || "a fellow who left"}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Replacement for {fellowNameById[s.fellow.replacesFellowId] || `a ${terms.fellow} who left`}</p>
                             )}
                             {s.fellow?.replacedByFellowId && (
                               <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                                Replaced by <ArrowRight className="h-2.5 w-2.5" /> {fellowNameById[s.fellow.replacedByFellowId] || "another fellow"}
+                                Replaced by <ArrowRight className="h-2.5 w-2.5" /> {fellowNameById[s.fellow.replacedByFellowId] || `another ${terms.fellow}`}
                               </p>
                             )}
                           </div>

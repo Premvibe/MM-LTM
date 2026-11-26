@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTerms } from "@/contexts/ProgramContext";
 
 type Fellow = { 
   _id: string; 
@@ -58,7 +59,10 @@ const formatDateDMY = (dateStr?: string) => {
 };
 
 const FellowsPage = () => {
+  const terms = useTerms();
   const { user, isMEManager, isSuperAdmin, isAdmin } = useAuth();
+  // Donor information is for admins and directors, not program managers
+  const canSeeDonors = isAdmin && user?.role !== "program_manager";
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +102,13 @@ const FellowsPage = () => {
     sponsorships.filter(s => s.status === "Active").forEach(s => { (m[s.fellowId] ||= []).push(s); });
     return m;
   }, [sponsorships]);
+  // Every donor link, current first, so fellows who left still show who funded them
+  const allDonorsByFellow = useMemo(() => {
+    const m: Record<string, Sponsorship[]> = {};
+    sponsorships.forEach(s => { (m[s.fellowId] ||= []).push(s); });
+    Object.values(m).forEach(list => list.sort((a, b) => Number(b.status === "Active") - Number(a.status === "Active")));
+    return m;
+  }, [sponsorships]);
   const programOptions = useMemo(
     () => Array.from(new Set(sponsorships.map(s => s.program).filter(Boolean))).sort() as string[],
     [sponsorships]
@@ -123,13 +134,13 @@ const FellowsPage = () => {
       const fellowCentres = centresList.filter(c => c.fellowIds.includes(f._id) || c.fellowIds.includes(f.id));
       const matchesType = filterType === "all" || fellowCentres.some(c => c.type === filterType);
 
-      const fellowDonors = activeDonorsByFellow[f._id] || [];
+      const fellowDonors = allDonorsByFellow[f._id] || [];
       const matchesDonor = filterDonor === "all" ||
         (filterDonor === "none" ? fellowDonors.length === 0 : fellowDonors.some(s => s.donorId === filterDonor));
-      
+
       return matchesSearch && matchesBatch && matchesType && matchesStatus && matchesDonor;
     });
-  }, [fellowsList, centresList, searchQuery, filterBatch, filterType, filterStatus, filterDonor, activeDonorsByFellow]);
+  }, [fellowsList, centresList, searchQuery, filterBatch, filterType, filterStatus, filterDonor, allDonorsByFellow]);
 
   useEffect(() => {
     fetchData();
@@ -154,7 +165,7 @@ const FellowsPage = () => {
 
   // Donor data comes from protected routes, so it loads separately and never blocks the fellow list
   const fetchDonorData = async () => {
-    if (!isAdmin) return;
+    if (!canSeeDonors) return;
     try {
       const [donorsRes, sponsorshipsRes] = await Promise.all([api.get("/donors"), api.get("/sponsorships")]);
       setDonorsList(donorsRes.data);
@@ -178,7 +189,7 @@ const FellowsPage = () => {
   };
 
   const removeDonorLink = async (s: Sponsorship) => {
-    if (!window.confirm(`Remove ${s.donorName} from this fellow? This deletes the record. To keep history, use "End" instead.`)) return;
+    if (!window.confirm(`Remove ${s.donorName} from this ${terms.fellow}? This deletes the record. To keep history, use "End" instead.`)) return;
     try {
       await api.delete(`/sponsorships/${s._id}`);
       toast.success("Donor removed");
@@ -209,9 +220,9 @@ const FellowsPage = () => {
   const handleReplace = async () => {
     if (!replaceTarget) return;
     const r = replaceForm;
-    if (r.mode === "existing" && !r.replacementFellowId) { toast.error("Choose the replacement fellow"); return; }
+    if (r.mode === "existing" && !r.replacementFellowId) { toast.error(`Choose the replacement ${terms.fellow}`); return; }
     if (r.mode === "new" && (!r.name.trim() || !r.email.trim() || !r.phone.trim() || !r.password.trim())) {
-      toast.error("Fill in the new fellow's name, email, phone and password"); return;
+      toast.error(`Fill in the new ${terms.fellow}'s name, email, phone and password`); return;
     }
     setReplacing(true);
     try {
@@ -270,7 +281,7 @@ const FellowsPage = () => {
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) { toast.error("Please fill in name, email, and phone"); return; }
-    if (!editItem && !password.trim()) { toast.error("Password is required for new fellows"); return; }
+    if (!editItem && !password.trim()) { toast.error(`Password is required for new ${terms.fellows}`); return; }
     
     const fellowData: any = { 
       name: name.trim(), 
@@ -289,28 +300,28 @@ const FellowsPage = () => {
     try {
       if (editItem) {
         await api.put(`/fellows/${editItem._id}`, fellowData);
-        toast.success("Fellow updated successfully");
+        toast.success(`${terms.Fellow} updated successfully`);
       } else {
         await api.post("/fellows", { ...fellowData, sessionsCompleted: 0, attendanceRate: 100 });
-        toast.success("Fellow added successfully");
+        toast.success(`${terms.Fellow} added successfully`);
       }
       fetchData();
       resetForm(); 
       setOpen(false);
     } catch (error) {
-      toast.error("Failed to save fellow");
+      toast.error(`Failed to save ${terms.fellow}`);
     }
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to permanently delete this fellow?")) return;
+    if (!window.confirm(`Are you sure you want to permanently delete this ${terms.fellow}?`)) return;
     try {
       await api.delete(`/fellows/${id}`);
-      toast.success("Fellow deleted successfully");
+      toast.success(`${terms.Fellow} deleted successfully`);
       fetchData();
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Failed to delete fellow"));
+      toast.error(apiErrorMessage(error, `Failed to delete ${terms.fellow}`));
     }
   };
 
@@ -333,18 +344,18 @@ const FellowsPage = () => {
     <div>
       <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">Fellows</h1>
-          <p className="page-description">Manage program fellows and track performance</p>
+          <h1 className="page-title">{terms.Fellows}</h1>
+          <p className="page-description">Manage program {terms.fellows} and track performance</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Fellow</Button>
+            <Button><Plus className="h-4 w-4 mr-2" />Add {terms.Fellow}</Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl">
             <div className="bg-primary p-6 text-white relative overflow-hidden flex-shrink-0">
               <div className="absolute -right-8 -top-8 h-32 w-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <DialogTitle className="text-xl font-black tracking-tight">{editItem ? "Edit Fellow" : "Add New Fellow"}</DialogTitle>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Fellow Profile, Centre Assignments & Records</p>
+              <DialogTitle className="text-xl font-black tracking-tight">{editItem ? `Edit ${terms.Fellow}` : `Add New ${terms.Fellow}`}</DialogTitle>
+              <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">{terms.Fellow} Profile, Centre Assignments & Records</p>
             </div>
             
             <div className="p-6 space-y-4 overflow-y-auto flex-1">
@@ -469,7 +480,7 @@ const FellowsPage = () => {
               </div>
 
               {/* Donors (saved immediately, separate from "Save Changes") */}
-              {editItem && isAdmin && (
+              {editItem && canSeeDonors && (
                 <div className="space-y-2 border-t border-border/50 pt-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold flex items-center gap-1.5"><HandHeart className="h-3.5 w-3.5 text-primary" /> Donors</Label>
@@ -529,7 +540,7 @@ const FellowsPage = () => {
 
             <div className="p-4 bg-muted/20 border-t flex items-center justify-end gap-3 flex-shrink-0">
               <DialogClose asChild><Button variant="ghost" className="rounded-xl font-bold text-xs">Cancel</Button></DialogClose>
-              <Button onClick={handleSubmit} className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10 shadow-lg shadow-primary/20">{editItem ? "Save Changes" : "Add Fellow"}</Button>
+              <Button onClick={handleSubmit} className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10 shadow-lg shadow-primary/20">{editItem ? "Save Changes" : `Add ${terms.Fellow}`}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -613,7 +624,7 @@ const FellowsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search fellows by name or email..." 
+            placeholder={`Search ${terms.fellows} by name or email...`} 
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -659,7 +670,7 @@ const FellowsPage = () => {
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest">
-          {filteredFellows.length} Fellow{filteredFellows.length !== 1 ? 's' : ''}
+          {filteredFellows.length} {filteredFellows.length !== 1 ? terms.Fellows : terms.Fellow}
         </h2>
       </div>
 
@@ -706,11 +717,16 @@ const FellowsPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col gap-2">
-                {(activeDonorsByFellow[f._id] || []).length > 0 && (
+                {(allDonorsByFellow[f._id] || []).length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {activeDonorsByFellow[f._id].map(s => (
+                    {allDonorsByFellow[f._id].map(s => s.status === "Active" ? (
                       <Badge key={s._id} title={s.program || undefined} className="text-[10px] font-semibold py-0 h-5 gap-1 bg-amber-100 text-amber-800 border-none hover:bg-amber-200">
                         <HandHeart className="h-3 w-3" />{s.donorName}
+                      </Badge>
+                    ) : (
+                      <Badge key={s._id} variant="outline" title={`${s.program ? s.program + " · " : ""}${s.status === "Transferred" ? "Moved to replacement" : "Ended"}`} className="text-[10px] font-normal py-0 h-5 gap-1 text-muted-foreground border-dashed">
+                        <HandHeart className="h-3 w-3" />{s.donorName}
+                        <span className="text-[9px] uppercase tracking-wide">{s.status === "Transferred" ? "· moved" : "· past"}</span>
                       </Badge>
                     ))}
                   </div>
@@ -794,7 +810,7 @@ const FellowsPage = () => {
             <>
               <div className="bg-primary p-6 text-white flex-shrink-0">
                 <DialogTitle className="text-xl font-black tracking-tight">Replace {replaceTarget.name}</DialogTitle>
-                <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Marks them as Left and links the new fellow</p>
+                <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Marks them as Left and links the new {terms.fellow}</p>
               </div>
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div className="grid grid-cols-2 gap-3">
@@ -814,18 +830,18 @@ const FellowsPage = () => {
                 </div>
 
                 <div className="space-y-2 border-t border-border/50 pt-3">
-                  <Label className="text-xs font-bold">Replacement fellow</Label>
+                  <Label className="text-xs font-bold">Replacement {terms.fellow}</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["existing", "new"] as const).map(m => (
                       <Button key={m} type="button" variant={replaceForm.mode === m ? "default" : "outline"} size="sm" className="text-xs rounded-xl"
                         onClick={() => setReplaceForm({ ...replaceForm, mode: m })}>
-                        {m === "existing" ? "Already in the app" : "Add a new fellow"}
+                        {m === "existing" ? "Already in the app" : `Add a new ${terms.fellow}`}
                       </Button>
                     ))}
                   </div>
                   {replaceForm.mode === "existing" ? (
                     <Select value={replaceForm.replacementFellowId} onValueChange={v => setReplaceForm({ ...replaceForm, replacementFellowId: v })}>
-                      <SelectTrigger className="rounded-xl text-xs"><SelectValue placeholder="Choose fellow" /></SelectTrigger>
+                      <SelectTrigger className="rounded-xl text-xs"><SelectValue placeholder={`Choose ${terms.fellow}`} /></SelectTrigger>
                       <SelectContent>
                         {fellowsList
                           .filter(x => x._id !== replaceTarget._id && !x.replacesFellowId && (x.status || "Active") === "Active")
@@ -846,24 +862,27 @@ const FellowsPage = () => {
                 </div>
 
                 <div className="space-y-2 border-t border-border/50 pt-3 text-xs">
+                  {/* Program managers don't see donors; donors still carry over by default */}
+                  {canSeeDonors && (
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" className="mt-0.5" checked={replaceForm.carryDonors} onChange={e => setReplaceForm({ ...replaceForm, carryDonors: e.target.checked })} />
                     <span>
                       <strong>Carry over donors</strong>
                       <span className="block text-[10px] text-muted-foreground">
                         {(activeDonorsByFellow[replaceTarget._id] || []).map(s => s.donorName).join(", ") || "No active donors"}
-                        {" "}move to the new fellow. The history stays with {replaceTarget.name}.
+                        {" "}move to the new {terms.fellow}. The history stays with {replaceTarget.name}.
                       </span>
                     </span>
                   </label>
-                  {replaceForm.mode === "existing" && (activeDonorsByFellow[replaceForm.replacementFellowId] || []).length > 0 && (
+                  )}
+                  {canSeeDonors && replaceForm.mode === "existing" && (activeDonorsByFellow[replaceForm.replacementFellowId] || []).length > 0 && (
                     <label className="flex items-start gap-2 cursor-pointer">
                       <input type="checkbox" className="mt-0.5" checked={replaceForm.endReplacementDonors} onChange={e => setReplaceForm({ ...replaceForm, endReplacementDonors: e.target.checked })} />
                       <span>
                         <strong>End {fellowById[replaceForm.replacementFellowId]?.name}'s current donors</strong>
                         <span className="block text-[10px] text-muted-foreground">
                           {activeDonorsByFellow[replaceForm.replacementFellowId].map(s => s.donorName).join(", ")} will be marked Ended on the join date,
-                          e.g. when a self-funded fellow moves into this donor's seat
+                          e.g. when a self-funded {terms.fellow} moves into this donor's seat
                         </span>
                       </span>
                     </label>
@@ -872,7 +891,7 @@ const FellowsPage = () => {
                     <input type="checkbox" className="mt-0.5" checked={replaceForm.carryCentres} onChange={e => setReplaceForm({ ...replaceForm, carryCentres: e.target.checked })} />
                     <span>
                       <strong>Assign the same centres</strong>
-                      <span className="block text-[10px] text-muted-foreground">Adds the new fellow to {replaceTarget.name}'s centres</span>
+                      <span className="block text-[10px] text-muted-foreground">Adds the new {terms.fellow} to {replaceTarget.name}'s centres</span>
                     </span>
                   </label>
                 </div>

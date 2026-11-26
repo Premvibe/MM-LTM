@@ -11,9 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { compareStudentsByClassAndName } from "@/lib/utils";
+import { useTerms } from "@/contexts/ProgramContext";
 
 type Centre = { _id: string; id: string; name: string; location: string; type: "In-school" | "After-school"; fellowIds: string[]; studentCount: number };
 type Fellow = { _id: string; id?: string; name: string; email?: string; phone?: string; centreIds?: string[]; sessionsCompleted?: number; attendanceRate?: number };
@@ -56,6 +57,8 @@ const getStudentDetails = (s: Student) => {
 };
 
 const AttendancePage = () => {
+  const terms = useTerms();
+  const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCentreId = searchParams.get("centre");
@@ -326,9 +329,9 @@ const AttendancePage = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Select value={filterFellow} onValueChange={setFilterFellow}>
-              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[130px] md:w-[180px]"><SelectValue placeholder="All Fellows" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[130px] md:w-[180px]"><SelectValue placeholder={`All ${terms.Fellows}`} /></SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-2xl">
-                <SelectItem value="all">All Fellows</SelectItem>
+                <SelectItem value="all">All {terms.Fellows}</SelectItem>
                 {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -540,7 +543,7 @@ const AttendancePage = () => {
                     <Button 
                       variant="outline" 
                       className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 h-10 border-primary/20 text-primary hover:bg-primary/5" 
-                      onClick={() => window.location.href = '/sessions'}
+                      onClick={() => navigate('/sessions')}
                     >
                       Go to Sessions Hub
                     </Button>

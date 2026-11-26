@@ -2,6 +2,7 @@ import React from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProgram } from "@/contexts/ProgramContext";
 import api from "@/lib/api";
 import { useState, useEffect } from "react";
 import { Bell, User as UserIcon, LogOut, Settings } from "lucide-react";
@@ -18,6 +19,7 @@ import {
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { isMid } = useProgram();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -42,7 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-16 md:h-24 flex items-center justify-between border-b border-gray-100 bg-white/70 backdrop-blur-2xl px-4 md:px-10 shrink-0 z-10 sticky top-0 shadow-[0_1px_15px_rgba(0,0,0,0.02)]">
+          <header className={`h-16 md:h-24 flex items-center justify-between border-b ${isMid ? "border-violet-300 border-b-2" : "border-gray-100"} bg-white/70 backdrop-blur-2xl px-4 md:px-10 shrink-0 z-10 sticky top-0 shadow-[0_1px_15px_rgba(0,0,0,0.02)]`}>
             <div className="flex items-center gap-3 md:gap-6">
               <SidebarTrigger className="hover:bg-primary/5 transition-all h-10 w-10 md:h-12 md:w-12 rounded-2xl" />
               <div className="flex flex-col">
@@ -53,6 +55,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   M&E System — Manzil Mystics
                 </span>
               </div>
+              {isMid && (
+                <span className="rounded-full bg-violet-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow" title="You are viewing and editing Mid touch data (facilitators)">
+                  Mid Touch
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 md:gap-6">
               <Button variant="ghost" size="icon" onClick={() => navigate("/notifications")} className="relative h-10 w-10 md:h-12 md:w-12 bg-gray-50 border border-gray-100 rounded-2xl transition-all hover:bg-white hover:shadow-lg active:scale-95 group">

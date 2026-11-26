@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
 import { compareStudentsByClassAndName } from "@/lib/utils";
+import { useTerms } from "@/contexts/ProgramContext";
 
 type Session = {
   _id: string;
@@ -91,6 +92,7 @@ const formatDateDMY = (dateStr?: string) => {
 };
 
 const SessionsPage = () => {
+  const terms = useTerms();
   const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -668,7 +670,7 @@ const SessionsPage = () => {
             </div>
             <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-orange-700 mt-1">{overallRevision}</h3>
             <p className="text-[10px] font-bold text-orange-600/80 mt-0.5">
-              {overallRevision > 0 ? "Awaiting fellow update" : "0 in revision"}
+              {overallRevision > 0 ? `Awaiting ${terms.fellow} update` : "0 in revision"}
             </p>
           </div>
           <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
@@ -756,10 +758,10 @@ const SessionsPage = () => {
                 </div>
                 {isAdmin && (
                   <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Fellow</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{terms.Fellow}</Label>
                     <Select value={fellowId} onValueChange={setFellowId}>
                       <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11">
-                        <SelectValue placeholder="Select Fellow..." />
+                        <SelectValue placeholder={`Select ${terms.Fellow}...`} />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl border-none shadow-2xl">
                         {fellowsList.map(f => (
@@ -928,7 +930,7 @@ const SessionsPage = () => {
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
               <Input 
-                placeholder={viewMode === "centres" ? "Search centre by name, location, or fellow..." : "Search sessions by topic, centre, or fellow..."}
+                placeholder={viewMode === "centres" ? `Search centre by name, location, or ${terms.fellow}...` : `Search sessions by topic, centre, or ${terms.fellow}...`}
                 className="pl-11 h-11 rounded-xl border-none shadow-sm bg-white font-bold text-xs w-full focus-visible:ring-primary/20" 
                 value={viewMode === "centres" ? centreSearchQuery : searchQuery} 
                 onChange={(e) => viewMode === "centres" ? setCentreSearchQuery(e.target.value) : setSearchQuery(e.target.value)} 
@@ -1045,10 +1047,10 @@ const SessionsPage = () => {
             {isAdmin && (
               <Select value={filterCentreFellow} onValueChange={setFilterCentreFellow}>
                 <SelectTrigger className="w-[140px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
-                  <SelectValue placeholder="Fellow" />
+                  <SelectValue placeholder={terms.Fellow} />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
-                  <SelectItem value="all">All Fellows</SelectItem>
+                  <SelectItem value="all">All {terms.Fellows}</SelectItem>
                   {fellowsList
                     .filter(f => filterBatch === "all" || f.batch === filterBatch)
                     .map(f => (
@@ -1097,7 +1099,7 @@ const SessionsPage = () => {
               )}
               {filterCentreFellow !== "all" && (
                 <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
-                  Fellow: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
+                  {terms.Fellow}: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
                   <button onClick={() => setFilterCentreFellow("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
                 </Badge>
               )}
@@ -1666,10 +1668,10 @@ const SessionsPage = () => {
             {isAdmin && (
               <Select value={filterCentreFellow} onValueChange={setFilterCentreFellow}>
                 <SelectTrigger className="w-[140px] h-10 rounded-xl bg-white border-border/40 shadow-sm text-xs font-bold">
-                  <SelectValue placeholder="Fellow" />
+                  <SelectValue placeholder={terms.Fellow} />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl p-1 max-h-[300px]">
-                  <SelectItem value="all">All Fellows</SelectItem>
+                  <SelectItem value="all">All {terms.Fellows}</SelectItem>
                   {fellowsList
                     .filter(f => selectedCentre?.fellowIds?.includes(f._id || f.id) || !selectedCentre)
                     .map(f => (
@@ -1712,7 +1714,7 @@ const SessionsPage = () => {
               )}
               {filterCentreFellow !== "all" && (
                 <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 gap-1 pr-1">
-                  Fellow: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
+                  {terms.Fellow}: {fellowsList.find(f => (f._id || f.id) === filterCentreFellow)?.name || filterCentreFellow}
                   <button onClick={() => setFilterCentreFellow("all")} className="hover:bg-primary/10 rounded p-0.5"><X className="h-2.5 w-2.5" /></button>
                 </Badge>
               )}
@@ -2137,7 +2139,7 @@ const SessionsPage = () => {
                 <Textarea 
                   placeholder={
                     reviewStatus === 'revision_requested' 
-                      ? "Explain what the fellow needs to update (e.g. upload missing media, correct student attendance, or update session plan)..." 
+                      ? `Explain what the ${terms.fellow} needs to update (e.g. upload missing media, correct student attendance, or update session plan)...` 
                       : reviewStatus === 'rejected' 
                         ? "Why is this session rejected?" 
                         : "Optional note..."
@@ -2148,7 +2150,7 @@ const SessionsPage = () => {
                 />
                 {reviewStatus === 'revision_requested' && (
                   <p className="text-[11px] text-muted-foreground">
-                    A notification with your instructions will be sent directly to the fellow.
+                    A notification with your instructions will be sent directly to the {terms.fellow}.
                   </p>
                 )}
               </div>

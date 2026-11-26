@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, ClipboardCheck, Search } from "lucide-react";
+import { useTerms } from "@/contexts/ProgramContext";
 
 export type PauseRecord = {
   _id?: string;
@@ -61,6 +62,7 @@ type Student = {
 type Session = { _id: string; id: string; date: string; centreId: string; fellowId: string; topic: string; duration: number; activities: string[]; studentsPresent: number; presentStudentIds?: string[]; reviewNote?: string };
 
 const CentreDetailPage = () => {
+  const terms = useTerms();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [centre, setCentre] = useState<Centre | null>(null);
@@ -483,11 +485,11 @@ const CentreDetailPage = () => {
       {/* Fellows */}
       <Card className="mb-6">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Assigned Fellows</CardTitle>
+          <CardTitle className="text-base">Assigned {terms.Fellows}</CardTitle>
         </CardHeader>
         <CardContent>
           {centreFellows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No fellows assigned.</p>
+            <p className="text-sm text-muted-foreground">No {terms.fellows} assigned.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {centreFellows.map(f => {

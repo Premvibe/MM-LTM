@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { DialogDescription } from "@/components/ui/dialog";
+import { useTerms } from "@/contexts/ProgramContext";
 
 export type PauseRecord = {
   _id?: string;
@@ -60,6 +61,7 @@ const getPMs = (c: Centre): string[] => {
 };
 
 const CentresPage = () => {
+  const terms = useTerms();
   const { user, isAdmin, isSuperAdmin, isMEManager } = useAuth();
   const navigate = useNavigate();
   const [centres, setCentres] = useState<Centre[]>([]);
@@ -181,7 +183,9 @@ const CentresPage = () => {
       setCentres(centresRes.data.sort((a: Centre, b: Centre) => a.name.localeCompare(b.name)));
       setFellowsList(fellowsRes.data.sort((a: Fellow, b: Fellow) => a.name.localeCompare(b.name)));
       if (adminsRes.data && Array.isArray(adminsRes.data)) {
-        setPmList(adminsRes.data.filter((a: any) => a.role === 'program_manager'));
+        // Program Manager – Mid Touch isn't picked per centre: they cover all Mid touch centres,
+        // and never High touch ones
+        setPmList(adminsRes.data.filter((a: any) => a.role === 'program_manager' && a.programModel !== 'mid'));
       }
     } catch (error) {
       toast.error("Failed to load data");
@@ -246,7 +250,7 @@ const CentresPage = () => {
       
       const limit = type === "In-school" ? 2 : 1;
       if (prev.length >= limit) {
-        toast.warning(`Maximum ${limit} fellow(s) allowed for ${type} centres`);
+        toast.warning(`Maximum ${limit} ${terms.fellow}(s) allowed for ${type} centres`);
         return prev;
       }
       return [...prev, fid];
@@ -256,11 +260,11 @@ const CentresPage = () => {
   const handleSubmit = async () => {
     if (!name.trim() || !location.trim()) { toast.error("Please fill in all fields"); return; }
     if (type === "In-school" && (selectedFellowIds.length < 1 || selectedFellowIds.length > 2)) {
-      toast.error("In-school centres must have 1 or 2 fellows assigned");
+      toast.error(`In-school centres must have 1 or 2 ${terms.fellows} assigned`);
       return;
     }
     if (type === "After-school" && selectedFellowIds.length !== 1) {
-      toast.error("After-school centres must have exactly 1 fellow assigned");
+      toast.error(`After-school centres must have exactly 1 ${terms.fellow} assigned`);
       return;
     }
 
@@ -385,8 +389,8 @@ const CentresPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="In-school">In-school (1-2 Fellows)</SelectItem>
-                    <SelectItem value="After-school">After-school (1 Fellow)</SelectItem>
+                    <SelectItem value="In-school">In-school (1-2 {terms.Fellows})</SelectItem>
+                    <SelectItem value="After-school">After-school (1 {terms.Fellow})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -426,7 +430,7 @@ const CentresPage = () => {
 
               <div className="space-y-3 pt-2">
                 <Label className="text-[13px] font-bold text-slate-800">
-                  Assign Fellows <span className="text-[11px] font-medium text-slate-500 font-normal">({type === "In-school" ? "1-2 required" : "1 required"})</span>
+                  Assign {terms.Fellows} <span className="text-[11px] font-medium text-slate-500 font-normal">({type === "In-school" ? "1-2 required" : "1 required"})</span>
                 </Label>
                 <div className="border border-slate-200 rounded-2xl p-4 space-y-4">
                   {Array.from(new Set(fellowsList.map(f => f.batch || "Unspecified"))).sort().reverse().map(batchVersion => (
@@ -465,7 +469,7 @@ const CentresPage = () => {
                   ))}
                 </div>
                 {((type === "In-school" && (selectedFellowIds.length < 1 || selectedFellowIds.length > 2)) || (type === "After-school" && selectedFellowIds.length !== 1)) && (
-                  <p className="text-[11px] font-medium text-red-500">Please select {type === "In-school" ? "1 or 2" : "exactly 1"} fellow{type === "In-school" ? "s" : ""} ({selectedFellowIds.length} selected)</p>
+                  <p className="text-[11px] font-medium text-red-500">Please select {type === "In-school" ? "1 or 2" : "exactly 1"} {type === "In-school" ? terms.fellows : terms.fellow} ({selectedFellowIds.length} selected)</p>
                 )}
               </div>
 
@@ -601,7 +605,7 @@ const CentresPage = () => {
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/50" />
             <Input 
-              placeholder="Search centres by name, location, or fellow..." 
+              placeholder={`Search centres by name, location, or ${terms.fellow}...`} 
               className="pl-10 h-10 rounded-xl border-border/40 bg-white/90 font-medium text-xs w-full shadow-none focus-visible:ring-primary/20" 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
@@ -687,10 +691,10 @@ const CentresPage = () => {
 
           <Select value={filterFellow} onValueChange={setFilterFellow}>
             <SelectTrigger className="h-8 rounded-xl border-border/40 bg-white/90 text-xs font-medium w-[130px] shadow-none">
-              <SelectValue placeholder="All Fellows" />
+              <SelectValue placeholder={`All ${terms.Fellows}`} />
             </SelectTrigger>
             <SelectContent className="rounded-xl shadow-xl">
-              <SelectItem value="all">All Fellows</SelectItem>
+              <SelectItem value="all">All {terms.Fellows}</SelectItem>
               {fellowsList
                 .filter(f => filterBatch === "all" || f.batch === filterBatch)
                 .map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}

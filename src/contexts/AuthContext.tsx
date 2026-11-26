@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import api, { clearApiCache, AUTH_EXPIRED_EVENT } from "@/lib/api";
+import api, { clearApiCache, AUTH_EXPIRED_EVENT, MIDTOUCH_API_URL, MIDTOUCH_USER_KEY } from "@/lib/api";
 
 export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
@@ -13,6 +13,8 @@ interface User {
   token?: string;
   assignedFellowIds?: string[];
   assignedCentreIds?: string[];
+  /** "mid" for a Program Manager – Mid Touch (works only in Mid touch) */
+  programModel?: "high" | "mid";
 }
 
 interface AuthContextType {
@@ -21,7 +23,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isMEManager: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolves "mid-touch" for a facilitator, who continues in the Mid touch app */
+  login: (email: string, password: string) => Promise<"app" | "mid-touch">;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
 }
@@ -38,13 +41,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = useCallback(async (email: string, password: string) => {
+  // One login page for everyone. Admins, managers and fellows are in the High touch backend;
+  // if the email isn't found there, try Mid touch facilitators. A facilitator's login is saved
+  // for the Mid touch app (same domain) and the caller sends them there.
+  const login = useCallback(async (email: string, password: string): Promise<"app" | "mid-touch"> => {
     try {
       const response = await api.post("/auth/login", { email, password });
       const userData = response.data;
       setUser(userData);
       localStorage.setItem("manzil_user", JSON.stringify(userData));
+      return "app";
     } catch (error: any) {
+      if (!error.response || error.response.status === 401) {
+        try {
+          const mid = await api.post("/auth/login", { email, password }, { baseURL: MIDTOUCH_API_URL });
+          localStorage.setItem(MIDTOUCH_USER_KEY, JSON.stringify(mid.data));
+          return "mid-touch";
+        } catch {
+          // Not a facilitator either
+        }
+      }
+      // Same message for a wrong password and an unknown email, so it doesn't reveal which accounts exist
+      if (!error.response) throw new Error("Couldn't reach the server. Please check your connection and try again.");
+      if (error.response.status === 401) throw new Error("Invalid email or password");
       throw new Error(error.response?.data?.message || "Invalid email or password");
     }
   }, []);

@@ -6,6 +6,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
+import { useProgram } from "@/contexts/ProgramContext";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -42,6 +43,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { model, isMid, canSwitch, setModel, terms } = useProgram();
 
   // On phones the sidebar is an overlay; close it once the user navigates
   React.useEffect(() => {
@@ -50,6 +52,10 @@ export function AppSidebar() {
 
   const filteredItems = navItems.filter(item => {
     if (!user) return false;
+    // Managers are added and edited only in High touch (admin accounts live there)
+    if (isMid && item.url === "/admins") return false;
+    // Donors page is for admins and directors, not program managers
+    if (item.url === "/donors" && user.role === "program_manager") return false;
     if (item.roles.includes(user.role)) return true;
     if (item.roles.includes("admin") && ["program_director", "program_lead", "program_manager", "m_e_manager"].includes(user.role)) {
       return true;
@@ -67,10 +73,36 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="animate-slide-in">
               <p className="text-lg font-[900] text-sidebar-foreground leading-none tracking-tighter">Manzil Mystics</p>
-              <p className="text-[10px] uppercase font-black text-accent tracking-[0.2em] mt-1.5">LTM Program</p>
+              <p className="text-[10px] uppercase font-black text-accent tracking-[0.2em] mt-1.5">LTM · {terms.programName}</p>
             </div>
           )}
         </div>
+        {canSwitch && !collapsed && (
+          <div role="radiogroup" aria-label="Program model" className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+            {([["high", "High Touch"], ["mid", "Mid Touch"]] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={model === value}
+                onClick={() => model !== value && setModel(value)}
+                className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all ${model === value ? (value === "mid" ? "bg-violet-600 text-white shadow" : "bg-background text-foreground shadow") : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {canSwitch && collapsed && (
+          <button
+            type="button"
+            title={`Switch to ${isMid ? "High Touch" : "Mid Touch"}`}
+            onClick={() => setModel(isMid ? "high" : "mid")}
+            className={`mt-3 h-7 w-full rounded-lg text-[10px] font-black ${isMid ? "bg-violet-600 text-white" : "bg-muted text-muted-foreground"}`}
+          >
+            {isMid ? "MID" : "HIGH"}
+          </button>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="px-3 py-4">
@@ -81,7 +113,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {filteredItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton 
                     asChild 
                     isActive={location.pathname === item.url} 
@@ -89,7 +121,7 @@ export function AppSidebar() {
                   >
                     <NavLink to={item.url} end activeClassName="text-primary">
                       <item.icon className={`h-5 w-5 transition-all duration-300 ${location.pathname === item.url ? 'scale-110 text-primary' : 'group-hover:scale-110 group-hover:text-primary'}`} />
-                      {!collapsed && <span className={`font-bold text-sm ${location.pathname === item.url ? 'text-primary' : 'text-sidebar-foreground'}`}>{item.title}</span>}
+                      {!collapsed && <span className={`font-bold text-sm ${location.pathname === item.url ? 'text-primary' : 'text-sidebar-foreground'}`}>{item.url === "/fellows" ? terms.Fellows : item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -105,7 +137,7 @@ export function AppSidebar() {
           <div className="mb-2 px-2">
             <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
             <p className="text-xs text-sidebar-foreground/60 capitalize">
-              {user.role === 'm_e_manager' ? 'M&E Manager' : user.role.replace(/_/g, " ")}
+              {user.role === 'm_e_manager' ? 'M&E Manager' : user.role === 'fellow' ? terms.Fellow : user.role === 'program_manager' && user.programModel === 'mid' ? 'Program Manager · Mid Touch' : user.role.replace(/_/g, " ")}
             </p>
           </div>
         )}

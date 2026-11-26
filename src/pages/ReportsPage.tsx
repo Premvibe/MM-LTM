@@ -14,10 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTerms } from "@/contexts/ProgramContext";
 
 const COLORS = ["#10b981", "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"];
 
 const ReportsPage = () => {
+  const terms = useTerms();
   const { user, isAdmin } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [stats, setStats] = useState<any>(null);
@@ -168,13 +170,13 @@ const ReportsPage = () => {
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col gap-1 w-full max-w-[140px]">
-          <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">Fellow</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">{terms.Fellow}</span>
           <Select value={filterFellow} onValueChange={(v) => { setFilterFellow(v); setFilterCentre("all"); }}>
             <SelectTrigger className="h-8 bg-slate-50 border-none rounded-lg text-xs font-semibold focus:ring-0">
-              <SelectValue placeholder="All Fellows" />
+              <SelectValue placeholder={`All ${terms.Fellows}`} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Fellows</SelectItem>
+              <SelectItem value="all">All {terms.Fellows}</SelectItem>
               {fellows.map(f => <SelectItem key={f._id || f.id} value={f._id || f.id}>{f.name}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -608,7 +610,7 @@ const ReportsPage = () => {
               </div>
               <div className="flex-1">
                 <p className="text-[11px] font-bold text-slate-800">12 sessions awaiting approval</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">Review logged sessions from fellows.</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Review logged sessions from {terms.fellows}.</p>
               </div>
               <Button variant="link" className="p-0 h-auto text-[10px] font-bold text-primary">View sessions <ChevronRight className="h-3 w-3 ml-0.5" /></Button>
             </div>
@@ -630,7 +632,7 @@ const ReportsPage = () => {
               </div>
               <div className="flex-1">
                 <p className="text-[11px] font-bold text-slate-800">5 sessions rejected</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">View rejection reasons and help fellows resubmit.</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">View rejection reasons and help {terms.fellows} resubmit.</p>
               </div>
               <Button variant="link" className="p-0 h-auto text-[10px] font-bold text-primary">View rejected <ChevronRight className="h-3 w-3 ml-0.5" /></Button>
             </div>

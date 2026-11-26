@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useTerms } from "@/contexts/ProgramContext";
 
 const getChangeIcon = (current: number, previous: number) => {
   if (previous === 0) return null;
@@ -19,7 +20,10 @@ const getChangeIcon = (current: number, previous: number) => {
 };
 
 const DashboardPage = () => {
+  const terms = useTerms();
   const { user, isAdmin } = useAuth();
+  // Donor information is for admins and directors, not program managers
+  const canSeeDonors = isAdmin && user?.role !== "program_manager";
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
@@ -31,6 +35,7 @@ const DashboardPage = () => {
   const [filterFellow, setFilterFellow] = useState<string>("all");
   const [filterModel, setFilterModel] = useState<string>("all");
   const [centreAttendanceFilter, setCentreAttendanceFilter] = useState<string>("all");
+  const [studentStatusFilter, setStudentStatusFilter] = useState<"all" | "active" | "inactive" | "left">("all");
   const [centres, setCentres] = useState<any[]>([]);
   const [fellows, setFellows] = useState<any[]>([]);
   const [filterDonor, setFilterDonor] = useState<string>("all");
@@ -53,9 +58,11 @@ const DashboardPage = () => {
         api.get(`/fellows${emailParams}`)
       ]).then(([cRes, fRes]) => { setCentres(cRes.data); setFellows(fRes.data); }).catch(() => {});
       // Donor data is on protected routes; if it fails the dashboard simply has no donor filter
-      Promise.all([api.get("/donors"), api.get("/sponsorships")])
-        .then(([dRes, sRes]) => { setDonors(dRes.data); setSponsorships(sRes.data); })
-        .catch(() => {});
+      if (canSeeDonors) {
+        Promise.all([api.get("/donors"), api.get("/sponsorships")])
+          .then(([dRes, sRes]) => { setDonors(dRes.data); setSponsorships(sRes.data); })
+          .catch(() => {});
+      }
     }
   }, [user]);
 
@@ -69,7 +76,11 @@ const DashboardPage = () => {
       .map(s => ({ link: s, fellow: byId(s.fellowId) }))
       .filter(r => r.fellow)
       .sort((a, b) => (a.link.program || "").localeCompare(b.link.program || "") || a.fellow.name.localeCompare(b.fellow.name));
-    return { current: pick(st => st === "Active"), past: pick(st => st !== "Active") };
+    const active = pick(st => st === "Active");
+    const activeIds = new Set(active.map(r => r.fellow._id));
+    // Ended fellows still count as funded; Transferred ones are covered by their replacement
+    const ended = pick(st => st === "Ended").filter(r => !activeIds.has(r.fellow._id));
+    return { current: [...active, ...ended], activeCount: active.length, endedCount: ended.length, past: pick(st => st === "Transferred") };
   }, [filterDonor, sponsorships, fellows]);
   const donorFellowIds = useMemo(
     () => (donorFellows ? new Set(donorFellows.current.map(r => r.fellow._id as string)) : null),
@@ -178,6 +189,15 @@ const DashboardPage = () => {
   };
 
   const studentChange = getChangeIcon(stats.totalStudents, stats.prevMonthData?.students || 0);
+  // Total Students card: All (incl. Left/Inactive) / Active / Left. Falls back to active-only figures for older API responses.
+  const studentCard: { total: number; males: number; females: number; unspecified: number } =
+    stats.studentBreakdown?.[studentStatusFilter] ?? {
+      total: stats.totalStudents,
+      males: stats.totalMales || 0,
+      females: stats.totalFemales || 0,
+      unspecified: stats.totalUnspecified ?? Math.max(0, stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0))),
+    };
+  const studentCardBadge = { all: "All", active: "Enrolled", inactive: "Inactive", left: "Left" }[studentStatusFilter];
   const sessionChange = getChangeIcon(stats.totalSessions, stats.prevMonthData?.sessions || 0);
   const assessmentChange = getChangeIcon(stats.totalAssessedStudents || 0, stats.prevMonthData?.assessments || 0);
   const scoreChange = getChangeIcon(parseFloat(stats.avgScore || 0), stats.prevMonthData?.avgScore || 0);
@@ -284,14 +304,14 @@ const DashboardPage = () => {
                 <SelectTrigger className="h-12 bg-white border border-gray-100 shadow-sm rounded-xl px-3.5 flex items-center justify-start text-left gap-3 w-40 hover:bg-gray-50/50 transition-colors focus:ring-0 [&>span]:w-full">
                   <User className="h-4 w-4 text-slate-500 shrink-0" />
                   <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-                    <span className="text-[10px] font-medium text-slate-500">Fellow</span>
+                    <span className="text-[10px] font-medium text-slate-500">{terms.Fellow}</span>
                     <span className="text-xs font-bold text-slate-900 truncate">
-                      <SelectValue placeholder="All Fellows" />
+                      <SelectValue placeholder={`All ${terms.Fellows}`} />
                     </span>
                   </div>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="all" className="text-xs font-semibold">All Fellows</SelectItem>
+                  <SelectItem value="all" className="text-xs font-semibold">All {terms.Fellows}</SelectItem>
                   {(() => {
                     const activeFellows = fellows.filter(f => f.status === 'Active' && (!donorFellowIds || donorFellowIds.has(f._id)));
                     const batches = [...new Set(activeFellows.map(f => f.batch || 'Unknown'))].sort();
@@ -362,17 +382,18 @@ const DashboardPage = () => {
                 <Badge variant="outline" className="text-[10px] font-semibold">{selectedDonor.type}</Badge>
               </CardTitle>
               <span className="text-xs text-muted-foreground font-semibold">
-                {donorFellows.current.length} fellow{donorFellows.current.length !== 1 ? "s" : ""} funded now
+                {donorFellows.current.length} {donorFellows.current.length !== 1 ? terms.fellows : terms.fellow} funded
+                {donorFellows.endedCount > 0 && ` (${donorFellows.activeCount} active · ${donorFellows.endedCount} ended)`}
                 {filterFellow !== "all" && (
                   <button type="button" className="ml-2 text-primary hover:underline" onClick={() => { setFilterFellow("all"); setFilterCentre("all"); }}>Show all</button>
                 )}
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground">The figures below cover these fellows' centres. Click a fellow to see only their numbers.</p>
+            <p className="text-[11px] text-muted-foreground">The figures below cover these {terms.fellows}' centres. Click a {terms.fellow} to see only their numbers.</p>
           </CardHeader>
           <CardContent>
             {donorFellows.current.length === 0 ? (
-              <p className="text-sm text-muted-foreground">This donor has no fellows linked right now.</p>
+              <p className="text-sm text-muted-foreground">This donor has no {terms.fellows} linked right now.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                 {donorFellows.current.map(({ link, fellow }) => {
@@ -390,6 +411,7 @@ const DashboardPage = () => {
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap">Batch {fellow.batch || "N/A"}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {link.status === "Ended" && <Badge className="text-[9px] h-4 px-1.5 py-0 font-bold uppercase tracking-widest bg-slate-100 text-slate-600 border-none">Ended</Badge>}
                         {link.program && <Badge variant="secondary" className="text-[9px] h-4 px-1.5 py-0 font-normal">{link.program}</Badge>}
                         {replaced && <span className="text-[10px] text-muted-foreground">Replacement for {replaced.name}</span>}
                       </div>
@@ -407,7 +429,7 @@ const DashboardPage = () => {
                 <span className="font-bold uppercase tracking-widest text-[9px] mr-1">Previously funded:</span>
                 {donorFellows.past.map(({ link, fellow }) => {
                   const by = fellow.replacedByFellowId ? fellows.find(f => f._id === fellow.replacedByFellowId) : null;
-                  return `${fellow.name}${by ? ` (replaced by ${by.name})` : link.status === "Ended" ? " (ended)" : ""}`;
+                  return `${fellow.name}${by ? ` (replaced by ${by.name})` : ""}`;
                 }).join(", ")}
               </p>
             )}
@@ -432,9 +454,23 @@ const DashboardPage = () => {
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Students</p>
               <div className="flex items-center gap-2 mt-2">
-                <p className="text-3xl font-black tracking-tight">{stats.totalStudents}</p>
-                <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[9px] font-bold uppercase tracking-widest">Enrolled</Badge>
+                <p className="text-3xl font-black tracking-tight">{studentCard.total}</p>
+                <Badge className={`${studentStatusFilter === "left" ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-blue-50 text-blue-600 border-blue-100"} text-[9px] font-bold uppercase tracking-widest`}>{studentCardBadge}</Badge>
               </div>
+              {stats.studentBreakdown && (
+                <Select value={studentStatusFilter} onValueChange={(v) => setStudentStatusFilter(v as typeof studentStatusFilter)}>
+                  <SelectTrigger className="mt-2 h-7 w-[120px] rounded-full text-[11px] font-semibold" aria-label="Filter students by status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["all", "active", "inactive", "left"] as const).map((key) => (
+                      <SelectItem key={key} value={key} className="text-xs capitalize">
+                        {key === "all" ? "All students" : key} ({stats.studentBreakdown[key]?.total ?? 0})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="h-11 w-11 rounded-xl bg-blue-50 flex items-center justify-center">
               <GraduationCap className="h-5 w-5 text-blue-500" />
@@ -442,25 +478,23 @@ const DashboardPage = () => {
           </div>
 
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className={`grid ${(stats.totalUnspecified ?? (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))) > 0 ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+            <div className={`grid ${studentCard.unspecified > 0 ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
               <div>
                 <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">Males</p>
-                <p className="text-base sm:text-lg font-black text-slate-800">{stats.totalMales !== undefined ? stats.totalMales : '-'}</p>
+                <p className="text-base sm:text-lg font-black text-slate-800">{studentCard.males}</p>
               </div>
               <div>
                 <p className="text-[9px] font-bold text-pink-600 uppercase tracking-widest">Females</p>
-                <p className="text-base sm:text-lg font-black text-slate-800">{stats.totalFemales !== undefined ? stats.totalFemales : '-'}</p>
+                <p className="text-base sm:text-lg font-black text-slate-800">{studentCard.females}</p>
               </div>
-              {(stats.totalUnspecified ?? (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))) > 0 && (
+              {studentCard.unspecified > 0 && (
                 <div>
                   <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest" title="Gender not yet recorded in student profile">Not Set</p>
-                  <p className="text-base sm:text-lg font-black text-slate-700">
-                    {stats.totalUnspecified !== undefined ? stats.totalUnspecified : (stats.totalStudents - ((stats.totalMales || 0) + (stats.totalFemales || 0)))}
-                  </p>
+                  <p className="text-base sm:text-lg font-black text-slate-700">{studentCard.unspecified}</p>
                 </div>
               )}
             </div>
-            {studentChange && (
+            {studentChange && studentStatusFilter === "active" && (
               <div className={`flex items-center gap-1 mt-3 text-[10px] font-bold ${studentChange.color}`}>
                 <studentChange.icon className="h-3 w-3" /> {studentChange.pct}% <span className="text-muted-foreground font-normal">vs last month</span>
               </div>
@@ -857,7 +891,7 @@ const DashboardPage = () => {
               <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center"><Users className="h-5 w-5 text-emerald-500" /></div>
               <div>
                 <p className="text-lg font-black">{stats.programOverview.totalFellows}</p>
-                <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">Total Fellows</p>
+                <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">Total {terms.Fellows}</p>
               </div>
             </div>
           </div>

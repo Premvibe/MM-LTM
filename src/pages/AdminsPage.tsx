@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "@/lib/api";
+import api, { MIDTOUCH_API_URL } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,17 @@ type Admin = {
   role: "admin" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
   assignedFellowIds?: string[];
   assignedCentreIds?: string[];
+  /** "mid" = Program Manager – Mid Touch */
+  programModel?: "high" | "mid";
+  midTouchFellowIds?: string[];
+  midTouchCentreIds?: string[];
 };
+
+// "program_manager_mid" exists only in this form: it is saved as role "program_manager" with
+// programModel "mid". This manager oversees every facilitator and centre in Mid touch
+// (including ones added later), so there is nothing to pick.
+type RoleChoice = Admin["role"] | "program_manager_mid";
+const isMidPM = (a: Admin) => a.role === "program_manager" && a.programModel === "mid";
 
 type Fellow = {
   _id: string;
@@ -43,6 +53,10 @@ const AdminsPage = () => {
   const [adminsList, setAdminsList] = useState<Admin[]>([]);
   const [fellowsList, setFellowsList] = useState<Fellow[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
+  // Mid touch facilitators and centres, counted on Program Manager – Mid Touch cards
+  const [midFellowsList, setMidFellowsList] = useState<Fellow[]>([]);
+  const [midCentresList, setMidCentresList] = useState<Centre[]>([]);
+  const [midLoadFailed, setMidLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Admin | null>(null);
@@ -51,7 +65,7 @@ const AdminsPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "program_director" | "program_lead" | "program_manager" | "m_e_manager">("program_manager");
+  const [role, setRole] = useState<RoleChoice>("program_manager");
   const [selectedFellowIds, setSelectedFellowIds] = useState<string[]>([]);
   const [selectedCentreIds, setSelectedCentreIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,6 +87,18 @@ const AdminsPage = () => {
       setAdminsList(adminsRes.data);
       setFellowsList(fellowsRes.data);
       setCentresList(centresRes.data);
+      // Mid touch lists come from the Mid touch backend; the page still works if it is down
+      const mid = await Promise.allSettled([
+        api.get("/fellows", { baseURL: MIDTOUCH_API_URL }),
+        api.get("/centres", { baseURL: MIDTOUCH_API_URL }),
+      ]);
+      if (mid[0].status === "fulfilled" && mid[1].status === "fulfilled") {
+        setMidFellowsList(mid[0].value.data);
+        setMidCentresList(mid[1].value.data);
+        setMidLoadFailed(false);
+      } else {
+        setMidLoadFailed(true);
+      }
     } catch (error) {
       toast.error("Failed to load administration data");
     } finally {
@@ -100,9 +126,15 @@ const AdminsPage = () => {
     setName(admin.name);
     setEmail(admin.email);
     setPassword("");
-    setRole(admin.role);
-    setSelectedFellowIds(admin.assignedFellowIds || []);
-    setSelectedCentreIds(admin.assignedCentreIds || []);
+    if (isMidPM(admin)) {
+      setRole("program_manager_mid");
+      setSelectedFellowIds([]);
+      setSelectedCentreIds([]);
+    } else {
+      setRole(admin.role);
+      setSelectedFellowIds(admin.assignedFellowIds || []);
+      setSelectedCentreIds(admin.assignedCentreIds || []);
+    }
     setOpen(true);
   };
 
@@ -122,13 +154,30 @@ const AdminsPage = () => {
     }
 
     try {
-      const payload: any = {
-        name,
-        email,
-        role,
-        assignedFellowIds: role === "program_manager" ? selectedFellowIds : [],
-        assignedCentreIds: role === "program_manager" ? selectedCentreIds : []
-      };
+      const isMidRole = role === "program_manager_mid";
+      const payload: any = isMidRole
+        ? {
+            // Mid touch program manager: no High touch access
+            name,
+            email,
+            role: "program_manager",
+            programModel: "mid",
+            assignedFellowIds: [],
+            assignedCentreIds: [],
+            // Covers all of Mid touch, so no individual picks are stored
+            midTouchFellowIds: [],
+            midTouchCentreIds: [],
+          }
+        : {
+            name,
+            email,
+            role,
+            programModel: "high",
+            assignedFellowIds: role === "program_manager" ? selectedFellowIds : [],
+            assignedCentreIds: role === "program_manager" ? selectedCentreIds : [],
+            // Leaving Mid touch PM for another role removes the Mid-only assignments
+            ...(editItem && isMidPM(editItem) ? { midTouchFellowIds: [], midTouchCentreIds: [] } : {}),
+          };
 
       if (password) {
         payload.password = password;
@@ -157,6 +206,17 @@ const AdminsPage = () => {
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to delete administrator");
     }
+  };
+
+  const isMidRole = role === "program_manager_mid";
+
+  const changeRole = (next: RoleChoice) => {
+    // A Mid touch PM has no individual picks
+    if (next === "program_manager_mid") {
+      setSelectedFellowIds([]);
+      setSelectedCentreIds([]);
+    }
+    setRole(next);
   };
 
   // Helper: get centre IDs assigned to a fellow (using centre.fellowIds as source of truth)
@@ -350,7 +410,7 @@ const AdminsPage = () => {
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">System Privilege / Role</Label>
                   <Select 
                     value={role} 
-                    onValueChange={(val: any) => setRole(val)}
+                    onValueChange={(val: RoleChoice) => changeRole(val)}
                   >
                     <SelectTrigger className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all h-11 text-xs font-bold">
                       <SelectValue placeholder="Select Privileged Role..." />
@@ -362,10 +422,17 @@ const AdminsPage = () => {
                       <SelectItem value="program_director" className="rounded-lg text-xs font-bold">Program Director (Super Admin)</SelectItem>
                       <SelectItem value="program_lead" className="rounded-lg text-xs font-bold">Program Lead (Super Admin)</SelectItem>
                       <SelectItem value="program_manager" className="rounded-lg text-xs font-bold">Program Manager (Admin - Scoped)</SelectItem>
+                      <SelectItem value="program_manager_mid" className="rounded-lg text-xs font-bold text-violet-700">Program Manager – Mid Touch (Facilitators)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
+                {isMidRole && (
+                  <p className="rounded-xl bg-violet-50 p-3 text-[11px] font-medium text-violet-800 border-t border-muted">
+                    This manager works only in <strong>Mid Touch</strong> and oversees <strong>all facilitators and
+                    centres</strong> there, including ones added later. They sign in to this app, which opens in Mid Touch.
+                  </p>
+                )}
                 {role === "program_manager" && (
                   <div className="space-y-5 pt-2 border-t border-muted">
                     {/* Fellows Selection */}
@@ -566,13 +633,26 @@ const AdminsPage = () => {
                       </div>
                     </div>
                   </div>
-                  <Badge variant={getRoleBadgeVariant(admin.role)} className="rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest">
-                    {getRoleLabel(admin.role)}
-                  </Badge>
+                  {isMidPM(admin) ? (
+                    <Badge className="rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest bg-violet-600 text-white border-none hover:bg-violet-600">
+                      Program Manager · Mid Touch
+                    </Badge>
+                  ) : (
+                    <Badge variant={getRoleBadgeVariant(admin.role)} className="rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest">
+                      {getRoleLabel(admin.role)}
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-0 space-y-4">
-                {admin.role === "program_manager" ? (
+                {isMidPM(admin) ? (
+                  <div className="space-y-2 border-t border-primary/5 pt-4">
+                    <p className="text-[9px] font-black text-violet-700 uppercase tracking-widest bg-violet-50 rounded-xl p-2 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 stroke-[2]" />
+                      All Mid Touch facilitators{midLoadFailed ? "" : ` (${midFellowsList.length})`} &amp; centres{midLoadFailed ? "" : ` (${midCentresList.length})`}
+                    </p>
+                  </div>
+                ) : admin.role === "program_manager" ? (
                   <div className="space-y-4 border-t border-primary/5 pt-4">
                     {/* Fellows Display */}
                     <div className="space-y-2">

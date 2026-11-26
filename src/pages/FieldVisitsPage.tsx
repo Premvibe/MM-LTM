@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
+import { useTerms } from "@/contexts/ProgramContext";
 
 type Visit = { 
   _id: string; 
@@ -50,6 +51,7 @@ const formatDateDMY = (dateStr?: string) => {
 };
 
 const FieldVisitsPage = () => {
+  const terms = useTerms();
   const { user } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [centresList, setCentresList] = useState<Centre[]>([]);
@@ -115,7 +117,7 @@ const FieldVisitsPage = () => {
             date: s.date,
             centreId: s.centreId,
             centre: centresData.find((c: any) => c._id === s.centreId)?.name || "Unknown",
-            observer: "Fellow (Session)",
+            observer: `${terms.Fellow} (Session)`,
             observations: s.observations || "No observations recorded.",
             issues: s.issues || "None",
             rating: "Good",

@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { compareStudentsByClassAndName } from "@/lib/utils";
+import { useTerms } from "@/contexts/ProgramContext";
 
 export const RUBRIC_POINTERS: Record<string, { title: string; subtitle: string; levels: { score: number; desc: string }[] }> = {
   involvement: {
@@ -302,6 +303,7 @@ const formatDateDMY = (dateStr?: string) => {
 };
 
 const AssessmentsPage = () => {
+  const terms = useTerms();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCentreId = searchParams.get("centre");
@@ -625,9 +627,9 @@ const AssessmentsPage = () => {
             <div className="h-6 w-px bg-primary/10 mx-1 hidden md:block" />
 
             <Select value={filterFellow} onValueChange={setFilterFellow}>
-              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[160px]"><SelectValue placeholder="All Fellows" /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs w-[160px]"><SelectValue placeholder={`All ${terms.Fellows}`} /></SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-2xl">
-                <SelectItem value="all">All Fellows</SelectItem>
+                <SelectItem value="all">All {terms.Fellows}</SelectItem>
                 {fellowsList.map(f => <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>)}
               </SelectContent>
             </Select>

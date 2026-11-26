@@ -14,6 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload, DriveFile } from "@/components/ui/file-upload";
 import { FileGallery } from "@/components/ui/file-gallery";
+import { useTerms } from "@/contexts/ProgramContext";
 
 type Centre = { 
   _id: string; 
@@ -79,6 +80,7 @@ const getPMs = (c: Centre): string[] => {
 };
 
 const ChangeStoriesPage = () => {
+  const terms = useTerms();
   const { user, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCentreId = searchParams.get("centre");
@@ -272,7 +274,7 @@ const ChangeStoriesPage = () => {
         reviewedBy: user?.name || user?.email || "Admin",
         reviewComment: reviewComment.trim(),
       });
-      const msg = status === "approved" ? "Story approved!" : status === "rejected" ? "Story rejected & notification sent to fellow" : "Revision requested & notification sent to fellow";
+      const msg = status === "approved" ? "Story approved!" : status === "rejected" ? `Story rejected & notification sent to ${terms.fellow}` : `Revision requested & notification sent to ${terms.fellow}`;
       toast.success(msg);
       setReviewOpen(false);
       setReviewingStory(null);
@@ -334,7 +336,7 @@ const ChangeStoriesPage = () => {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/40" />
             <Input
-              placeholder="Search centre, fellow, or PM..."
+              placeholder={`Search centre, ${terms.fellow}, or PM...`}
               className="pl-9 h-10 rounded-xl border-none shadow-sm bg-white/60 font-bold text-xs"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -345,10 +347,10 @@ const ChangeStoriesPage = () => {
             {/* Filter by Fellow */}
             <Select value={filterFellow} onValueChange={setFilterFellow}>
               <SelectTrigger className="h-10 rounded-xl border-none shadow-sm bg-white/70 font-bold text-xs w-[145px]">
-                <SelectValue placeholder="All Fellows" />
+                <SelectValue placeholder={`All ${terms.Fellows}`} />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-2xl max-h-[280px]">
-                <SelectItem value="all" className="font-bold text-xs">All Fellows</SelectItem>
+                <SelectItem value="all" className="font-bold text-xs">All {terms.Fellows}</SelectItem>
                 {fellows
                   .slice()
                   .sort((a, b) => a.name.localeCompare(b.name))
@@ -715,7 +717,7 @@ const ChangeStoriesPage = () => {
                 className="rounded-xl border-muted-foreground/10 bg-muted/30 focus:bg-white transition-all min-h-[90px] resize-y text-xs" 
               />
               <p className="text-[11px] text-muted-foreground">
-                When revision is requested or rejected, a notification will be delivered directly to the fellow.
+                When revision is requested or rejected, a notification will be delivered directly to the {terms.fellow}.
               </p>
             </div>
           </div>
