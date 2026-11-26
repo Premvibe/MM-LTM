@@ -139,7 +139,7 @@ export type ProgramModel = "high" | "mid";
 const PROGRAM_MODEL_KEY = "manzil_program_model";
 const HIGH_TOUCH_ONLY_PREFIXES = ["/auth", "/admins"];
 
-export let MIDTOUCH_API_URL = import.meta.env.VITE_MIDTOUCH_API_URL || "https://mm-mid-touch-backend.onrender.com/api";
+export let MIDTOUCH_API_URL = import.meta.env.VITE_MIDTOUCH_API_URL || "https://mm-ltm-midtouch-backend.onrender.com/api";
 if (import.meta.env.DEV && !import.meta.env.VITE_MIDTOUCH_API_URL) {
   MIDTOUCH_API_URL = "http://localhost:5002/api";
 }

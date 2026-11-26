@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/mid-touch",
-      "destination": "https://mm-mid-touch.vercel.app/mid-touch/"
+      "destination": "https://mm-ltm-mid-touch.vercel.app/mid-touch/"
     },
     {
       "source": "/mid-touch/:path*",
-      "destination": "https://mm-mid-touch.vercel.app/mid-touch/:path*"
+      "destination": "https://mm-ltm-mid-touch.vercel.app/mid-touch/:path*"
     },
     {
       "source": "/(.*)",
