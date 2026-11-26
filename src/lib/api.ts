@@ -126,18 +126,14 @@ api.interceptors.response.use(undefined, (error) => {
 });
 
 // ---------------------------------------------------------------------------
-// Program model: High touch (this app's own backend) or Mid touch
+// Mid touch
 //
-// Admins and managers can switch to Mid touch. Their requests then go to the
-// Mid touch backend, which has its own database (facilitators, centres,
-// students, sessions ...). Logins and the Managers page always stay on the
-// High touch backend, because admin accounts live only there. Fellows are
-// always High touch.
+// This app is always High touch. Mid touch has its own website and backend, with its own
+// database. Admins and managers open it with the sidebar's High Touch / Mid Touch switch and
+// sign in there with the same account. This app only calls the Mid touch backend for the
+// Managers page (counts) and to recognise a facilitator who tries to sign in here.
 // ---------------------------------------------------------------------------
 export type ProgramModel = "high" | "mid";
-
-const PROGRAM_MODEL_KEY = "manzil_program_model";
-const HIGH_TOUCH_ONLY_PREFIXES = ["/auth", "/admins"];
 
 export let MIDTOUCH_API_URL = import.meta.env.VITE_MIDTOUCH_API_URL || "https://mm-ltm-midtouch-backend.onrender.com/api";
 if (import.meta.env.DEV && !import.meta.env.VITE_MIDTOUCH_API_URL) {
@@ -147,54 +143,27 @@ if (!MIDTOUCH_API_URL.endsWith("/api") && !MIDTOUCH_API_URL.endsWith("/api/")) {
   MIDTOUCH_API_URL = MIDTOUCH_API_URL.replace(/\/$/, "") + "/api";
 }
 
-// Facilitators use the Mid touch app on its own website and sign in there.
-// This app is for admins, managers and fellows; admins manage Mid touch here with the switch.
-export const MIDTOUCH_APP_URL = (import.meta.env.VITE_MIDTOUCH_APP_URL || "https://mm-ltm-mid-touch.vercel.app").replace(/\/$/, "");
-
-const storedUser = (): { role?: string; programModel?: string } | undefined => {
-  try {
-    const saved = localStorage.getItem("manzil_user");
-    return saved ? JSON.parse(saved) : undefined;
-  } catch {
-    return undefined;
-  }
-};
+// Local development: the Mid touch app's dev server (npm run dev in manzil-connect-midtouch)
+export const MIDTOUCH_APP_URL = (
+  import.meta.env.VITE_MIDTOUCH_APP_URL ||
+  (import.meta.env.DEV ? "http://localhost:8081" : "https://mm-ltm-mid-touch.vercel.app")
+).replace(/\/$/, "");
 
 /** Mid touch is available to every signed-in user except fellows. */
 export const canUseMidTouch = (role?: string) => !!role && role !== "fellow";
 
-/** A Program Manager – Mid Touch works only in Mid touch. */
+/** A Program Manager – Mid Touch works only in Mid touch, on its own website. */
 export const isMidTouchOnly = (user?: { role?: string; programModel?: string } | null) =>
   !!user && canUseMidTouch(user.role) && user.programModel === "mid";
 
-export function getProgramModel(): ProgramModel {
+/** Earlier versions loaded Mid touch inside this app and remembered the choice; forget it. */
+export function forgetOldProgramChoice() {
   try {
-    const user = storedUser();
-    if (isMidTouchOnly(user)) return "mid";
-    if (localStorage.getItem(PROGRAM_MODEL_KEY) === "mid" && canUseMidTouch(user?.role)) return "mid";
+    localStorage.removeItem("manzil_program_model");
   } catch {
-    // Storage unavailable: default to High touch
+    // Storage unavailable: nothing to forget
   }
-  return "high";
 }
-
-export function setProgramModel(model: ProgramModel) {
-  try {
-    if (model === "mid") localStorage.setItem(PROGRAM_MODEL_KEY, "mid");
-    else localStorage.removeItem(PROGRAM_MODEL_KEY);
-  } catch {
-    // Storage unavailable: the choice lasts until the page reloads
-  }
-  clearApiCache();
-}
-
-api.interceptors.request.use((config) => {
-  const path = (config.url || "").split("?")[0];
-  if (getProgramModel() === "mid" && !HIGH_TOUCH_ONLY_PREFIXES.some((p) => path.startsWith(p))) {
-    config.baseURL = MIDTOUCH_API_URL;
-  }
-  return config;
-});
 
 /** Append extra query params to a path that may already have a query string, e.g. "/sessions?role=fellow&email=…". */
 export function withQuery(path: string, extra: Record<string, string | number | boolean | undefined>) {

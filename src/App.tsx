@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { AppLayout } from "@/components/AppLayout";
+import LoginHandoff from "@/components/LoginHandoff";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const CentresPage = lazy(() => import("./pages/CentresPage"));
@@ -103,6 +104,7 @@ function AppRoutes() {
       <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
       <Route path="/admins" element={<ProtectedRoute><ManagersRoute /></ProtectedRoute>} />
       <Route path="/change-stories" element={<ProtectedRoute><ChangeStoriesPage /></ProtectedRoute>} />
+      <Route path="/handoff" element={<LoginHandoff storageKey="manzil_user" allowMidOnly={false} />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<NotFound />} />

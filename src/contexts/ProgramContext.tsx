@@ -1,16 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { canUseMidTouch, getProgramModel, isMidTouchOnly, setProgramModel, type ProgramModel } from "@/lib/api";
+import { handoffUrl } from "@/components/LoginHandoff";
+import { canUseMidTouch, isMidTouchOnly, forgetOldProgramChoice, MIDTOUCH_APP_URL, type ProgramModel } from "@/lib/api";
 
 /**
- * Which program model the app is showing: High touch (fellows) or Mid touch (facilitators).
- *
- * Admins and managers can switch; fellows always see High touch. The API layer sends
- * requests to the matching backend (see lib/api.ts), and pages use useTerms() so that
- * "Fellow" reads "Facilitator" in Mid touch.
- *
- * The Mid touch app (manzil-connect-midtouch) has its own copy of this file that is
- * fixed to Mid touch, so shared pages work unchanged in both apps.
+ * This app is always High touch (fellows). Mid touch has its own website
+ * (manzil-connect-midtouch, mm-ltm-mid-touch.vercel.app) for facilitators, admins and managers.
+ * Admins and managers get the sidebar's High Touch / Mid Touch switch: choosing Mid Touch opens
+ * that website. Pages use useTerms() so the same page files work in both apps.
  */
 
 export type Terms = {
@@ -38,36 +35,22 @@ const ProgramContext = createContext<ProgramContextType | null>(null);
 
 export function ProgramProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  // A Program Manager – Mid Touch is always in Mid touch, so gets no switch
-  const midOnly = isMidTouchOnly(user);
-  const canSwitch = canUseMidTouch(user?.role) && !midOnly;
-  const [model, setModelState] = useState<ProgramModel>(getProgramModel);
+  const canSwitch = canUseMidTouch(user?.role) && !isMidTouchOnly(user);
 
-  // Fellows (or a signed-out user) always get High touch; Mid touch program managers always Mid
-  useEffect(() => {
-    if (midOnly) {
-      if (model !== "mid") setModelState("mid");
-    } else if (!canSwitch && model !== "high") {
-      setProgramModel("high");
-      setModelState("high");
-    } else if (canSwitch && model !== getProgramModel()) {
-      // Signed in as an admin who left Mid touch selected last time
-      setModelState(getProgramModel());
-    }
-  }, [canSwitch, midOnly, model]);
+  useEffect(forgetOldProgramChoice, []);
 
+  // Opens the Mid touch website, signed in with the same account
   const setModel = useCallback((next: ProgramModel) => {
-    setProgramModel(next);
-    setModelState(next);
-  }, []);
+    if (next === "mid" && user) window.location.assign(handoffUrl(MIDTOUCH_APP_URL, user));
+  }, [user]);
 
   const value = useMemo<ProgramContextType>(() => ({
-    model,
-    isMid: model === "mid",
+    model: "high",
+    isMid: false,
     canSwitch,
     setModel,
-    terms: model === "mid" ? MID_TOUCH_TERMS : HIGH_TOUCH_TERMS,
-  }), [model, canSwitch, setModel]);
+    terms: HIGH_TOUCH_TERMS,
+  }), [canSwitch, setModel]);
 
   return <ProgramContext.Provider value={value}>{children}</ProgramContext.Provider>;
 }

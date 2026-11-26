@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import api, { clearApiCache, AUTH_EXPIRED_EVENT, MIDTOUCH_API_URL, MIDTOUCH_APP_URL } from "@/lib/api";
+import api, { clearApiCache, AUTH_EXPIRED_EVENT, MIDTOUCH_API_URL, MIDTOUCH_APP_URL, isMidTouchOnly } from "@/lib/api";
+
+const MIDTOUCH_SITE = MIDTOUCH_APP_URL.replace(/^https?:\/\//, "");
 
 export type UserRole = "admin" | "fellow" | "mne_officer" | "program_director" | "program_lead" | "program_manager" | "m_e_manager";
 
@@ -34,20 +36,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem("manzil_user");
-      return saved ? JSON.parse(saved) : null;
+      const parsed = saved ? JSON.parse(saved) : null;
+      // A Program Manager – Mid Touch now works only on the Mid touch website
+      if (isMidTouchOnly(parsed)) {
+        localStorage.removeItem("manzil_user");
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
   });
 
-  // Admins, managers and fellows sign in here (High touch backend). Facilitators have their own
-  // Mid touch website: if the details are a facilitator's, point them there instead of signing in.
+  // Admins, managers and fellows sign in here (High touch backend). Facilitators and the
+  // Program Manager – Mid Touch use the Mid touch website, so point them there instead.
   const login = useCallback(async (email: string, password: string) => {
+    let userData: User;
     try {
       const response = await api.post("/auth/login", { email, password });
-      const userData = response.data;
-      setUser(userData);
-      localStorage.setItem("manzil_user", JSON.stringify(userData));
+      userData = response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
         const isFacilitator = await api
@@ -55,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .post("/auth/login", { email, password }, { baseURL: MIDTOUCH_API_URL, timeout: 8000 })
           .then(() => true, () => false);
         if (isFacilitator) {
-          throw new Error(`Facilitators sign in on the Mid Touch website: ${MIDTOUCH_APP_URL.replace(/^https?:\/\//, "")}`);
+          throw new Error(`Facilitators sign in on the Mid Touch website: ${MIDTOUCH_SITE}`);
         }
       }
       // Same message for a wrong password and an unknown email, so it doesn't reveal which accounts exist
@@ -63,6 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error.response.status === 401) throw new Error("Invalid email or password");
       throw new Error(error.response?.data?.message || "Invalid email or password");
     }
+    if (isMidTouchOnly(userData)) {
+      throw new Error(`Program Manager – Mid Touch signs in on the Mid Touch website: ${MIDTOUCH_SITE}`);
+    }
+    setUser(userData);
+    localStorage.setItem("manzil_user", JSON.stringify(userData));
   }, []);
 
   const logout = useCallback(() => {
